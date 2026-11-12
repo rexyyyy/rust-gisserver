@@ -1,7 +1,7 @@
 {
   "$schema": "https://json.schemastore.org/package",
   "name": "manager-ui",
-  "version": "0.1.0",
+  "version": "0.8.0",
   "description": "rust-gisserver 管理控制台前端（manager-ui）",
   "license": "MIT",
   "type": "module",
