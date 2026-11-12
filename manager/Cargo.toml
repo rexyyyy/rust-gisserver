@@ -6,4 +6,7 @@ resolver = "2"
 [workspace.package]
 version = "0.8.0"
 edition = "2021"
+# 管理控制台：AGPL-3.0-only + 商业授权例外（Commercial License Exception，
+# 全文见 LICENSE 末尾）。SPDX 无「AGPL + 例外」标准标识，故 license 字段仍
+# 声明 AGPL-3.0-only，例外条款以 LICENSE 附加文本为准。
 license = "AGPL-3.0-only"
