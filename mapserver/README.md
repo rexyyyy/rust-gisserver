@@ -400,7 +400,48 @@ python tools/bench_server.py --label before                # HTTP 层压测（QP
 
 ## 许可证 / License
 
-mapserver 采用 **AGPL-3.0-only** 授权，全文见 [LICENSE](LICENSE)；第三方组件声明见 [THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md)。
-核心库 gisserver（`../gisserver`）采用 **MIT OR Apache-2.0** 双许可，可独立用于闭源/商用开发。
+| 组件 | 许可证 | 闭源商用 |
+|---|---|---|
+| **gisserver 核心库**（`../gisserver`） | MIT OR Apache-2.0 | ✅ 允许，无需授权 |
+| **mapserver 服务端**（本项目） | AGPL-3.0-only + 商业授权例外 | ⚠️ 需购买商业授权（见下） |
+
+### AGPL-3.0 与商业授权例外
+
+mapserver 默认采用 **AGPL-3.0-only** 授权——这是一种「网络 copyleft」许可证：
+
+- ✅ **免费场景**：内部使用、个人学习、开源项目集成 → 直接用 AGPL-3.0，无任何费用
+- ⚠️ **商用 SaaS**：如果你把 mapserver 作为 SaaS 服务对外提供（如在线 GIS 平台、云端瓦片服务），AGPL-3.0 要求你向**所有网络用户**提供完整的服务端源代码
+- ⚠️ **闭源集成**：如果你想把 mapserver 嵌入到自己的商业 GIS 产品中，且不希望公开衍生代码
+
+上述两种场景需要购买**商业授权**（Commercial License Exception），购买后可：
+
+1. **闭源使用**：无 copyleft 约束，无需公开任何代码
+2. **无限分发**：可自由复制、修改、分发给客户、合作伙伴
+3. **定制开发**：按需加企业级功能（集群部署、读写分离、监控面板等）
+4. **技术支持**：优先 bug 修复、性能调优、架构咨询
+
+> 商业授权详情见 [LICENSE 末尾](#commercial-license-exception) 的完整条款。
+
+### 核心库 gisserver 的独立许可
+
+核心库 `gisserver`（纯 Rust，无 GDAL 依赖的 COG/瓦片/MVT 引擎）采用 **MIT OR Apache-2.0** 双许可——这是**最宽松的开源许可**：
+
+- ✅ 可闭源集成到任何商业产品（包括 C++ DLL、C# NuGet、Python wheel 等桥接层）
+- ✅ 无需购买任何授权
+- ✅ 无需保留衍生代码开源义务
+- ✅ Apache-2.0 额外提供**明确的专利授权**（消除侵权风险）
+
+### 商业合作 / 收购咨询
+
+本项目的核心技术卖点（**纯 Rust 自研 COG/BigTIFF 解析、零 GDAL/tiff/mapbox 重型 C 绑定、高性能瓦片渲染与缓存**）可闭源授权或整体收购：
+
+- **企业级 GIS 厂商**（如超图、中地数码、Esri 中国）→ 可将自研内核集成到商业 GIS 平台，替换旧 GDAL 依赖
+- **云服务商**（如阿里云、腾讯云）→ 可作为 GIS 云服务的瓦片/OGC API 引擎
+- **创业团队/个人开发者** → 可基于商业授权快速推出垂直 SaaS 产品
+- **整体收购** → 核心库 + 服务端 + 管理后台全栈技术交接
+
+**联系方式**：rex yang <13556388@qq.com>
+
+---
 
 Copyright (c) 2026 rex yang <13556388@qq.com> and contributors.
