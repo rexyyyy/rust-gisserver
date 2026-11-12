@@ -1,15 +1,55 @@
-//! PMTiles v3 reader: opens an archive, caches the header + root directory +
-//! metadata, and looks up a tile's bytes by (z,x,y) with positioned reads.
+//! PMTiles v3 archive reader.
+//!
+//! Layout recap (PMTiles v3 public spec): a fixed 127-byte header at offset 0
+//! is followed by four sections in order — root directory, metadata (a gzipped
+//! JSON document), leaf directories, and tile data. Directories are lists of
+//! entries; an entry either covers a run of consecutive TileIDs (`run_length >
+//! 0`) or points into the leaf-directory section (`run_length == 0`).
+//!
+//! The reader opens the file once, keeps the header and root directory in
+//! memory, and serves every later access through positioned reads on the
+//! shared file descriptor. Concurrent lookups therefore never fight over a
+//! seek cursor and each caller only ever observes the bytes it asked for.
 
 use super::codec::{deserialize_directory, gunzip, read_header};
 use super::{zxy_to_tileid, Entry, Header, PmResult};
 use std::fs::File;
 use std::path::Path;
 
-/// A read-only PMTiles archive. The file handle is shared and read with
-/// **positioned** reads (`crate::storage::read_exact_at`: Windows `seek_read`, Unix
-/// `read_at`), so concurrent tile lookups never serialize on a cursor and
-/// cannot observe each other's data.
+/// Size of the fixed v3 header, in bytes.
+const HEADER_BYTES: u64 = 127;
+
+/// A byte range inside the archive, checked before any allocation happens.
+struct Range {
+    offset: u64,
+    length: u64,
+}
+
+impl Range {
+    /// Reject ranges that fall outside `[0, file_len)` or overflow `u64`.
+    /// Offsets and lengths come from the archive itself, which is untrusted
+    /// input: a hostile header must not be able to trigger a huge allocation.
+    fn checked(offset: u64, length: u64, file_len: u64) -> PmResult<Range> {
+        let end = offset.checked_add(length).ok_or_else(|| {
+            format!("pmtiles: section at {offset} with length {length} overflows u64")
+        })?;
+        if end > file_len {
+            return Err(format!(
+                "pmtiles: section [{offset}, {end}) extends past the end of the {file_len}-byte archive"
+            ));
+        }
+        Ok(Range { offset, length })
+    }
+
+    fn read_within(&self, file: &File) -> PmResult<Vec<u8>> {
+        let mut buf = vec![0u8; self.length as usize];
+        crate::storage::read_exact_at(file, &mut buf, self.offset)
+            .map_err(|e| format!("pmtiles: positioned read at {} failed: {e}", self.offset))?;
+        Ok(buf)
+    }
+}
+
+/// Cached view of one PMTiles archive on disk.
 pub struct PmtilesReader {
     file: File,
     file_len: u64,
@@ -18,194 +58,194 @@ pub struct PmtilesReader {
     metadata: String,
 }
 
-/// Read `len` bytes at `offset`, rejecting any range outside `[0, file_len)`
-/// (offset/len come from an untrusted archive; a crafted huge len must not
-/// reach an over-large allocation).
-fn read_at(file: &File, file_len: u64, offset: u64, len: u64) -> PmResult<Vec<u8>> {
-    let end = offset
-        .checked_add(len)
-        .ok_or_else(|| format!("pmtiles: read {offset}+{len} overflows"))?;
-    if end > file_len {
-        return Err(format!("pmtiles: read {offset}+{len} exceeds file length {file_len}"));
-    }
-    let mut buf = vec![0u8; len as usize];
-    crate::storage::read_exact_at(file, &mut buf, offset).map_err(|e| format!("read: {e}"))?;
-    Ok(buf)
-}
-
 impl PmtilesReader {
+    /// Open `path` and validate + cache the header, root directory and
+    /// metadata JSON. Tile bytes themselves are read lazily.
     pub fn open(path: &Path) -> PmResult<PmtilesReader> {
-        let f = File::open(path).map_err(|e| format!("open {path:?}: {e}"))?;
-        let file_len = f.metadata().map_err(|e| format!("stat {path:?}: {e}"))?.len();
-        let head_bytes = read_at(&f, file_len, 0, 127)?;
-        let header = read_header(&head_bytes)?;
-        let root = deserialize_directory(&read_at(
-            &f,
-            file_len,
-            header.root_dir_offset,
-            header.root_dir_length,
-        )?)?;
-        let metadata = if header.metadata_length > 0 {
-            String::from_utf8(gunzip(&read_at(
-                &f,
-                file_len,
-                header.metadata_offset,
-                header.metadata_length,
-            )?)?)
-            .map_err(|e| format!("metadata utf8: {e}"))?
-        } else {
+        let file = File::open(path).map_err(|e| format!("pmtiles: cannot open {path:?}: {e}"))?;
+        let file_len = file
+            .metadata()
+            .map_err(|e| format!("pmtiles: cannot stat {path:?}: {e}"))?
+            .len();
+        if file_len < HEADER_BYTES {
+            return Err(format!(
+                "pmtiles: {path:?} is {file_len} bytes, shorter than the {HEADER_BYTES}-byte v3 header"
+            ));
+        }
+
+        let head = Range::checked(0, HEADER_BYTES, file_len)?.read_within(&file)?;
+        let header = read_header(&head)?;
+
+        let root = deserialize_directory(
+            &Range::checked(header.root_dir_offset, header.root_dir_length, file_len)?
+                .read_within(&file)?,
+        )?;
+
+        let metadata = if header.metadata_length == 0 {
             String::new()
+        } else {
+            let raw = Range::checked(header.metadata_offset, header.metadata_length, file_len)?
+                .read_within(&file)?;
+            let inflated = gunzip(&raw).map_err(|e| format!("pmtiles: metadata gunzip: {e}"))?;
+            String::from_utf8(inflated)
+                .map_err(|e| format!("pmtiles: metadata is not valid UTF-8: {e}"))?
         };
+
         Ok(PmtilesReader {
-            file: f,
-            file_len,
-            header,
-            root,
             metadata,
+            root,
+            header,
+            file_len,
+            file,
         })
     }
 
+    /// The decoded 127-byte v3 header.
     pub fn header(&self) -> &Header {
         &self.header
     }
 
+    /// The raw metadata JSON document (may be empty).
     pub fn metadata(&self) -> &str {
         &self.metadata
     }
 
-    /// The metadata JSON as a `serde_json::Value`, when parseable.
+    /// The metadata JSON parsed into a `serde_json::Value`, if it parses.
     pub fn metadata_json(&self) -> Option<serde_json::Value> {
         serde_json::from_str(&self.metadata).ok()
     }
 
-    /// The stored blob one tile entry points at (not decompressed).
-    pub fn entry_blob(&self, e: &Entry) -> PmResult<Vec<u8>> {
-        let off = self
-            .header
-            .tile_data_offset
-            .checked_add(e.offset)
-            .ok_or_else(|| "pmtiles: offset overflow".to_string())?;
-        read_at(&self.file, self.file_len, off, e.length)
-    }
-    /// The archive's declared tile type (MVT / PNG / ...).
+    /// Declared tile content type (see [`crate::pmtiles::tile_type`]).
     pub fn tile_type(&self) -> u8 {
         self.header.tile_type
     }
 
-    /// The tile compression scheme the archive declares.
+    /// Declared tile payload compression (see [`crate::pmtiles::compression`]).
     pub fn tile_compression(&self) -> u8 {
         self.header.tile_compression
     }
 
-    /// Look up one tile; returns `Ok(None)` when the archive has no such tile.
-    pub fn get(&self, z: u32, x: u32, y: u32) -> PmResult<Option<Vec<u8>>> {
-        let tile_id = zxy_to_tileid(z, x, y);
-        let entry = self.find_entry(&self.root, tile_id)?;
-        match entry {
-            None => Ok(None),
-            Some(e) if e.run_length == 0 => {
-                // Leaf-directory pointer: read the leaf dir, then search it.
-                let leaf = deserialize_directory(&read_at(
-                    &self.file,
-                    self.file_len,
-                    self.header.leaf_dirs_offset + e.offset,
-                    e.length,
-                )?)?;
-                match self.find_entry(&leaf, tile_id)? {
-                    None => Ok(None),
-                    Some(le) => self.entry_blob(&le).map(Some),
-                }
-            }
-            Some(e) => self.entry_blob(&e).map(Some),
-        }
+    /// Raw bytes of the tile-data blob one entry points at. The blob is
+    /// returned as stored — tile compression is *not* removed here.
+    pub fn entry_blob(&self, e: &Entry) -> PmResult<Vec<u8>> {
+        let offset = self
+            .header
+            .tile_data_offset
+            .checked_add(e.offset)
+            .ok_or_else(|| "pmtiles: tile offset overflows the archive".to_string())?;
+        Range::checked(offset, e.length, self.file_len)?.read_within(&self.file)
     }
 
-    /// Binary-search a sorted directory for the entry covering `tile_id`
-    /// (entries cover `[tile_id, tile_id + run_length)`; `run_length == 0`
-    /// entries are leaf pointers covering exactly one id).
-    fn find_entry(&self, dir: &[Entry], tile_id: u64) -> PmResult<Option<Entry>> {
-        let mut lo = 0usize;
-        let mut hi = dir.len();
-        while lo < hi {
-            let mid = (lo + hi) / 2;
-            if dir[mid].tile_id <= tile_id {
-                lo = mid + 1;
-            } else {
-                hi = mid;
-            }
+    /// Fetch one tile by (z,x,y). `Ok(None)` means the archive simply does
+    /// not contain that tile.
+    pub fn get(&self, z: u32, x: u32, y: u32) -> PmResult<Option<Vec<u8>>> {
+        let id = zxy_to_tileid(z, x, y);
+        let entry = match locate(&self.root, id) {
+            Some(e) => e,
+            None => return Ok(None),
+        };
+        if entry.run_length > 0 {
+            return self.entry_blob(&entry).map(Some);
         }
-        if lo == 0 {
-            return Ok(None);
+        // `run_length == 0` is a leaf-directory pointer. PMTiles v3 defines
+        // exactly one indirection level: root -> leaf -> tile.
+        let leaf_base = self.header.leaf_dirs_offset.checked_add(entry.offset).ok_or_else(
+            || "pmtiles: leaf directory offset overflows the archive".to_string(),
+        )?;
+        let leaf = deserialize_directory(
+            &Range::checked(leaf_base, entry.length, self.file_len)?.read_within(&self.file)?,
+        )?;
+        match locate(&leaf, id) {
+            Some(leaf_entry) => self.entry_blob(&leaf_entry).map(Some),
+            None => Ok(None),
         }
-        let e = dir[lo - 1];
-        if tile_id >= e.tile_id && tile_id < e.tile_id + e.run_length.max(1) {
-            Ok(Some(e))
-        } else {
-            Ok(None)
-        }
+    }
+}
+
+/// Find the directory entry that covers `id`, i.e. the last entry with
+/// `tile_id <= id` whose run `[tile_id, tile_id + max(run_length, 1))`
+/// contains it. Entries must be sorted by `tile_id`, as the format requires.
+fn locate(dir: &[Entry], id: u64) -> Option<Entry> {
+    // Index of the first entry strictly greater than `id`; the candidate is
+    // the entry just before it.
+    let idx = dir.partition_point(|e| e.tile_id <= id);
+    if idx == 0 {
+        return None;
+    }
+    let e = dir[idx - 1];
+    // A leaf pointer (`run_length == 0`) covers exactly one TileID.
+    let run = e.run_length.max(1);
+    if id < e.tile_id + run {
+        Some(e)
+    } else {
+        None
     }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::pmtiles::pack;
+    use crate::pmtiles::{compression, pack, tile_type};
     use std::sync::Arc;
 
+    /// Pack three z=1 tiles, reopen the archive and read each one back; also
+    /// confirm header accessors and that missing tiles resolve to `None`.
     #[test]
-    fn round_trips_a_packed_archive() {
-        let dir = tempfile::tempdir().unwrap();
-        let p = dir.path().join("t.pmtiles");
-        // Three tiles at z=1.
+    fn pack_then_read_round_trip() {
+        let tmp = tempfile::tempdir().unwrap();
+        let path = tmp.path().join("roundtrip.pmtiles");
         let tiles = vec![
-            ((1u32, 0u32, 0u32), b"tile-a".to_vec()),
-            ((1u32, 0u32, 1u32), b"tile-b".to_vec()),
-            ((1u32, 1u32, 1u32), b"tile-c".to_vec()),
+            ((1u32, 0u32, 0u32), b"alpha".to_vec()),
+            ((1u32, 0u32, 1u32), b"beta".to_vec()),
+            ((1u32, 1u32, 1u32), b"gamma".to_vec()),
         ];
-        pack::pack_tiles(
-            &p,
-            &tiles,
-            crate::pmtiles::tile_type::MVT,
-            crate::pmtiles::compression::NONE,
-            "test",
-        )
-        .unwrap();
-        let r = PmtilesReader::open(&p).unwrap();
-        assert_eq!(r.tile_type(), crate::pmtiles::tile_type::MVT);
-        assert_eq!(r.get(1, 0, 0).unwrap().unwrap(), b"tile-a");
-        assert_eq!(r.get(1, 0, 1).unwrap().unwrap(), b"tile-b");
-        assert_eq!(r.get(1, 1, 1).unwrap().unwrap(), b"tile-c");
-        assert!(r.get(1, 1, 0).unwrap().is_none());
-        assert!(r.get(2, 0, 0).unwrap().is_none());
+        pack::pack_tiles(&path, &tiles, tile_type::MVT, compression::NONE, "spec").unwrap();
+
+        let reader = PmtilesReader::open(&path).unwrap();
+        assert_eq!(reader.tile_type(), tile_type::MVT);
+        assert_eq!(reader.tile_compression(), compression::NONE);
+        assert!(reader.metadata_json().is_some());
+
+        for ((z, x, y), body) in &tiles {
+            assert_eq!(reader.get(*z, *x, *y).unwrap().unwrap(), body.as_slice());
+        }
+        // Present at z=1, absent one level down and off the Hilbert curve.
+        assert!(reader.get(1, 1, 0).unwrap().is_none());
+        assert!(reader.get(2, 0, 0).unwrap().is_none());
     }
 
-    /// The reader shares one fd across threads with positioned reads; every
-    /// concurrent lookup must return exactly its own tile's bytes (the old
-    /// Mutex+seek path could interleave and return another tile's data).
+    /// One descriptor, many threads: every concurrent `get` must observe its
+    /// own tile's bytes. Positioned reads (seek_read / read_at) make this
+    /// deterministic, unlike a shared seek cursor guarded by a Mutex.
     #[test]
-    fn concurrent_lookups_are_isolated() {
-        let dir = tempfile::tempdir().unwrap();
-        let p = dir.path().join("c.pmtiles");
+    fn threads_never_cross_contaminate_tiles() {
+        let tmp = tempfile::tempdir().unwrap();
+        let path = tmp.path().join("threads.pmtiles");
         let tiles: Vec<((u32, u32, u32), Vec<u8>)> = (0..16u32)
-            .map(|i| ((2u32, i % 4, i / 4), vec![b'a' + i as u8; 64]))
+            .map(|i| {
+                let fill = (0x20 + i) as u8; // distinct printable byte per tile
+                ((2u32, i % 4, i / 4), vec![fill; 96])
+            })
             .collect();
-        pack::pack_tiles(&p, &tiles, crate::pmtiles::tile_type::MVT, crate::pmtiles::compression::NONE, "t")
-            .unwrap();
-        let r = std::sync::Arc::new(PmtilesReader::open(&p).unwrap());
-        let mut handles = Vec::new();
-        for _ in 0..8 {
-            let r = Arc::clone(&r);
-            handles.push(std::thread::spawn(move || {
-                for _ in 0..200 {
-                    for i in 0..16u32 {
-                        let got = r.get(2, i % 4, i / 4).unwrap().unwrap();
-                        assert_eq!(got, vec![b'a' + i as u8; 64]);
+        pack::pack_tiles(&path, &tiles, tile_type::MVT, compression::NONE, "t").unwrap();
+
+        let reader = Arc::new(PmtilesReader::open(&path).unwrap());
+        let workers: Vec<_> = (0..8)
+            .map(|_| {
+                let reader = Arc::clone(&reader);
+                std::thread::spawn(move || {
+                    for _ in 0..200 {
+                        for i in 0..16u32 {
+                            let want = vec![(0x20 + i) as u8; 96];
+                            let got = reader.get(2, i % 4, i / 4).unwrap().unwrap();
+                            assert_eq!(got, want, "thread read tile {} bytes", i);
+                        }
                     }
-                }
-            }));
-        }
-        for h in handles {
-            h.join().expect("worker panicked");
+                })
+            })
+            .collect();
+        for w in workers {
+            w.join().expect("reader thread panicked");
         }
     }
 }
