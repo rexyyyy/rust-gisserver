@@ -145,7 +145,7 @@ fn run_serve(args: &ServeArgs) -> anyhow::Result<()> {
     // `.tpk`（ZIP 缓存包）解压落点：必须在 collect_layers() 触发 arcgis 网格
     // 注入（内部会 ArcgisCache::open→CacheDocs::load→tpk::ensure_dir）之前设好，
     // 否则退回系统临时目录。进程级一次注入，后续重读/刷新沿用。
-    arcgis_cache::tpk::set_cache_root(config.tpk_cache_root());
+    gisserver::arcgis_cache::tpk::set_cache_root(config.tpk_cache_root());
 
     // Layer catalog: merge legacy inline `layers:` with one-file-per-layer
     // XML documents under `<catalog.root>/<type>/` (cog/vector/pmtiles/mbtiles).
@@ -192,7 +192,7 @@ fn run_serve(args: &ServeArgs) -> anyhow::Result<()> {
                     })?;
                 // 不做 PostGIS 探针：目录库只读普通表。
                 let pool = Arc::new(
-                    pg_source::PgPool::new_plain(&dsn, 2)
+                    gisserver::pg_source::PgPool::new_plain(&dsn, 2)
                         .await
                         .map_err(|e| anyhow::anyhow!("目录库连接失败：{e}"))?,
                 );
@@ -231,12 +231,12 @@ fn run_serve(args: &ServeArgs) -> anyhow::Result<()> {
     );
     for l in state.layers.read().unwrap_or_else(|e| e.into_inner()).iter() {
         let kind = match &l.def.source {
-            wms_common::layer::SourceKind::Cog { path } => format!("cog({path})"),
-            wms_common::layer::SourceKind::Vector { path } => format!("vector({path})"),
-            wms_common::layer::SourceKind::Pmtiles { path } => format!("pmtiles({path})"),
-            wms_common::layer::SourceKind::Mbtiles { path } => format!("mbtiles({path})"),
-            wms_common::layer::SourceKind::Arcgis { path } => format!("arcgis({path})"),
-            wms_common::layer::SourceKind::Postgis(pg) => {
+            gisserver::wms_common::layer::SourceKind::Cog { path } => format!("cog({path})"),
+            gisserver::wms_common::layer::SourceKind::Vector { path } => format!("vector({path})"),
+            gisserver::wms_common::layer::SourceKind::Pmtiles { path } => format!("pmtiles({path})"),
+            gisserver::wms_common::layer::SourceKind::Mbtiles { path } => format!("mbtiles({path})"),
+            gisserver::wms_common::layer::SourceKind::Arcgis { path } => format!("arcgis({path})"),
+            gisserver::wms_common::layer::SourceKind::Postgis(pg) => {
                 format!("postgis({}/{})", pg.schema, pg.table)
             }
         };
@@ -368,7 +368,7 @@ fn run_cog_create(args: &CogCreateArgs) -> anyhow::Result<()> {
     if args.width == 0 || args.height == 0 || args.tile == 0 {
         anyhow::bail!("width/height/tile must be > 0");
     }
-    let bytes = cog::write::gradient_cog(
+    let bytes = gisserver::cog::write::gradient_cog(
         args.width,
         args.height,
         args.tile,
@@ -401,13 +401,13 @@ fn run_pmtiles_pack(args: &PmtilesPackArgs) -> anyhow::Result<()> {
         anyhow::bail!("input {} is not a directory", args.input.display());
     }
     let tile_type = match args.tile_type.as_str() {
-        "mvt" | "pbf" => pmtiles::tile_type::MVT,
-        "png" => pmtiles::tile_type::PNG,
+        "mvt" | "pbf" => gisserver::pmtiles::tile_type::MVT,
+        "png" => gisserver::pmtiles::tile_type::PNG,
         other => anyhow::bail!("unknown tile type '{other}' (use mvt|png)"),
     };
     let compression = match args.compression.as_str() {
-        "none" => pmtiles::compression::NONE,
-        "gzip" | "gz" => pmtiles::compression::GZIP,
+        "none" => gisserver::pmtiles::compression::NONE,
+        "gzip" | "gz" => gisserver::pmtiles::compression::GZIP,
         other => anyhow::bail!("unknown compression '{other}' (use none|gzip)"),
     };
 
@@ -444,7 +444,7 @@ fn run_pmtiles_pack(args: &PmtilesPackArgs) -> anyhow::Result<()> {
     if let Some(parent) = args.output.parent() {
         std::fs::create_dir_all(parent)?;
     }
-    pmtiles::pack::pack_tiles(&args.output, &tiles, tile_type, compression, "map-api")
+    gisserver::pmtiles::pack::pack_tiles(&args.output, &tiles, tile_type, compression, "map-api")
         .map_err(|e| anyhow::anyhow!(e))?;
     println!("packed {} tiles -> {}", tiles.len(), args.output.display());
     Ok(())

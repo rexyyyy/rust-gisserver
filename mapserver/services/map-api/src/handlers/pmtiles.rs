@@ -21,7 +21,7 @@ pub async fn archive(
         p.clone()
     } else if let Some(l) = state.layer(&name) {
         match &l.def.source {
-            wms_common::layer::SourceKind::Pmtiles { path } => path.clone(),
+            gisserver::wms_common::layer::SourceKind::Pmtiles { path } => path.clone(),
             _ => {
                 return (
                     StatusCode::NOT_FOUND,

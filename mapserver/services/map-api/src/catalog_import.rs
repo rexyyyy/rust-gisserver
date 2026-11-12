@@ -18,9 +18,9 @@
 
 use std::collections::{BTreeMap, BTreeSet};
 
-use pg_source::PgPool;
+use gisserver::pg_source::PgPool;
 use serde_json::Value;
-use wms_common::layer::Layer;
+use gisserver::wms_common::layer::Layer;
 
 use crate::config::{parse_layer_doc, CatalogOpts, GridDef, ServerConfig};
 

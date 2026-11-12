@@ -3,11 +3,11 @@
 
 use std::io::{Read, Write};
 
-use pmtiles::tile_type as pt;
-use projection::Transformer;
-use renderer::{RenderRequest, Resample};
-use wms_common::style::RasterStyle;
-use wms_common::tile::TileMatrixSet;
+use gisserver::pmtiles::tile_type as pt;
+use gisserver::projection::Transformer;
+use gisserver::renderer::{RenderRequest, Resample};
+use gisserver::wms_common::style::RasterStyle;
+use gisserver::wms_common::tile::TileMatrixSet;
 
 use crate::layer::LayerRuntime;
 use crate::state::AppState;
@@ -143,7 +143,7 @@ pub fn raster_tile(
     if let Some(fc) = &layer.vector_fc {
         let rgba =
             layer.render_vector(fc, &grid.crs, bounds, grid.tile_w, grid.tile_h);
-        let png = renderer::png::encode_rgba(&rgba, grid.tile_w, grid.tile_h)?;
+        let png = gisserver::renderer::png::encode_rgba(&rgba, grid.tile_w, grid.tile_h)?;
         return Ok(TileOut::png(png));
     }
 
@@ -162,10 +162,10 @@ pub fn raster_tile(
         style,
     };
     let transformer =
-        Transformer::new_any(req.crs, req.src_crs, projection::proj()).map_err(|e| e.to_string())?;
-    let rgba = renderer::render_with_cog(&req, cog, src, Some(&state.tile_cache), &transformer)
+        Transformer::new_any(req.crs, req.src_crs, gisserver::projection::proj()).map_err(|e| e.to_string())?;
+    let rgba = gisserver::renderer::render_with_cog(&req, cog, src, Some(&state.tile_cache), &transformer)
         .map_err(|e| e.to_string())?;
-    let png = renderer::png::encode_rgba(&rgba, grid.tile_w, grid.tile_h)?;
+    let png = gisserver::renderer::png::encode_rgba(&rgba, grid.tile_w, grid.tile_h)?;
     Ok(TileOut::png(png))
 }
 
@@ -176,10 +176,10 @@ pub fn raster_tile(
 /// * vector layer -> GeoJSON -> MVT encode, **grid-aware**:
 ///   - when the GeoJSON is stored in the requested grid's own CRS (a projected
 ///     source, e.g. EPSG:4522), tiles stay in that source projection via
-///     [`mvt::encode_projected`] (linear map, no reprojection) — otherwise the
+///     [`gisserver::mvt::encode_projected`] (linear map, no reprojection) — otherwise the
 ///     Web-Mercator encoder would clip every metre-unit feature away and emit a
 ///     15-byte empty tile;
-///   - geographic sources (EPSG:4326) keep the classic [`mvt::encode`] path.
+///   - geographic sources (EPSG:4326) keep the classic [`gisserver::mvt::encode`] path.
 /// * PMTiles MVT archive -> read-through (gzip payloads passed through with
 ///   `Content-Encoding: gzip`).
 pub fn mvt_tile(
@@ -212,7 +212,7 @@ pub fn mvt_tile(
         let bytes = pm.get(z, x, y).map_err(|e| e.to_string())?;
         let bytes = bytes.ok_or_else(|| format!("tile {z}/{x}/{y} not in archive"))?;
         let encoding = match pm.tile_compression() {
-            pmtiles::compression::GZIP => Some("gzip"),
+            gisserver::pmtiles::compression::GZIP => Some("gzip"),
             _ => None,
         };
         return Ok(TileOut {
@@ -224,17 +224,17 @@ pub fn mvt_tile(
     let fc = layer.vector_fc.as_ref().ok_or("layer is not a vector layer")?;
     // Grid-aware dispatch (see the doc above). Only a **projected** grid whose
     // CRS equals the layer's source CRS takes the source-projection path; a
-    // geographic source (or a Web Mercator request) keeps `mvt::encode`, so the
+    // geographic source (or a Web Mercator request) keeps `gisserver::mvt::encode`, so the
     // long-standing EPSG:4326 -> Web Mercator behaviour is byte-for-byte intact.
-    let src = wms_common::crs::normalize(&layer.def.src_crs);
-    let gcrs = wms_common::crs::normalize(&grid.crs);
-    let bytes = if src == gcrs && !wms_common::crs::is_geographic(&gcrs) {
+    let src = gisserver::wms_common::crs::normalize(&layer.def.src_crs);
+    let gcrs = gisserver::wms_common::crs::normalize(&grid.crs);
+    let bytes = if src == gcrs && !gisserver::wms_common::crs::is_geographic(&gcrs) {
         let Some(bounds) = grid.tile_bounds(z, x, y) else {
             return Err(format!("tile {z}/{x}/{y} out of grid range"));
         };
-        mvt::encode_projected(fc, layer.name(), bounds)
+        gisserver::mvt::encode_projected(fc, layer.name(), bounds)
     } else {
-        mvt::encode(fc, z, x, y, layer.name())
+        gisserver::mvt::encode(fc, z, x, y, layer.name())
     };
     Ok(TileOut::pbf(bytes))
 }

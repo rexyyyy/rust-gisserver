@@ -16,7 +16,7 @@ rust-gisserver/
 
 | 组件 | 角色 | 说明 | 许可证 |
 |---|---|---|---|
-| **gisserver** | 核心库 | 纯 Rust 数据与协议层：COG/BigTIFF 解析与写入、瓦片渲染、MVT 编码、PMTiles/MBTiles 归档、WMS/WFS/OGC API 协议、投影、PostGIS 数据源、路径编码推断。发布到 crates.io（`gisserver-*` 包名），可直接作为开发依赖复用 | MIT OR Apache-2.0 |
+| **gisserver** | 核心库 | 纯 Rust 数据与协议层：COG/BigTIFF 解析与写入、瓦片渲染、MVT 编码、PMTiles/MBTiles 归档、WMS/WFS/OGC API 协议、投影、PostGIS 数据源、路径编码推断。**单包发布**到 crates.io，功能域作为模块由 feature 门控，可直接作为开发依赖复用 | MIT OR Apache-2.0 |
 | **mapserver** | 地图服务器 | 开箱即用的 HTTP 服务：WMS 1.1.1/1.3.0、WMTS 1.0.0、TMS/XYZ、MVT 矢量瓦片（含 PostGIS 动态矢量）、PMTiles/MBTiles/COG 直读、WFS、OGC API - Features/Tiles、3D Tiles/terrain 直通；内置 Leaflet/Cesium 查看器与缓存体系 | AGPL-3.0-only |
 | **manager** | 管理控制台 | Web 控制台：服务目录管理、地图服务发布向导（坐标系/范围校验）、运行时监控、样式管理、缓存管理、日志审计 | AGPL-3.0-only |
 
@@ -45,8 +45,12 @@ cd ui && npm install && npm run dev     # 前端（Vite）
 
 ```toml
 [dependencies]
-gisserver-cog = "0.1"        # 示例：COG 解析/写入
-gisserver-projection = "0.1" # 示例：投影
+gisserver = "0.1"                                   # 全量
+# 或按需：default-features = false, features = ["mvt", "projection"]
+```
+
+```rust
+use gisserver::cog::{Cog, GeoTransform};   // 模块路径 = gisserver::<module>::
 ```
 
 详见 [gisserver/README.md](gisserver/README.md)。

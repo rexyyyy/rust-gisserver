@@ -9,10 +9,10 @@ use axum::response::{IntoResponse, Response};
 
 use crate::layer::vector_bounds;
 use crate::state::AppState;
-use wfs_protocol::caps::{self, CapFeatureType};
-use wfs_protocol::dft;
-use wfs_protocol::error::{WfsError, exception_report_xml, service_exception_xml};
-use wfs_protocol::getfeature::{
+use gisserver::wfs_protocol::caps::{self, CapFeatureType};
+use gisserver::wfs_protocol::dft;
+use gisserver::wfs_protocol::error::{WfsError, exception_report_xml, service_exception_xml};
+use gisserver::wfs_protocol::getfeature::{
     OutputFormat, feature_collection_csv, feature_collection_json, feature_collection_xml,
     resolve_features, resolve_features_owned,
 };
@@ -24,8 +24,8 @@ pub async fn handle(
     headers: HeaderMap,
 ) -> Response {
     let query = query.unwrap_or_default();
-    let kv = wms_protocol::kvp::parse_kvp(&query);
-    let get = |k: &str| wms_protocol::kvp::lookup(&kv, k);
+    let kv = gisserver::wms_protocol::kvp::parse_kvp(&query);
+    let get = |k: &str| gisserver::wms_protocol::kvp::lookup(&kv, k);
 
     // WFS 2.0 negotiates via AcceptVersions; 1.x clients send VERSION=.
     // Honor both (a VERSION= value that is not servable falls back to the
@@ -107,7 +107,7 @@ pub async fn handle(
                 .filter(|l| l.is_queryable())
                 .map(|l| l.name().to_string())
                 .collect();
-            let params = match wfs_protocol::getfeature::parse_get_feature(&version, &kv, &feature_layers)
+            let params = match gisserver::wfs_protocol::getfeature::parse_get_feature(&version, &kv, &feature_layers)
             {
                 Ok(p) => p,
                 Err(e) => return error_response(&e, is20),
@@ -191,7 +191,7 @@ fn cap_feature_types(state: &AppState) -> Vec<CapFeatureType> {
                         .as_ref()
                         .and_then(|r| r.find(l.name()))
                         .and_then(|(_, d)| d.bounds)
-                        .map(|b| wms_common::Bbox::new(b[0], b[1], b[2], b[3]))
+                        .map(|b| gisserver::wms_common::Bbox::new(b[0], b[1], b[2], b[3]))
                 });
             CapFeatureType {
                 name: l.name().to_string(),
@@ -214,12 +214,12 @@ fn cap_feature_types(state: &AppState) -> Vec<CapFeatureType> {
 /// `numberMatched` always comes from a server-side `count(*)`.
 async fn pg_get_feature(
     state: Arc<AppState>,
-    params: &wfs_protocol::getfeature::GetFeatureParams,
+    params: &gisserver::wfs_protocol::getfeature::GetFeatureParams,
     type_name: &str,
     kv: &[(String, String)],
     is20: bool,
 ) -> Response {
-    use pg_source::sql::SqlParam;
+    use gisserver::pg_source::sql::SqlParam;
     let Some((pool, def)) = state
         .pg_registry()
         .as_ref()
@@ -231,9 +231,9 @@ async fn pg_get_feature(
 
     // OGC Filter pushdown (`FILTER=<xml>` KVP parameter). A malformed or
     // unsupported filter FAILS the request — never silently unfiltered.
-    let where_sql = match wms_protocol::kvp::lookup(kv, "filter") {
+    let where_sql = match gisserver::wms_protocol::kvp::lookup(kv, "filter") {
         Some(xml) if !xml.trim().is_empty() => {
-            match pg_source::filter::filter_to_where(xml, &def.geometry_column, def.srid) {
+            match gisserver::pg_source::filter::filter_to_where(xml, &def.geometry_column, def.srid) {
                 Ok(Some(w)) => Some(w),
                 Ok(None) => None,
                 Err(e) => return error_response(&WfsError::invalid("filter", e), is20),
@@ -247,12 +247,12 @@ async fn pg_get_feature(
 
     // featureId selection: precise per-id SQL lookups.
     let selected: Vec<serde_json::Value> = if !params.feature_ids.is_empty() {
-        let (sql, _) = pg_source::sql::feature_by_id_sql(&def);
+        let (sql, _) = gisserver::pg_source::sql::feature_by_id_sql(&def);
         let mut found = Vec::new();
         for id in &params.feature_ids {
             let qp = vec![SqlParam::S(id.clone())];
-            let refs = pg_source::sql::as_params(&qp);
-            match pg_source::sql::query_features(&pool, &sql, &refs).await {
+            let refs = gisserver::pg_source::sql::as_params(&qp);
+            match gisserver::pg_source::sql::query_features(&pool, &sql, &refs).await {
                 Ok(rows) => found.extend(rows.into_iter().map(crate::handlers::ensure_feature_id)),
                 Err(e) => {
                     return error_response(&WfsError::new("NoApplicableCode", format!("postgis query: {e}")), is20)
@@ -270,8 +270,8 @@ async fn pg_get_feature(
         // Clamp with the source `limit` (full-table protection).
         let limit = def.limit.map(|l| limit.min(l as i64)).unwrap_or(limit);
         let (sql, qp) =
-            pg_source::sql::feature_sql(&def, bbox, where_sql.as_deref(), None, limit, params.start_index as i64);
-        let rows = match pg_source::sql::query_features(&pool, &sql, &pg_source::sql::as_params(&qp))
+            gisserver::pg_source::sql::feature_sql(&def, bbox, where_sql.as_deref(), None, limit, params.start_index as i64);
+        let rows = match gisserver::pg_source::sql::query_features(&pool, &sql, &gisserver::pg_source::sql::as_params(&qp))
             .await
         {
             Ok(r) => r,
@@ -279,7 +279,7 @@ async fn pg_get_feature(
                 return error_response(&WfsError::new("NoApplicableCode", format!("postgis query: {e}")), is20)
             }
         };
-        if params.result_type == wfs_protocol::getfeature::ResultType::Hits {
+        if params.result_type == gisserver::wfs_protocol::getfeature::ResultType::Hits {
             Vec::new()
         } else {
             rows.into_iter().map(crate::handlers::ensure_feature_id).collect()
@@ -287,12 +287,12 @@ async fn pg_get_feature(
     };
 
     // numberMatched: server-side count over the same predicate.
-    let (csql, cqp) = pg_source::sql::count_sql(&def, bbox, where_sql.as_deref());
+    let (csql, cqp) = gisserver::pg_source::sql::count_sql(&def, bbox, where_sql.as_deref());
     let matched = if !params.feature_ids.is_empty() {
         // per-id lookups already know the total
         params.feature_ids.len() as i64
     } else {
-        match pg_source::sql::query_count(&pool, &csql, &pg_source::sql::as_params(&cqp)).await {
+        match gisserver::pg_source::sql::query_count(&pool, &csql, &gisserver::pg_source::sql::as_params(&cqp)).await {
             Ok(c) => c,
             Err(_) => selected.len() as i64,
         }
@@ -304,14 +304,14 @@ async fn pg_get_feature(
     } else {
         selected
             .into_iter()
-            .map(|f| vector_query::project_properties(&f, &params.property_names))
+            .map(|f| gisserver::vector_query::project_properties(&f, &params.property_names))
             .collect()
     };
 
     match params.output_format {
-        wfs_protocol::getfeature::OutputFormat::Gml => {
+        gisserver::wfs_protocol::getfeature::OutputFormat::Gml => {
             let sel: Vec<&serde_json::Value> = selected.iter().collect();
-            let xml = wfs_protocol::getfeature::feature_collection_xml(
+            let xml = gisserver::wfs_protocol::getfeature::feature_collection_xml(
                 &params.version,
                 type_name,
                 &sel,
@@ -326,15 +326,15 @@ async fn pg_get_feature(
             )
                 .into_response()
         }
-        wfs_protocol::getfeature::OutputFormat::Json => {
+        gisserver::wfs_protocol::getfeature::OutputFormat::Json => {
             let refs: Vec<&serde_json::Value> = selected.iter().collect();
-            let body = wfs_protocol::getfeature::feature_collection_json(&refs, matched);
+            let body = gisserver::wfs_protocol::getfeature::feature_collection_json(&refs, matched);
             json_response(body)
         }
-        wfs_protocol::getfeature::OutputFormat::Csv => {
+        gisserver::wfs_protocol::getfeature::OutputFormat::Csv => {
             let refs: Vec<&serde_json::Value> = selected.iter().collect();
             let body =
-                wfs_protocol::getfeature::feature_collection_csv(&refs, &params.property_names);
+                gisserver::wfs_protocol::getfeature::feature_collection_csv(&refs, &params.property_names);
             (
                 StatusCode::OK,
                 [("content-type", "text/csv; charset=utf-8")],

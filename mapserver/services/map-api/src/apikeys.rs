@@ -14,7 +14,7 @@ use std::collections::HashSet;
 use std::sync::{Arc, RwLock};
 use std::time::Duration;
 
-use pg_source::PgPool;
+use gisserver::pg_source::PgPool;
 
 /// 刷新间隔：manager 生成/停用 key 后最多 15 秒在 server 侧生效。
 const REFRESH_SECS: u64 = 15;

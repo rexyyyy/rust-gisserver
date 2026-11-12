@@ -6,8 +6,8 @@ use axum::extract::{RawQuery, State};
 use axum::http::{HeaderMap, StatusCode};
 use axum::response::{IntoResponse, Response};
 use serde_json::Map as JsonMap;
-use wms_protocol::wms::{self, CapLayer, WmsError};
-use wms_protocol::kvp;
+use gisserver::wms_protocol::wms::{self, CapLayer, WmsError};
+use gisserver::wms_protocol::kvp;
 
 use crate::state::AppState;
 use crate::tiles;
@@ -18,8 +18,8 @@ pub async fn handle(
     RawQuery(query): RawQuery,
     headers: HeaderMap,
 ) -> Response {
-    let kv = wms_protocol::parse_kvp(query.as_deref().unwrap_or(""));
-    let get = |k: &str| wms_protocol::kvp::lookup(&kv, k);
+    let kv = gisserver::wms_protocol::parse_kvp(query.as_deref().unwrap_or(""));
+    let get = |k: &str| gisserver::wms_protocol::kvp::lookup(&kv, k);
     let request = get("request").unwrap_or("").to_ascii_uppercase();
     let version = wms::negotiate_version(get("version"));
     let base = crate::handlers::base_url(&state, &headers);
@@ -57,12 +57,12 @@ pub async fn handle(
 /// 把任意 CRS 的范围转为 EPSG:4326 度数（给 capabilities 的
 /// EX_GeographicBoundingBox / LatLonBoundingBox 用）。地理坐标系直接返回；
 /// 投影坐标系取四角变换后取包络，PROJ 未加载或不支持时返回 None。
-pub(crate) fn geographic_bounds(bounds: wms_common::Bbox, crs: &str) -> Option<wms_common::Bbox> {
-    use wms_common::crs::is_geographic;
+pub(crate) fn geographic_bounds(bounds: gisserver::wms_common::Bbox, crs: &str) -> Option<gisserver::wms_common::Bbox> {
+    use gisserver::wms_common::crs::is_geographic;
     if is_geographic(crs) {
         return Some(bounds);
     }
-    let tr = projection::Transformer::new_any(crs, "EPSG:4326", projection::proj()).ok()?;
+    let tr = gisserver::projection::Transformer::new_any(crs, "EPSG:4326", gisserver::projection::proj()).ok()?;
     let pts = [
         (bounds.minx, bounds.miny),
         (bounds.minx, bounds.maxy),
@@ -84,7 +84,7 @@ pub(crate) fn geographic_bounds(bounds: wms_common::Bbox, crs: &str) -> Option<w
         }
     }
     if any {
-        Some(wms_common::Bbox { minx, miny, maxx, maxy })
+        Some(gisserver::wms_common::Bbox { minx, miny, maxx, maxy })
     } else {
         None
     }
@@ -124,7 +124,7 @@ fn cap_layers(state: &AppState) -> Vec<CapLayer> {
                         let reg = state.pg_registry()?;
                         let (_, pg) = reg.find(l.name())?;
                         pg.bounds
-                            .map(|b| wms_common::Bbox::new(b[0], b[1], b[2], b[3]))
+                            .map(|b| gisserver::wms_common::Bbox::new(b[0], b[1], b[2], b[3]))
                     }),
                 queryable: true,
             }
@@ -245,9 +245,9 @@ async fn get_map(
         let mut rgba = render_get_map(&state, &layer, &params)?;
         // TRANSPARENT defaults to FALSE -> composite onto BGCOLOR.
         if !params.transparent {
-            renderer::png::composite_over_bg(&mut rgba, params.bgcolor);
+            gisserver::renderer::png::composite_over_bg(&mut rgba, params.bgcolor);
         }
-        renderer::png::encode_rgba(&rgba, params.width, params.height)
+        gisserver::renderer::png::encode_rgba(&rgba, params.width, params.height)
     })
     .await;
     match res {
@@ -278,10 +278,10 @@ async fn get_map(
 /// when the transform fails (invalid CRS / coordinates out of range).
 fn bbox_to_4326(crs: &str, bbox: [f64; 4]) -> Option<[f64; 4]> {
     let [minx, miny, maxx, maxy] = bbox;
-    if crs == wms_common::crs::EPSG_4326 || wms_common::crs::is_crs84(crs) {
+    if crs == gisserver::wms_common::crs::EPSG_4326 || gisserver::wms_common::crs::is_crs84(crs) {
         return Some(bbox);
     }
-    let t = projection::Transformer::new_any(crs, wms_common::crs::EPSG_4326, projection::proj())
+    let t = gisserver::projection::Transformer::new_any(crs, gisserver::wms_common::crs::EPSG_4326, gisserver::projection::proj())
         .ok()?;
     let mut out: Option<[f64; 4]> = None;
     for (x, y) in [(minx, miny), (maxx, miny), (maxx, maxy), (minx, maxy)] {
@@ -322,8 +322,8 @@ async fn pg_get_map(
     // Frame feature cap: the source `limit` when configured, else a hard
     // default so a country-wide GetMap cannot pull the whole table.
     let limit = def.limit.map(i64::from).unwrap_or(50_000);
-    let (sql, qp) = pg_source::sql::feature_sql(&def, Some(bbox_4326), None, None, limit, 0);
-    let rows = match pg_source::sql::query_features(&pool, &sql, &pg_source::sql::as_params(&qp))
+    let (sql, qp) = gisserver::pg_source::sql::feature_sql(&def, Some(bbox_4326), None, None, limit, 0);
+    let rows = match gisserver::pg_source::sql::query_features(&pool, &sql, &gisserver::pg_source::sql::as_params(&qp))
         .await
     {
         Ok(r) => r,
@@ -337,9 +337,9 @@ async fn pg_get_map(
     let res = tokio::task::spawn_blocking(move || {
         let mut rgba = layer.render_vector(&fc, &p.crs, p.bbox.to_array(), p.width, p.height);
         if !p.transparent {
-            renderer::png::composite_over_bg(&mut rgba, p.bgcolor);
+            gisserver::renderer::png::composite_over_bg(&mut rgba, p.bgcolor);
         }
-        renderer::png::encode_rgba(&rgba, p.width, p.height)
+        gisserver::renderer::png::encode_rgba(&rgba, p.width, p.height)
     })
     .await;
     match res {
@@ -378,18 +378,18 @@ fn render_get_map(
         _ => return Err("layer has no raster source".into()),
     };
     let style = tiles::raster_style(layer);
-    let req = renderer::RenderRequest {
+    let req = gisserver::renderer::RenderRequest {
         bbox: params.bbox.to_array(),
         crs: &params.crs,
         src_crs: &layer.def.src_crs,
         width: params.width,
         height: params.height,
-        resample: renderer::Resample::Nearest,
+        resample: gisserver::renderer::Resample::Nearest,
         style,
     };
-    let transformer = projection::Transformer::new_any(req.crs, req.src_crs, projection::proj())
+    let transformer = gisserver::projection::Transformer::new_any(req.crs, req.src_crs, gisserver::projection::proj())
         .map_err(|e| format!("projection: {e}"))?;
-    renderer::render_with_cog(&req, cog, src, Some(&state.tile_cache), &transformer)
+    gisserver::renderer::render_with_cog(&req, cog, src, Some(&state.tile_cache), &transformer)
         .map_err(|e| e.to_string())
 }
 
@@ -400,7 +400,7 @@ async fn get_feature_info(
     kv: &[(String, String)],
     version: &str,
 ) -> Response {
-    let get = |k: &str| wms_protocol::kvp::lookup(kv, k);
+    let get = |k: &str| gisserver::wms_protocol::kvp::lookup(kv, k);
     let layer_name = get("query_layers")
         .or_else(|| get("layers"))
         .unwrap_or("")
@@ -430,15 +430,15 @@ async fn get_feature_info(
     // (lon/lat by definition); 1.1.1 is `minx,miny,maxx,maxy`. The protocol
     // crate normalizes GetMap the same way; GetFeatureInfo must do the same
     // for the sample math below.
-    let bbox = if version.starts_with("1.3") && !wms_common::crs::is_crs84(crs_raw) {
+    let bbox = if version.starts_with("1.3") && !gisserver::wms_common::crs::is_crs84(crs_raw) {
         let v: Vec<f64> = bbox_raw.split(',').filter_map(|s| s.trim().parse().ok()).collect();
         if v.len() == 4 {
-            Some(wms_common::Bbox::new(v[1], v[0], v[3], v[2]))
+            Some(gisserver::wms_common::Bbox::new(v[1], v[0], v[3], v[2]))
         } else {
             None
         }
     } else {
-        wms_common::Bbox::parse(bbox_raw)
+        gisserver::wms_common::Bbox::parse(bbox_raw)
     };
     let width: u32 = get("width").and_then(|w| w.parse().ok()).unwrap_or(0);
     let height: u32 = get("height").and_then(|h| h.parse().ok()).unwrap_or(0);
@@ -616,23 +616,23 @@ async fn pg_feature_info(
     let dy = (maxy - miny) / height as f64;
     let ox = minx + (i as f64 + 0.5) * dx;
     let oy = maxy - (j as f64 + 0.5) * dy;
-    let (lon, lat) = if crs == wms_common::crs::EPSG_4326 || wms_common::crs::is_crs84(&crs) {
+    let (lon, lat) = if crs == gisserver::wms_common::crs::EPSG_4326 || gisserver::wms_common::crs::is_crs84(&crs) {
         (ox, oy)
     } else {
-        let transformer = projection::Transformer::new_any(
+        let transformer = gisserver::projection::Transformer::new_any(
             &crs,
-            wms_common::crs::EPSG_4326,
-            projection::proj(),
+            gisserver::wms_common::crs::EPSG_4326,
+            gisserver::projection::proj(),
         )
         .map_err(|e| e.to_string())?;
         transformer
             .to_source(ox, oy)
             .ok_or_else(|| "point outside valid CRS range".to_string())?
     };
-    let (sql, mut qp) = pg_source::sql::point_feature_sql(&def);
-    qp[0] = pg_source::sql::SqlParam::F(lon);
-    qp[1] = pg_source::sql::SqlParam::F(lat);
-    let rows = pg_source::sql::query_features(&pool, &sql, &pg_source::sql::as_params(&qp))
+    let (sql, mut qp) = gisserver::pg_source::sql::point_feature_sql(&def);
+    qp[0] = gisserver::pg_source::sql::SqlParam::F(lon);
+    qp[1] = gisserver::pg_source::sql::SqlParam::F(lat);
+    let rows = gisserver::pg_source::sql::query_features(&pool, &sql, &gisserver::pg_source::sql::as_params(&qp))
         .await
         .map_err(|e| format!("postgis query: {e}"))?;
     let props = rows
@@ -665,7 +665,7 @@ fn vector_hit_blocking(
     // Err is reserved for invalid requests (bad CRS / transform failure);
     // "nothing under the click" is Ok(None) -> 200 with an empty body,
     // matching GeoServer's GetFeatureInfo semantics.
-    let transformer = projection::Transformer::new_any(crs, wms_common::crs::EPSG_4326, projection::proj())
+    let transformer = gisserver::projection::Transformer::new_any(crs, gisserver::wms_common::crs::EPSG_4326, gisserver::projection::proj())
         .map_err(|e| e.to_string())?;
     let [minx, miny, maxx, maxy] = bbox;
     let dx = (maxx - minx) / width as f64;
@@ -822,7 +822,7 @@ fn sample_value_blocking(
         (Some(c), Some(s)) => (c, s.as_ref()),
         _ => return Err("layer has no raster source".into()),
     };
-    let transformer = projection::Transformer::new_any(crs, &layer.def.src_crs, projection::proj())
+    let transformer = gisserver::projection::Transformer::new_any(crs, &layer.def.src_crs, gisserver::projection::proj())
         .map_err(|e| e.to_string())?;
     let [minx, miny, maxx, maxy] = bbox;
     let dx = (maxx - minx) / width as f64;
@@ -840,7 +840,7 @@ fn sample_value_blocking(
     let level = &cog.levels[0];
     let tx = (u as u32) / level.tile_w;
     let ty = (v as u32) / level.tile_h;
-    let tile = cog::read_tile_rgba(level, src, tx, ty, Some(&state.tile_cache))
+    let tile = gisserver::cog::read_tile_rgba(level, src, tx, ty, Some(&state.tile_cache))
         .map_err(|e| e.to_string())?;
     let px = (v as u32 - ty * level.tile_h) as usize;
     let py = (u as u32 - tx * level.tile_w) as usize;

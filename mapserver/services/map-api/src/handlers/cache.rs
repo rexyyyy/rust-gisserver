@@ -34,9 +34,9 @@ pub async fn stats(State(state): State<Arc<AppState>>) -> Response {
 pub async fn purge(State(state): State<Arc<AppState>>, RawQuery(qs): RawQuery) -> Response {
     let kv = qs
         .as_deref()
-        .map(wms_protocol::kvp::parse_kvp)
+        .map(gisserver::wms_protocol::kvp::parse_kvp)
         .unwrap_or_default();
-    let scope_raw = wms_protocol::kvp::lookup(&kv, "scope").unwrap_or("all");
+    let scope_raw = gisserver::wms_protocol::kvp::lookup(&kv, "scope").unwrap_or("all");
     let Some(scope) = CacheScope::parse(scope_raw) else {
         return (
             StatusCode::BAD_REQUEST,

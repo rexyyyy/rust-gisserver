@@ -21,7 +21,7 @@ use std::sync::Mutex;
 use rusqlite::{Connection, OpenFlags};
 
 use crate::tiles::TileOut;
-use wms_common::Bbox;
+use gisserver::wms_common::Bbox;
 
 /// Maximum number of read-only connections kept warm per archive.
 const POOL_CAP: usize = 8;

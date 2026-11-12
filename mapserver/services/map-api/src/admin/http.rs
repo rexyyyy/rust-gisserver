@@ -56,7 +56,7 @@ pub fn endpoints_for(
     base: &str,
     kind: &str,
     name: &str,
-    layers: &[wms_common::layer::Layer],
+    layers: &[gisserver::wms_common::layer::Layer],
 ) -> Vec<serde_json::Value> {
     let b = base.trim_end_matches('/');
     let mut v: Vec<(String, String)> = Vec::new();
@@ -84,7 +84,7 @@ pub fn endpoints_for(
         ));
         let src = def.map(|l| &l.source);
         // WMTS / XYZ 同走 raster_tile：PostGIS 层无栅格源（实测报错），不宣传。
-        if !matches!(src, Some(wms_common::layer::SourceKind::Postgis(_))) {
+        if !matches!(src, Some(gisserver::wms_common::layer::SourceKind::Postgis(_))) {
             v.push((
                 "WMTS Capabilities".into(),
                 format!("{b}/wmts/1.0.0/WMTSCapabilities.xml"),
@@ -100,14 +100,14 @@ pub fn endpoints_for(
         ));
         let is_vector = matches!(
             src,
-            Some(wms_common::layer::SourceKind::Vector { .. })
-                | Some(wms_common::layer::SourceKind::Postgis(_))
+            Some(gisserver::wms_common::layer::SourceKind::Vector { .. })
+                | Some(gisserver::wms_common::layer::SourceKind::Postgis(_))
         );
         // 首个网格决定 MVT 的寻址口径：非 Web Mercator 时模板要带网格段。
         let grid_id = def
             .and_then(|l| l.grids.first().cloned())
             .unwrap_or_else(|| "WebMercatorQuad".to_string());
-        let native_grid = wms_common::tile::strip_size_suffix(&grid_id) != "WebMercatorQuad";
+        let native_grid = gisserver::wms_common::tile::strip_size_suffix(&grid_id) != "WebMercatorQuad";
         if is_vector {
             v.push((
                 "MVT 矢量瓦片模板".into(),
@@ -133,7 +133,7 @@ pub fn endpoints_for(
         // PostGIS 层没有栅格源，预览改用矢量瓦片页 viewer-mvt（同样的网格读取逻辑）。
         v.push((
             "内置预览（OpenLayers）".into(),
-            if matches!(src, Some(wms_common::layer::SourceKind::Postgis(_))) {
+            if matches!(src, Some(gisserver::wms_common::layer::SourceKind::Postgis(_))) {
                 format!("{b}/viewer-mvt?layer={name}&grid={grid_id}")
             } else if native_grid {
                 format!("{b}/viewer-arcgis?layer={name}&grid={grid_id}")
@@ -147,7 +147,7 @@ pub fn endpoints_for(
         let is_vector = state
             .layer(name)
             .map(|l| match (&l.pmtiles, &l.mbtiles) {
-                (Some(pm), _) => pm.tile_type() == pmtiles::tile_type::MVT,
+                (Some(pm), _) => pm.tile_type() == gisserver::pmtiles::tile_type::MVT,
                 (_, Some(mb)) => matches!(mb.format().as_str(), "pbf" | "protobuf" | "mvt"),
                 _ => false,
             })
@@ -256,11 +256,11 @@ pub async fn services(State(state): State<Arc<AppState>>, headers: HeaderMap) ->
                     .or_else(|| Some("加载失败（详见体检）".to_string())),
                 "cog" | "vector" | "pmtiles" | "mbtiles" | "arcgis" => {
                     let path = cur_layers.iter().find(|l| l.name == s.name).map(|l| match &l.source {
-                        wms_common::layer::SourceKind::Cog { path }
-                        | wms_common::layer::SourceKind::Vector { path }
-                        | wms_common::layer::SourceKind::Pmtiles { path }
-                        | wms_common::layer::SourceKind::Mbtiles { path }
-                        | wms_common::layer::SourceKind::Arcgis { path } => path.clone(),
+                        gisserver::wms_common::layer::SourceKind::Cog { path }
+                        | gisserver::wms_common::layer::SourceKind::Vector { path }
+                        | gisserver::wms_common::layer::SourceKind::Pmtiles { path }
+                        | gisserver::wms_common::layer::SourceKind::Mbtiles { path }
+                        | gisserver::wms_common::layer::SourceKind::Arcgis { path } => path.clone(),
                         _ => String::new(),
                     });
                     // ArcGIS 缓存的 path 是目录不是文件，措辞分开才不会把运维
@@ -290,7 +290,7 @@ pub async fn services(State(state): State<Arc<AppState>>, headers: HeaderMap) ->
                 serde_json::json!({
                     "id": gid,
                     "crs": l.src_crs,
-                    "standard": wms_common::tile::is_preset_id(&gid),
+                    "standard": gisserver::wms_common::tile::is_preset_id(&gid),
                 })
             });
         rows.push(serde_json::json!({
@@ -445,7 +445,7 @@ pub async fn usage_handler(State(state): State<Arc<AppState>>, headers: HeaderMa
     }
     let kv = qs
         .as_deref()
-        .map(wms_protocol::kvp::parse_kvp)
+        .map(gisserver::wms_protocol::kvp::parse_kvp)
         .unwrap_or_default();
     let get = |k: &str| -> Option<String> {
         kv.iter().find(|(key, _)| key == k).map(|(_, v)| v.clone())
@@ -497,7 +497,7 @@ pub async fn access_logs(
     }
     let kv = qs
         .as_deref()
-        .map(wms_protocol::kvp::parse_kvp)
+        .map(gisserver::wms_protocol::kvp::parse_kvp)
         .unwrap_or_default();
     let get = |k: &str| -> Option<String> {
         kv.iter().find(|(key, _)| key == k).map(|(_, v)| v.clone())

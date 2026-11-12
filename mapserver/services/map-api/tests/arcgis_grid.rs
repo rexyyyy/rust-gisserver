@@ -97,7 +97,7 @@ fn unusable_cache_warns_instead_of_breaking_startup() {
 
     // 目录存在但不是缓存（没有 Conf.xml）：给出格式层面的原因。
     let mut layer = layers[0].clone();
-    layer.source = wms_common::layer::SourceKind::Arcgis {
+    layer.source = gisserver::wms_common::layer::SourceKind::Arcgis {
         path: dir.to_string_lossy().replace('\\', "/"),
     };
     let err = match map_api::layer::LayerRuntime::open(layer, None, 1, None) {
@@ -135,7 +135,7 @@ fn real_cache_grid_and_scales_survive_the_service_layer() {
     assert_eq!(layer.tile_px, 256);
     assert!(layer.extent.is_some(), "extent 应取 conf.cdi 的数据范围");
 
-    let ac = arcgis_cache::ArcgisCache::open(&cache_dir).expect("打开缓存");
+    let ac = gisserver::arcgis_cache::ArcgisCache::open(&cache_dir).expect("打开缓存");
     let info = ac.info();
     let grid = grids.get("arcgis_td").expect("应注入 arcgis_td 网格");
 
@@ -172,7 +172,7 @@ fn real_cache_grid_and_scales_survive_the_service_layer() {
         assert!((src - info.lods[i].scale).abs() <= info.lods[i].scale.abs() * 1e-9);
         // 源比例尺与 OGC 反算的比 = 0.28mm / (0.0254/DPI)，DPI=96 时≈1.058：
         // 这正是网格必须携带 Scale 的原因（拿 OGC 反算会报小 5.5%）。
-        let ogc = lv.resolution * wms_common::crs::meters_per_unit(&tms.crs) / 0.00028;
+        let ogc = lv.resolution * gisserver::wms_common::crs::meters_per_unit(&tms.crs) / 0.00028;
         let expect = 0.00028 / (0.0254 / info.dpi);
         let ratio = src / ogc;
         assert!(
@@ -181,7 +181,7 @@ fn real_cache_grid_and_scales_survive_the_service_layer() {
             lv.z
         );
     }
-    let xml = wms_protocol::wmts::tile_matrix_set_xml(&tms);
+    let xml = gisserver::wms_protocol::wmts::tile_matrix_set_xml(&tms);
     assert!(
         xml.contains(&format!("<ScaleDenominator>{}</ScaleDenominator>", tms.levels[0].scale_denominator.unwrap())),
         "能力文档应原样宣告 Conf.xml 的 z0 比例尺"

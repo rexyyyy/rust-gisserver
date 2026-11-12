@@ -292,7 +292,7 @@ pub async fn pg_tables(
 /// `publishable=false`，不参与图层发布。
 async fn pg_table_entries(dsn: &str, schema: &str) -> Result<Vec<Value>, String> {
     let (kind, supported, defaults) = data_type_caps("postgis_table");
-    let pool = pg_source::PgPool::new(dsn, 1)
+    let pool = gisserver::pg_source::PgPool::new(dsn, 1)
         .await
         .map_err(|e| e.to_string())?;
     let client = pool.get().await.map_err(|e| e.to_string())?;
@@ -500,7 +500,7 @@ fn scan_dir(
 
 /// 目录（或其一级子目录）是否为一份 ArcGIS 预切片缓存：以 `Conf.xml` 可解析为准。
 fn is_arcgis_cache(dir: &Path) -> bool {
-    arcgis_cache::conf::CacheDocs::load(dir).is_ok()
+    gisserver::arcgis_cache::conf::CacheDocs::load(dir).is_ok()
 }
 
 /// 是否为静态 MVT 瓦片金字塔：抽 `z/x` 前几个分支确认存在 `.pbf` 叶子，避免全目录扫描。
@@ -575,7 +575,7 @@ fn pinyin_initials(s: &str) -> String {
 /// ArcGIS 预切片缓存：读 `Conf.xml` / `conf.cdi`，给出缓存范围、WKID 与层级。
 fn probe_arcgis(path: &Path) -> Value {
     let name = arcgis_resource_name(path);
-    let docs = match arcgis_cache::conf::CacheDocs::load(path) {
+    let docs = match gisserver::arcgis_cache::conf::CacheDocs::load(path) {
         Ok(d) => d,
         Err(e) => {
             let mut v = finish(
@@ -680,8 +680,8 @@ fn probe_one(state: &AppState, path: &Path) -> Value {
 fn probe_cog(state: &AppState, path: &Path) -> Value {
     let uri = path.display().to_string();
     let s3 = state.config.server.s3.as_ref().map(|c| c.to_storage());
-    match storage::source_from_uri_with_s3(&uri, s3.as_ref())
-        .and_then(|src| cog::Cog::parse(src.as_ref()).map(|cog| (cog, src)))
+    match gisserver::storage::source_from_uri_with_s3(&uri, s3.as_ref())
+        .and_then(|src| gisserver::cog::Cog::parse(src.as_ref()).map(|cog| (cog, src)))
     {
         Ok((cog, _)) => {
             let lvl = &cog.levels[0];
@@ -726,11 +726,11 @@ fn probe_geojson(path: &Path) -> Value {
         .and_then(|t| serde_json::from_str::<Value>(&t).map_err(|e| e.to_string()))
     {
         Ok(fc) => {
-            let bbox = vector_query::geom_bbox_fc(&fc);
+            let bbox = gisserver::vector_query::geom_bbox_fc(&fc);
             let (kind, supported, defaults) = data_type_caps(data_type);
             let mut v = base(path, data_type, kind, bbox, Some(4326), supported, defaults);
-            let features = vector_query::features(&fc).len();
-            let geom_type = vector_query::primary_geometry_type(&fc).unwrap_or("");
+            let features = gisserver::vector_query::features(&fc).len();
+            let geom_type = gisserver::vector_query::primary_geometry_type(&fc).unwrap_or("");
             v["meta"] = json!({
                 "features": features,
                 "geometry_type": geom_type,
@@ -744,7 +744,7 @@ fn probe_geojson(path: &Path) -> Value {
 
 /// PMTiles：只读 127 字节头，得到 bounds（e7 定点）、瓦片类型与缩放区间。
 fn probe_pmtiles(path: &Path) -> Value {
-    match pmtiles::read::PmtilesReader::open(path) {
+    match gisserver::pmtiles::read::PmtilesReader::open(path) {
         Ok(r) => {
             let h = r.header();
             let bbox = [
@@ -753,7 +753,7 @@ fn probe_pmtiles(path: &Path) -> Value {
                 h.max_lon_e7 as f64 / 1e7,
                 h.max_lat_e7 as f64 / 1e7,
             ];
-            let is_mvt = h.tile_type == pmtiles::tile_type::MVT;
+            let is_mvt = h.tile_type == gisserver::pmtiles::tile_type::MVT;
             let data_type = if is_mvt { "pmtiles_mvt" } else { "pmtiles" };
             let (kind, supported, defaults) = data_type_caps(data_type);
             let mut v = base(path, data_type, kind, Some(bbox), Some(4326), supported, defaults);
@@ -926,9 +926,9 @@ fn display_path(p: &Path) -> String {
 /// 系统内部生成的路径（配置默认值、拼接出的子路径）不适用。
 ///
 /// 修的是两类 mojibake：传统编码字节被逐字节误读为 Latin-1；UTF-8 字节被 GBK 误读。
-/// 正常 UTF-8 路径原样返回（判定保守，见 `gis_encoding::fix_path`）。
+/// 正常 UTF-8 路径原样返回（判定保守，见 `gisserver::encoding::fix_path`）。
 fn norm_input_path(p: &str) -> String {
-    gis_encoding::fix_path(p)
+    gisserver::encoding::fix_path(p)
 }
 
 /// `server.data_root` 路径守卫（计划 §9.2：文件浏览器必须限定在 data_root 内）。
@@ -1052,11 +1052,11 @@ pub(crate) fn decode_param(s: &str) -> String {
 /// PMTiles tile_type 数值 → 可读名。
 fn tile_type_name(t: u8) -> &'static str {
     match t {
-        pmtiles::tile_type::MVT => "mvt",
-        pmtiles::tile_type::PNG => "png",
-        pmtiles::tile_type::JPEG => "jpeg",
-        pmtiles::tile_type::WEBP => "webp",
-        pmtiles::tile_type::AVIF => "avif",
+        gisserver::pmtiles::tile_type::MVT => "mvt",
+        gisserver::pmtiles::tile_type::PNG => "png",
+        gisserver::pmtiles::tile_type::JPEG => "jpeg",
+        gisserver::pmtiles::tile_type::WEBP => "webp",
+        gisserver::pmtiles::tile_type::AVIF => "avif",
         _ => "unknown",
     }
 }

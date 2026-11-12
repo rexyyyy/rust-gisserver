@@ -10,7 +10,7 @@
 //!   `LayerRuntime::open` (COG header parse, GeoJSON parse, SQLite open) —
 //!   the same path startup uses, so "check passes" == "serves".
 //! * postgis: fresh `PgPool::new_plain` connection test, feature count and
-//!   extent probes via `pg_source::sql` helpers (estimated first, exact
+//!   extent probes via `gisserver::pg_source::sql` helpers (estimated first, exact
 //!   fallback — mirrors startup behavior).
 //! * 3dtiles: tileset.xml presence + tileset.json + payload file inventory.
 
@@ -20,7 +20,7 @@ use std::sync::Arc;
 use axum::extract::{Path, State};
 use axum::http::{HeaderMap, StatusCode};
 use axum::response::Response;
-use wms_common::layer::SourceKind;
+use gisserver::wms_common::layer::SourceKind;
 
 use crate::state::AppState;
 
@@ -200,7 +200,7 @@ fn check_3dtiles(state: &AppState, name: &str, report: &mut Report) {
     );
 }
 
-async fn check_layer(_state: &AppState, def: &wms_common::layer::Layer, report: &mut Report) {
+async fn check_layer(_state: &AppState, def: &gisserver::wms_common::layer::Layer, report: &mut Report) {
     report.push(
         "服务定义",
         true,
@@ -234,7 +234,7 @@ async fn check_layer(_state: &AppState, def: &wms_common::layer::Layer, report: 
         // 同一套定位规则），否则出图正常、体检却报 critical。
         SourceKind::Arcgis { path } => {
             let p = std::path::Path::new(path);
-            let is_tpk = arcgis_cache::tpk::is_tpk(p);
+            let is_tpk = gisserver::arcgis_cache::tpk::is_tpk(p);
             if !p.exists() {
                 report.push(
                     "数据文件",
@@ -243,8 +243,8 @@ async fn check_layer(_state: &AppState, def: &wms_common::layer::Layer, report: 
                     format!("{path} 不存在（缓存目录或 .tpk 包）"),
                 );
             } else {
-                match arcgis_cache::tpk::ensure_dir(p)
-                    .and_then(|dir| arcgis_cache::conf::find_conf(&dir).map(|c| (dir, c)))
+                match gisserver::arcgis_cache::tpk::ensure_dir(p)
+                    .and_then(|dir| gisserver::arcgis_cache::conf::find_conf(&dir).map(|c| (dir, c)))
                 {
                     Ok((dir, conf)) => {
                         let csize = conf.metadata().map(|c| c.len()).unwrap_or(0);
@@ -256,7 +256,7 @@ async fn check_layer(_state: &AppState, def: &wms_common::layer::Layer, report: 
                             format!("{what}，Conf.xml {}（{}）", fmt_bytes(csize), conf.display()),
                         );
                         let cache_dir = conf.parent().unwrap_or(&dir);
-                        match arcgis_cache::bundle::find_alllayers(cache_dir) {
+                        match gisserver::arcgis_cache::bundle::find_alllayers(cache_dir) {
                             Ok(all) => report.push(
                                 "瓦片目录",
                                 true,
@@ -304,7 +304,7 @@ async fn check_layer(_state: &AppState, def: &wms_common::layer::Layer, report: 
         format!(
             "{}（PROJ {}）",
             def.src_crs,
-           if projection::proj().is_some() { "已加载，支持动态重投影" } else { "未加载，仅原生 CRS 出图" }
+           if gisserver::projection::proj().is_some() { "已加载，支持动态重投影" } else { "未加载，仅原生 CRS 出图" }
         ),
     );
 
@@ -312,7 +312,7 @@ async fn check_layer(_state: &AppState, def: &wms_common::layer::Layer, report: 
     // TileMatrixSet（WebMercatorQuad / WorldCRS84Quad 为预设），与"坐标系是否
     // 标准 EPSG"是两个正交维度——例如 EPSG:4490 本身是标准坐标系，但按 ArcGIS
     // Conf.xml LOD 派生的 arcgis_<图层> 网格是自定义网格（OGC 未为 4490 登记预设
-    // TileMatrixSet）。判定与 OGC API/WMTS 元数据共用 wms_common::tile::is_preset_id。
+    // TileMatrixSet）。判定与 OGC API/WMTS 元数据共用 gisserver::wms_common::tile::is_preset_id。
     let gid = _state.config.default_grid_id(def);
     report.push(
         "瓦片网格",
@@ -320,7 +320,7 @@ async fn check_layer(_state: &AppState, def: &wms_common::layer::Layer, report: 
         "info",
         format!(
             "{gid}（{}，坐标系 {}）",
-            if wms_common::tile::is_preset_id(&gid) { "标准/OGC 预设网格" } else { "自定义网格" },
+            if gisserver::wms_common::tile::is_preset_id(&gid) { "标准/OGC 预设网格" } else { "自定义网格" },
             def.src_crs
         ),
     );
@@ -328,7 +328,7 @@ async fn check_layer(_state: &AppState, def: &wms_common::layer::Layer, report: 
     // Style probes.
     match &def.sld {
         Some(p) => match std::fs::read_to_string(p)
-            .map(|t| renderer::sld::SldDocument::parse(&t))
+            .map(|t| gisserver::renderer::sld::SldDocument::parse(&t))
         {
             Ok(Some(doc)) => {
                 let rules: usize = doc.feature_type_styles.iter().map(|f| f.rules.len()).sum();
@@ -349,20 +349,20 @@ async fn check_layer(_state: &AppState, def: &wms_common::layer::Layer, report: 
 
     // PostGIS dedicated probes.
     if let SourceKind::Postgis(pg) = &def.source {
-        match pg_source::PgPool::new_plain(&pg.dsn, 1).await {
+        match gisserver::pg_source::PgPool::new_plain(&pg.dsn, 1).await {
             Ok(pool) => {
                 report.push("PG连接", true, "critical", pg.dsn.clone());
                 let target = match &pg.from {
                     Some(f) => format!("SQL: {f}"),
                     None => format!("{}/{}", pg.schema, pg.table),
                 };
-                match pg_source::sql::query_count(&pool, &pg_source::sql::count_all_sql(pg), &[]).await {
+                match gisserver::pg_source::sql::query_count(&pool, &gisserver::pg_source::sql::count_all_sql(pg), &[]).await {
                     Ok(n) => report.push("要素数量", true, "info", format!("{target}：{n} 条要素")),
                     Err(e) => report.push("要素数量", false, "critical", format!("{target}: {e}")),
                 }
-                let bounds = match pg_source::sql::query_bounds(&pool, &pg_source::sql::bounds_sql_estimated(pg)).await {
+                let bounds = match gisserver::pg_source::sql::query_bounds(&pool, &gisserver::pg_source::sql::bounds_sql_estimated(pg)).await {
                     Ok(Some(b)) => Some(b),
-                    _ => pg_source::sql::query_bounds(&pool, &pg_source::sql::bounds_sql(pg)).await.ok().flatten(),
+                    _ => gisserver::pg_source::sql::query_bounds(&pool, &gisserver::pg_source::sql::bounds_sql(pg)).await.ok().flatten(),
                 };
                 report.push(
                     "PG数据范围",

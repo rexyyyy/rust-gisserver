@@ -8,8 +8,8 @@ use axum::response::{IntoResponse, Response};
 
 use crate::cache::TileBuild;
 use crate::state::AppState;
-use pg_source::sql::SqlParam;
-use wms_common::layer::SourceKind;
+use gisserver::pg_source::sql::SqlParam;
+use gisserver::wms_common::layer::SourceKind;
 
 /// GET /mvt/{layer}/{z}/{x}/{y}.pbf (Web Mercator default grid).
 pub async fn tile(
@@ -89,14 +89,14 @@ async fn serve(
     }
     // Resolve the effective grid: the requested `tms` interface when given, else
     // the layer's default. The file-vector MVT path is grid-aware (a projected
-    // source stays in its own projection via `mvt::encode_projected`), so the
+    // source stays in its own projection via `gisserver::mvt::encode_projected`), so the
     // grid must both reach `mvt_tile` and key the output cache.
     let grid_id = tms
         .clone()
         .unwrap_or_else(|| state.config.default_grid_id(&layer.def));
     let grid = state
         .grid_for_layer(&layer, &grid_id)
-        .unwrap_or_else(|| wms_common::tile::TileMatrixSet::web_mercator_quad(layer.def.tile_px));
+        .unwrap_or_else(|| gisserver::wms_common::tile::TileMatrixSet::web_mercator_quad(layer.def.tile_px));
     if let Some(lvl) = grid.level(z) {
         if x >= lvl.matrix_w || y >= lvl.matrix_h {
             return plain(StatusCode::NOT_FOUND, format!("tile {z}/{x}/{y} out of range"));
@@ -149,7 +149,7 @@ pub async fn tilejson(
     let template = format!("{base}/mvt/{layer_name}/{{z}}/{{x}}/{{y}}.pbf");
     // TileJSON is immutable per (layer, base): render once per TTL window.
     let doc = state.cache.doc(format!("mvt-tilejson/{base}/{layer_name}"), || {
-        let tj = mvt::tilejson(&template, &layer_name, minzoom as u8, maxzoom as u8, bounds);
+        let tj = gisserver::mvt::tilejson(&template, &layer_name, minzoom as u8, maxzoom as u8, bounds);
         serde_json::to_string(&tj).unwrap_or_else(|_| "{}".into())
     });
     (
@@ -218,10 +218,10 @@ pub async fn style(
 async fn serve_pg(
     state: Arc<AppState>,
     layer_name: String,
-    pool: std::sync::Arc<pg_source::PgPool>,
-    def: &pg_source::PgSourceDef,
+    pool: std::sync::Arc<gisserver::pg_source::PgPool>,
+    def: &gisserver::pg_source::PgSourceDef,
     tms: Option<&str>,
-    grid: Option<wms_common::tile::TileMatrixSet>,
+    grid: Option<gisserver::wms_common::tile::TileMatrixSet>,
     z: u32,
     x: u32,
     y: u32,
@@ -232,15 +232,15 @@ async fn serve_pg(
         WebMercator,
         /// A published grid: the tile envelope comes from its own origin and
         /// resolution, geometry is cut in the grid's CRS.
-        Grid(wms_common::tile::TileMatrixSet, i32),
-        /// Original projection grid (see `pg_source::grid`) — legacy path used
+        Grid(gisserver::wms_common::tile::TileMatrixSet, i32),
+        /// Original projection grid (see `gisserver::pg_source::grid`) — legacy path used
         /// when the layer publishes no custom grid.
         Projected,
     }
     let srid_str = def.srid.to_string();
     let iface = match &grid {
         // Published grid in a non-Web-Mercator CRS: authoritative.
-        Some(g) if g.crs != wms_common::crs::EPSG_3857 => {
+        Some(g) if g.crs != gisserver::wms_common::crs::EPSG_3857 => {
             match epsg_of(&g.crs) {
                 Some(code) => Iface::Grid(g.clone(), code),
                 None => {
@@ -294,22 +294,22 @@ async fn serve_pg(
         Env(String, Vec<SqlParam>),
     }
     let query = match iface {
-        Iface::WebMercator => Query::Tile(pg_source::sql::tile_sql(&pool, def, &layer_id)),
+        Iface::WebMercator => Query::Tile(gisserver::pg_source::sql::tile_sql(&pool, def, &layer_id)),
         Iface::Grid(g, out_srid) => {
             let Some([minx, miny, maxx, maxy]) = g.tile_bounds(z, x, y) else {
                 return plain(StatusCode::NOT_FOUND, format!("tile {z}/{x}/{y} out of grid range"));
             };
             Query::Env(
-                pg_source::sql::tile_sql_env(def, &layer_id, out_srid),
+                gisserver::pg_source::sql::tile_sql_env(def, &layer_id, out_srid),
                 envelope_params(def, [minx, miny, maxx, maxy], z),
             )
         }
         Iface::Projected => {
-            let Some([minx, miny, maxx, maxy]) = pg_source::grid::tile_bounds(z, x, y) else {
+            let Some([minx, miny, maxx, maxy]) = gisserver::pg_source::grid::tile_bounds(z, x, y) else {
                 return plain(StatusCode::NOT_FOUND, format!("tile {z}/{x}/{y} out of grid range"));
             };
             Query::Env(
-                pg_source::sql::tile_sql_projected(def, &layer_id),
+                gisserver::pg_source::sql::tile_sql_projected(def, &layer_id),
                 envelope_params(def, [minx, miny, maxx, maxy], z),
             )
         }
@@ -327,9 +327,9 @@ async fn serve_pg(
             let pool = Arc::clone(&pool);
             async move {
                 let res = match query {
-                    Query::Tile(sql) => pg_source::sql::query_tile(&pool, &sql, z, x, y).await,
+                    Query::Tile(sql) => gisserver::pg_source::sql::query_tile(&pool, &sql, z, x, y).await,
                     Query::Env(sql, params) => {
-                        pg_source::sql::query_tile_env(&pool, &sql, &params).await
+                        gisserver::pg_source::sql::query_tile_env(&pool, &sql, &params).await
                     }
                 };
                 match res {
@@ -460,29 +460,29 @@ fn tilejson_response(doc: String) -> Response {
 /// The database-bound half of [`pg_tilejson`], executed once per cache window
 /// (and once per burst of concurrent cold requests).
 async fn render_pg_tilejson(
-    pool: std::sync::Arc<pg_source::PgPool>,
-    def: pg_source::PgSourceDef,
-    grid: Option<wms_common::tile::TileMatrixSet>,
+    pool: std::sync::Arc<gisserver::pg_source::PgPool>,
+    def: gisserver::pg_source::PgSourceDef,
+    grid: Option<gisserver::wms_common::tile::TileMatrixSet>,
     tms: Option<String>,
     base: String,
     layer_name: String,
 ) -> String {
     let mut extra = serde_json::Map::new();
     let (crs_tag, template, bounds, crs_member, zrange) = match &grid {
-        Some(g) if g.crs != wms_common::crs::EPSG_3857 => {
+        Some(g) if g.crs != gisserver::wms_common::crs::EPSG_3857 => {
             // 网格 CRS 与数据 SRID 一致时直接取源包络；否则退回网格满幅范围。
             let same_crs = epsg_of(&g.crs) == Some(def.srid);
             let b = if same_crs {
-                pg_source::sql::query_bounds(&pool, &pg_source::sql::bounds_sql_src(&def))
+                gisserver::pg_source::sql::query_bounds(&pool, &gisserver::pg_source::sql::bounds_sql_src(&def))
                     .await
                     .ok()
                     .flatten()
                     .or_else(|| g.full_extent())
                     .unwrap_or([
-                        -pg_source::grid::PROJECTED_WORLD_HALF,
-                        -pg_source::grid::PROJECTED_WORLD_HALF,
-                        pg_source::grid::PROJECTED_WORLD_HALF,
-                        pg_source::grid::PROJECTED_WORLD_HALF,
+                        -gisserver::pg_source::grid::PROJECTED_WORLD_HALF,
+                        -gisserver::pg_source::grid::PROJECTED_WORLD_HALF,
+                        gisserver::pg_source::grid::PROJECTED_WORLD_HALF,
+                        gisserver::pg_source::grid::PROJECTED_WORLD_HALF,
                     ])
             } else {
                 g.full_extent().unwrap_or([-180.0, -90.0, 180.0, 90.0])
@@ -511,15 +511,15 @@ async fn render_pg_tilejson(
                 Some(s) if s == def.srid.to_string() || s == format!("EPSG:{}", def.srid)
             );
             if same_srid {
-                let b = pg_source::sql::query_bounds(&pool, &pg_source::sql::bounds_sql_src(&def))
+                let b = gisserver::pg_source::sql::query_bounds(&pool, &gisserver::pg_source::sql::bounds_sql_src(&def))
                     .await
                     .ok()
                     .flatten()
                     .unwrap_or([
-                        -pg_source::grid::PROJECTED_WORLD_HALF,
-                        -pg_source::grid::PROJECTED_WORLD_HALF,
-                        pg_source::grid::PROJECTED_WORLD_HALF,
-                        pg_source::grid::PROJECTED_WORLD_HALF,
+                        -gisserver::pg_source::grid::PROJECTED_WORLD_HALF,
+                        -gisserver::pg_source::grid::PROJECTED_WORLD_HALF,
+                        gisserver::pg_source::grid::PROJECTED_WORLD_HALF,
+                        gisserver::pg_source::grid::PROJECTED_WORLD_HALF,
                     ]);
                 (
                     def.srid.to_string(),
@@ -529,7 +529,7 @@ async fn render_pg_tilejson(
                     (u32::from(def.minzoom.unwrap_or(0)), u32::from(def.maxzoom.unwrap_or(22))),
                 )
             } else {
-                let b = pg_source::sql::query_bounds(&pool, &pg_source::sql::bounds_sql(&def))
+                let b = gisserver::pg_source::sql::query_bounds(&pool, &gisserver::pg_source::sql::bounds_sql(&def))
                     .await
                     .ok()
                     .flatten()
@@ -549,12 +549,12 @@ async fn render_pg_tilejson(
     // information_schema.
     let fields = match &def.from {
         Some(f) => {
-            pg_source::sql::discover_from_fields(&pool, f, &def.geometry_column)
+            gisserver::pg_source::sql::discover_from_fields(&pool, f, &def.geometry_column)
                 .await
                 .unwrap_or_default()
         }
         None => {
-            pg_source::sql::discover_fields(&pool, &def.schema, &def.table, &def.geometry_column)
+            gisserver::pg_source::sql::discover_fields(&pool, &def.schema, &def.table, &def.geometry_column)
                 .await
                 .unwrap_or_default()
         }
@@ -621,7 +621,7 @@ fn epsg_of(crs: &str) -> Option<i32> {
 /// Envelope params for `tile_sql_env` / `tile_sql_projected`: `$1..$4` are the
 /// tile bbox in the grid CRS, `$5` (only when simplify is configured) is zoom.
 fn envelope_params(
-    def: &pg_source::PgSourceDef,
+    def: &gisserver::pg_source::PgSourceDef,
     bbox: [f64; 4],
     z: u32,
 ) -> Vec<SqlParam> {

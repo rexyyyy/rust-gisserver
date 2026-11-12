@@ -9,8 +9,8 @@ use axum::http::{HeaderMap, StatusCode, header};
 use axum::response::{IntoResponse, Response};
 
 use crate::state::AppState;
-use ogcapi_tiles::{TiledCollection, tile_matrix_set, tile_matrix_sets, tileset, tilesets};
-use wms_common::tile::{TileMatrixSet, strip_size_suffix};
+use gisserver::ogcapi_tiles::{TiledCollection, tile_matrix_set, tile_matrix_sets, tileset, tilesets};
+use gisserver::wms_common::tile::{TileMatrixSet, strip_size_suffix};
 
 /// The mount point (kept in one place so links and routes cannot drift).
 pub const BASE_PATH: &str = "/ogc/tiles/v1";
@@ -53,13 +53,13 @@ fn tiled_collections(state: &AppState) -> Arc<Vec<TiledCollection>> {
 /// GET /ogc/tiles/v1 — landing page.
 pub async fn landing(State(state): State<Arc<AppState>>, headers: HeaderMap) -> Response {
     let base = format!("{}{}", crate::handlers::base_url(&state, &headers), BASE_PATH);
-    let doc = state.cache.doc(format!("oat-landing/{base}"), || ogcapi_tiles::landing(&base));
+    let doc = state.cache.doc(format!("oat-landing/{base}"), || gisserver::ogcapi_tiles::landing(&base));
     json_response((*doc).clone())
 }
 
 /// GET /ogc/tiles/v1/conformance
 pub async fn conformance(State(state): State<Arc<AppState>>) -> Response {
-    let doc = state.cache.doc("oat-conformance".to_string(), ogcapi_tiles::conformance);
+    let doc = state.cache.doc("oat-conformance".to_string(), gisserver::ogcapi_tiles::conformance);
     json_response((*doc).clone())
 }
 
@@ -109,7 +109,7 @@ pub async fn tile_matrix_set_one(
             .and_then(|l| l.def.extent)
     };
     let doc = state.cache.doc(format!("oat-tms/{base}/{tms_id}"), || {
-        let s = tile_matrix_set(&base, &g, projection::crs_proj4(&g.crs).as_deref());
+        let s = tile_matrix_set(&base, &g, gisserver::projection::crs_proj4(&g.crs).as_deref());
         match bbox {
             Some(b) => with_bbox(s, b),
             None => s,
@@ -137,7 +137,7 @@ pub async fn collections(State(state): State<Arc<AppState>>, headers: HeaderMap)
     let base = format!("{}{}", crate::handlers::base_url(&state, &headers), BASE_PATH);
     let cols = tiled_collections(&state);
     let doc = state.cache.doc(format!("oat-collections/{base}"), || {
-        ogcapi_tiles::collections(&base, &cols)
+        gisserver::ogcapi_tiles::collections(&base, &cols)
     });
     json_response((*doc).clone())
 }
@@ -156,7 +156,7 @@ pub async fn collection(
         );
     };
     let doc = state.cache.doc(format!("oat-collection/{base}/{collection_id}"), || {
-        ogcapi_tiles::collection(&base, &c)
+        gisserver::ogcapi_tiles::collection(&base, &c)
     });
     json_response((*doc).clone())
 }

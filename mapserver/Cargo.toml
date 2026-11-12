@@ -1,8 +1,7 @@
-# gisserver workspace
+# mapserver —— rust-gisserver 的地图服务器（引擎，经 path 依赖核心库 gisserver）
 #
-# Published crates live under the `gisserver-*` namespace. Directory names stay
-# short (`crates/wms-common`, `services/map-api`) and the `package` aliases in
-# [workspace.dependencies] keep the same short Rust import names in source.
+# Core library `gisserver` is a single package with feature-gated modules;
+# the engine enables everything via features = ["full"].
 [workspace]
 resolver = "2"
 members = ["services/*"]
@@ -14,25 +13,8 @@ edition = "2021"
 license = "AGPL-3.0-only"
 
 [workspace.dependencies]
-# --- Internal crates (gisserver-* published names) --------------------------
-# `package` is the crates.io name; the key stays the Rust import name.
-# `version` is required by `cargo publish` to turn a path dep into a registry one.
-wms-common = { package = "gisserver-wms-common", version = "0.1.0", path = "../gisserver/crates/wms-common" }
-wms-protocol = { package = "gisserver-wms-protocol", version = "0.1.0", path = "../gisserver/crates/wms-protocol" }
-projection = { package = "gisserver-projection", version = "0.1.0", path = "../gisserver/crates/projection" }
-storage = { package = "gisserver-storage", version = "0.1.0", path = "../gisserver/crates/storage" }
-cog = { package = "gisserver-cog", version = "0.1.0", path = "../gisserver/crates/cog" }
-renderer = { package = "gisserver-renderer", version = "0.1.0", path = "../gisserver/crates/renderer" }
-mvt = { package = "gisserver-mvt", version = "0.1.0", path = "../gisserver/crates/mvt" }
-pmtiles = { package = "gisserver-pmtiles", version = "0.1.0", path = "../gisserver/crates/pmtiles" }
-arcgis-cache = { package = "gisserver-arcgis-cache", version = "0.1.0", path = "../gisserver/crates/arcgis-cache" }
-vector-query = { package = "gisserver-vector-query", version = "0.1.0", path = "../gisserver/crates/vector-query" }
-wfs-protocol = { package = "gisserver-wfs-protocol", version = "0.1.0", path = "../gisserver/crates/wfs-protocol" }
-ogcapi-features = { package = "gisserver-ogcapi-features", version = "0.1.0", path = "../gisserver/crates/ogcapi-features" }
-ogcapi-tiles = { package = "gisserver-ogcapi-tiles", version = "0.1.0", path = "../gisserver/crates/ogcapi-tiles" }
-pg-source = { package = "gisserver-pg-source", version = "0.1.0", path = "../gisserver/crates/pg-source" }
-gis-encoding = { package = "gisserver-encoding", version = "0.1.0", path = "../gisserver/crates/gis-encoding" }
-
+# --- Core library (single package, feature-gated modules) -------------------
+gisserver = { path = "../gisserver", features = ["full"] }
 # --- Runtime / async --------------------------------------------------------
 tokio = { version = "1", features = ["full"] }
 futures = "0.3"

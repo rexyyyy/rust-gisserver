@@ -4,11 +4,11 @@ use std::collections::BTreeMap;
 use std::path::PathBuf;
 use std::sync::{Arc, RwLock};
 
-use pg_source::{PgPool, PgRegistry, PgSourceDef};
+use gisserver::pg_source::{PgPool, PgRegistry, PgSourceDef};
 use serde::Serialize;
-use storage::TileCache;
-use wms_common::layer::{Layer, SourceKind};
-use wms_common::tile::TileMatrixSet;
+use gisserver::storage::TileCache;
+use gisserver::wms_common::layer::{Layer, SourceKind};
+use gisserver::wms_common::tile::TileMatrixSet;
 
 use crate::admin::access_log::AccessLog;
 use crate::admin::registry::{Registry, ServiceScan};
@@ -175,7 +175,7 @@ pub async fn build_pg_registry(
             // SQL/view layers cannot be probed via information_schema; their
             // columns come from the row description of the FROM expression.
             let discovered_props = if let Some(f) = &def.from {
-                match pg_source::sql::discover_from_fields(&pool, f, &def.geometry_column).await {
+                match gisserver::pg_source::sql::discover_from_fields(&pool, f, &def.geometry_column).await {
                     Ok(cols) if cols.is_empty() => {
                         tracing::warn!(
                             layer = %name,
@@ -199,7 +199,7 @@ pub async fn build_pg_registry(
                     }
                 }
             } else {
-                match pg_source::sql::discover_columns(
+                match gisserver::pg_source::sql::discover_columns(
                     &pool,
                     &def.schema,
                     &def.table,
@@ -253,9 +253,9 @@ pub async fn build_pg_registry(
         // turns every tile/feature query into a sequential scan — say so once,
         // loudly, at startup instead of in p99 latency later.
         if def.from.is_none() {
-            match pg_source::sql::query_count(
+            match gisserver::pg_source::sql::query_count(
                 &probe_pool,
-                &pg_source::sql::gist_index_sql(&def),
+                &gisserver::pg_source::sql::gist_index_sql(&def),
                 &[],
             )
             .await
@@ -275,9 +275,9 @@ pub async fn build_pg_registry(
             // Fast path (P3): planner statistics via ST_EstimatedExtent —
             // no full-table scan. Table sources only; NULL stats fall back.
             if def.from.is_none() {
-                match pg_source::sql::query_bounds(
+                match gisserver::pg_source::sql::query_bounds(
                     &probe_pool,
-                    &pg_source::sql::bounds_sql_estimated(&def),
+                    &gisserver::pg_source::sql::bounds_sql_estimated(&def),
                 )
                 .await
                 {
@@ -289,7 +289,7 @@ pub async fn build_pg_registry(
                 }
             }
             if bounds.is_none() {
-                match pg_source::sql::query_bounds(&probe_pool, &pg_source::sql::bounds_sql(&def))
+                match gisserver::pg_source::sql::query_bounds(&probe_pool, &gisserver::pg_source::sql::bounds_sql(&def))
                     .await
                 {
                     Ok(Some(b)) => bounds = Some(b),
@@ -302,9 +302,9 @@ pub async fn build_pg_registry(
         // for SQL/view layers always exact (no single stats entry).
         let mut count: Option<i64> = None;
         if def.from.is_none() {
-            match pg_source::sql::query_count(
+            match gisserver::pg_source::sql::query_count(
                 &probe_pool,
-                &pg_source::sql::count_sql_estimated(&def),
+                &gisserver::pg_source::sql::count_sql_estimated(&def),
                 &[],
             )
             .await
@@ -315,9 +315,9 @@ pub async fn build_pg_registry(
         }
         let count = match count {
             Some(c) => c,
-            None => match pg_source::sql::query_count(
+            None => match gisserver::pg_source::sql::query_count(
                 &probe_pool,
-                &pg_source::sql::count_all_sql(&def),
+                &gisserver::pg_source::sql::count_all_sql(&def),
                 &[],
             )
             .await
@@ -464,9 +464,9 @@ impl AppState {
         // explicit env vars PROJ_DLL / PROJ_DATA, then run-directory defaults
         // (`proj_9.dll` in the working directory, `<workdir>/share/proj`).
         // Missing/failed load only disables arbitrary-CRS reprojection.
-        projection::init_proj(None, None);
+        gisserver::projection::init_proj(None, None);
         tracing::info!(
-            proj_loaded = projection::proj().is_some(),
+            proj_loaded = gisserver::projection::proj().is_some(),
             "projection backend (PROJ_DLL/PROJ_DATA env or run-dir defaults)"
         );
         let base_url = config
@@ -897,9 +897,9 @@ impl AppState {
         // 完整 id `wh_custom_grid_4522`）：`strip_size_suffix` 会把投影带码（4522）
         // 当尺寸后缀剥掉，客户端（尤其 OL WMTS 按 caps 回发）只会带剥离 id。这里在
         // 图层声明的网格里按同一剥离规则反查完整 key 再取，避免 WMTS GetTile 误判无网格。
-        let want = wms_common::tile::strip_size_suffix(grid_id).to_ascii_lowercase();
+        let want = gisserver::wms_common::tile::strip_size_suffix(grid_id).to_ascii_lowercase();
         for declared in &layer.def.grids {
-            if wms_common::tile::strip_size_suffix(declared).to_ascii_lowercase() == want {
+            if gisserver::wms_common::tile::strip_size_suffix(declared).to_ascii_lowercase() == want {
                 if let Some(g) = custom.get(declared) {
                     return Some(g.clone());
                 }
@@ -920,12 +920,12 @@ impl AppState {
     /// the geographic `WorldCRS84Quad` grid the way WMTS already does, without
     /// silently rasterizing grids a layer never declared.
     pub fn advertised_grid(&self, layer: &LayerRuntime, grid_id: &str) -> Option<TileMatrixSet> {
-        let want = wms_common::tile::strip_size_suffix(grid_id).to_ascii_lowercase();
+        let want = gisserver::wms_common::tile::strip_size_suffix(grid_id).to_ascii_lowercase();
         let declared = layer
             .def
             .grids
             .iter()
-            .any(|g| wms_common::tile::strip_size_suffix(g).to_ascii_lowercase() == want);
+            .any(|g| gisserver::wms_common::tile::strip_size_suffix(g).to_ascii_lowercase() == want);
         if declared {
             self.grid_for_layer(layer, grid_id)
         } else {

@@ -10,7 +10,7 @@ use axum::response::{IntoResponse, Response};
 /// of guessing from a failing GetMap. The built-in 4326<->3857 path serves
 /// either way, so this flag never flips the probe to non-200.
 pub async fn health() -> Response {
-    let body = format!(r#"{{"status":"ok","proj":{}}}"#, projection::proj().is_some());
+    let body = format!(r#"{{"status":"ok","proj":{}}}"#, gisserver::projection::proj().is_some());
     (StatusCode::OK, [(axum::http::header::CONTENT_TYPE, "application/json")], body).into_response()
 }
 

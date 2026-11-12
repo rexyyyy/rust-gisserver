@@ -266,7 +266,7 @@ pub async fn pg_test(
             )
         }
     };
-    match pg_source::PgPool::new(&dsn, 1).await {
+    match gisserver::pg_source::PgPool::new(&dsn, 1).await {
         Ok(pool) => match pool.get().await {
             Ok(client) => match client.query_opt("SELECT 1", &[]).await {
                 Ok(_) => json(
@@ -332,7 +332,7 @@ pub async fn pg_query(
         .and_then(|v| v.as_i64())
         .unwrap_or(100)
         .clamp(1, 1000);
-    match pg_source::PgPool::new(&dsn, 1).await {
+    match gisserver::pg_source::PgPool::new(&dsn, 1).await {
         Ok(pool) => match pool.get().await {
             Ok(client) => {
                 // 先用 LIMIT 0 准备语句取列名（空表也能拿到列结构），再按 limit 查数据。
@@ -413,7 +413,7 @@ pub async fn components(
         return r;
     }
     let pg = state.pg_registry().is_some();
-    let proj = projection::proj().is_some();
+    let proj = gisserver::projection::proj().is_some();
     let catalog_root = resolve_catalog_root(&state);
     let catalog_exists = catalog_root.exists();
     let tilesets_dir = state.config.tilesets_dir();

@@ -7,11 +7,11 @@
 
 use std::collections::{BTreeMap, BTreeSet};
 
-use pg_source::PgPool;
+use gisserver::pg_source::PgPool;
 use serde_json::Value;
 
 use crate::config::GridDef;
-use wms_common::layer::Layer;
+use gisserver::wms_common::layer::Layer;
 
 /// 从 `sys_published_layer` 载入全部 `active` 且未删除的图层定义。
 ///

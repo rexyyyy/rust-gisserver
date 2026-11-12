@@ -19,26 +19,11 @@ name = "map-api"
 path = "src/main.rs"
 
 [dependencies]
-wms-common.workspace = true
-pg-source.workspace = true
-gis-encoding.workspace = true
-wms-protocol.workspace = true
-projection.workspace = true
-storage.workspace = true
-cog.workspace = true
+gisserver = { workspace = true }
 tokio-postgres = { workspace = true }
 # SHP 导入（/admin/pg-import-shp）通过 COPY 流式写库，需要 Sink 接口与 Bytes 缓冲。
 bytes = { workspace = true }
 futures-util = { workspace = true }
-renderer.workspace = true
-mvt.workspace = true
-pmtiles.workspace = true
-# v1/v2 bundle reader). Only opened for `source.type: arcgis` layers.
-arcgis-cache.workspace = true
-vector-query.workspace = true
-wfs-protocol.workspace = true
-ogcapi-features.workspace = true
-ogcapi-tiles.workspace = true
 pinyin = "0.11"
 rusqlite = { workspace = true }
 

@@ -6,8 +6,8 @@
 //! `WIDTH`, `HEIGHT` (GeoServer's common KVP subset; `SCALE`, `DPI`,
 //! `TRANSPARENT`, legend *rules* JSON and font metrics are out of scope).
 
-use renderer::sld::{MarkKind, SldDocument, Symbolizer};
-use renderer::vector::VectorStyle;
+use gisserver::renderer::sld::{MarkKind, SldDocument, Symbolizer};
+use gisserver::renderer::vector::VectorStyle;
 
 use crate::layer::LayerRuntime;
 
@@ -52,7 +52,7 @@ pub fn legend_png(
     // Raster layer: vertical palette ramp (value-domain style).
     if let Some(rs) = layer.style.as_ref().and_then(|s| s.raster.as_ref()) {
         draw_palette_ramp(&mut canvas, w, h, rs);
-        return renderer::png::encode_rgba(&canvas, w as u32, h as u32);
+        return gisserver::renderer::png::encode_rgba(&canvas, w as u32, h as u32);
     }
 
     if let Some(doc) = &layer.sld {
@@ -60,7 +60,7 @@ pub fn legend_png(
     } else {
         draw_legacy_legend(&mut canvas, w, h, layer);
     }
-    renderer::png::encode_rgba(&canvas, w as u32, h as u32)
+    gisserver::renderer::png::encode_rgba(&canvas, w as u32, h as u32)
 }
 
 /// Collect the (rule-name, symbolizer) pairs to draw, honouring `rule`.
@@ -97,7 +97,7 @@ fn draw_sld_legend(
         let c = [200, 200, 200, 255];
         for y in PAD..(h as i64 - PAD) {
             for x in PAD..(w as i64 - PAD) {
-                renderer::blend::blend_px(canvas, x, y, w, h, c);
+                gisserver::renderer::blend::blend_px(canvas, x, y, w, h, c);
             }
         }
         return;
@@ -132,7 +132,7 @@ fn draw_symbolizer(
             let r = (p.size / 2.0).clamp(2.0, max_r);
             let mut sym2 = p.clone();
             sym2.size = r * 2.0;
-            renderer::vector::stamp_mark(canvas, w, h, cx as f64, cy as f64, &sym2);
+            gisserver::renderer::vector::stamp_mark(canvas, w, h, cx as f64, cy as f64, &sym2);
         }
         Symbolizer::Line(l) => {
             let path = vec![
@@ -158,18 +158,18 @@ fn draw_symbolizer(
         Symbolizer::Text(t) => {
             // Show the literal label, or the property name it references.
             let label = match &t.label {
-                renderer::sld::LabelExpr::Literal(s) => s.clone(),
-                renderer::sld::LabelExpr::Property(p) => p.clone(),
+                gisserver::renderer::sld::LabelExpr::Literal(s) => s.clone(),
+                gisserver::renderer::sld::LabelExpr::Property(p) => p.clone(),
             };
             let scale = ((t.font_size / 7.0).round() as usize).clamp(1, 4);
-            let tw = renderer::font::text_width(&label, scale) as i64;
-            let th = renderer::font::text_height(scale) as i64;
+            let tw = gisserver::renderer::font::text_width(&label, scale) as i64;
+            let th = gisserver::renderer::font::text_height(scale) as i64;
             let x = cx - tw / 2;
             let y = cy - th / 2;
             if let Some(halo) = t.halo_fill {
-                renderer::font::draw_text(canvas, w, h, x, y, &label, halo, scale);
+                gisserver::renderer::font::draw_text(canvas, w, h, x, y, &label, halo, scale);
             }
-            renderer::font::draw_text(canvas, w, h, x, y, &label, t.fill, scale);
+            gisserver::renderer::font::draw_text(canvas, w, h, x, y, &label, t.fill, scale);
         }
         Symbolizer::Raster => {}
     }
@@ -223,19 +223,19 @@ fn draw_legacy_legend(canvas: &mut [u8], w: usize, h: usize, layer: &LayerRuntim
             );
         }
         _ => {
-            let sym = renderer::sld::PointSymbolizer {
+            let sym = gisserver::renderer::sld::PointSymbolizer {
                 mark: MarkKind::Circle,
                 fill: style.point_color,
                 stroke: style.stroke,
                 size: style.point_size * 2.0,
                 stroke_width: style.stroke_width,
             };
-            renderer::vector::stamp_mark(canvas, w, h, cx, cy, &sym);
+            gisserver::renderer::vector::stamp_mark(canvas, w, h, cx, cy, &sym);
         }
     }
 }
 
-fn draw_palette_ramp(canvas: &mut [u8], w: usize, h: usize, rs: &wms_common::style::RasterStyle) {
+fn draw_palette_ramp(canvas: &mut [u8], w: usize, h: usize, rs: &gisserver::wms_common::style::RasterStyle) {
     let (min, max) = match (rs.min, rs.max) {
         (Some(a), Some(b)) if b > a => (a, b),
         _ => {
@@ -247,7 +247,7 @@ fn draw_palette_ramp(canvas: &mut [u8], w: usize, h: usize, rs: &wms_common::sty
                 let col = [c[0], c[1], c[2], 255];
                 for y in PAD..(h as i64 - PAD) {
                     for x in x0..x1 {
-                        renderer::blend::blend_px(canvas, x, y, w, h, col);
+                        gisserver::renderer::blend::blend_px(canvas, x, y, w, h, col);
                     }
                 }
             }
@@ -272,7 +272,7 @@ fn draw_palette_ramp(canvas: &mut [u8], w: usize, h: usize, rs: &wms_common::sty
             255,
         ];
         for x in PAD..(w as i64 - PAD) {
-            renderer::blend::blend_px(canvas, x, y, w, h, col);
+            gisserver::renderer::blend::blend_px(canvas, x, y, w, h, col);
         }
     }
 }
@@ -296,7 +296,7 @@ fn fill_legend_poly(canvas: &mut [u8], w: usize, h: usize, ring: &[(f64, f64)], 
                 break;
             }
             for x in pair[0].ceil() as i64..=pair[1].floor() as i64 {
-                renderer::blend::blend_px(canvas, x, y, w, h, color);
+                gisserver::renderer::blend::blend_px(canvas, x, y, w, h, color);
             }
         }
     }
@@ -374,7 +374,7 @@ fn legend_disc(canvas: &mut [u8], w: usize, h: usize, x: f64, y: f64, r: f64, co
             let dx = xx as f64 - x;
             let dy = yy as f64 - y;
             if dx * dx + dy * dy <= r * r {
-                renderer::blend::blend_px(canvas, xx, yy, w, h, color);
+                gisserver::renderer::blend::blend_px(canvas, xx, yy, w, h, color);
             }
         }
     }
@@ -386,10 +386,10 @@ mod tests {
 
     fn point_layer() -> crate::layer::LayerRuntime {
         crate::layer::LayerRuntime {
-            def: wms_common::layer::Layer {
+            def: gisserver::wms_common::layer::Layer {
                 name: "places".into(),
                 title: "Places".into(),
-                source: wms_common::layer::SourceKind::Vector {
+                source: gisserver::wms_common::layer::SourceKind::Vector {
                     path: "unused".into(),
                 },
                 src_crs: "EPSG:4326".into(),

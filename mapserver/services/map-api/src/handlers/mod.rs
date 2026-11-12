@@ -661,7 +661,7 @@ pub async fn file_range_response(
                 let end = end.min(total - 1);
                 let n = (end - start + 1) as usize;
                 let mut buf = vec![0u8; n];
-                storage::read_exact_at(&file, &mut buf, start)?;
+                gisserver::storage::read_exact_at(&file, &mut buf, start)?;
                 FileRange::Partial {
                     total,
                     start,
@@ -677,7 +677,7 @@ pub async fn file_range_response(
                     let n = ((total - off).min(1 << 20)) as usize;
                     let base = bytes.len();
                     bytes.resize(base + n, 0);
-                    storage::read_exact_at(&file, &mut bytes[base..], off)?;
+                    gisserver::storage::read_exact_at(&file, &mut bytes[base..], off)?;
                     off += n as u64;
                 }
                 FileRange::Full { bytes }

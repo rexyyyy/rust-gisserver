@@ -19,7 +19,7 @@ use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use std::time::SystemTime;
 
-use storage::read_exact_at;
+use gisserver::storage::read_exact_at;
 
 /// 单瓦目录条目（25 字节反序列化结果）。
 #[derive(Clone, Copy, Debug)]

@@ -147,7 +147,7 @@ async fn run_import(body: Value, progress: Option<mpsc::Sender<Value>>) -> Respo
         .map(str::trim)
         .filter(|s| !s.is_empty())
         .map(str::to_string);
-    let region = locale.as_deref().map(gis_encoding::Region::from_locale);
+    let region = locale.as_deref().map(gisserver::encoding::Region::from_locale);
     let dbf_encoding = detect_dbf_encoding(&shp, region, explicit_encoding.as_deref());
 
     let (detected_srid, srid_detected) = detect_srid(&shp);
@@ -180,7 +180,7 @@ async fn run_import(body: Value, progress: Option<mpsc::Sender<Value>>) -> Respo
         }
     };
 
-    let pool = match pg_source::PgPool::new(&dsn, 1).await {
+    let pool = match gisserver::pg_source::PgPool::new(&dsn, 1).await {
         Ok(p) => p,
         Err(e) => {
             return json_resp(
@@ -423,16 +423,16 @@ fn bad(msg: &str) -> Response {
 /// `explicit`：调用方直接指定的编码名（跳过自动判定）。
 fn detect_dbf_encoding(
     shp: &Path,
-    region: Option<gis_encoding::Region>,
+    region: Option<gisserver::encoding::Region>,
     explicit: Option<&str>,
 ) -> Option<&'static str> {
     // 调用方显式指定优先（转成 iconv 名）
     if let Some(name) = explicit {
-        return gis_encoding::dbf::cpg_to_iconv_name(name);
+        return gisserver::encoding::dbf::cpg_to_iconv_name(name);
     }
     let hint = match region {
-        Some(r) => gis_encoding::dbf::detect_shp_for(shp, r),
-        None => gis_encoding::dbf::detect_shp(shp),
+        Some(r) => gisserver::encoding::dbf::detect_shp_for(shp, r),
+        None => gisserver::encoding::dbf::detect_shp(shp),
     };
     hint.ok().and_then(|h| h.suggested_shp2pgsql)
 }

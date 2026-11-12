@@ -11,8 +11,8 @@ $env:INCLUDE  = "$msvc\include;$sdk\Include\$sdkv\um;$sdk\Include\$sdkv\ucrt;$sd
 $env:CARGO_TARGET_DIR = "E:\rmap_target"
 
 Set-Location "D:\mycomputor\documents\gis-wt\thirdparty\rust-gisserver"
-Write-Host "=== cargo test -p gisserver-ogcapi-tiles --lib (resolution 口径守卫) ==="
-& "$cargo\cargo.exe" test -p gisserver-ogcapi-tiles --lib *>"E:\rmap_target\test_ogcapi_tiles.log"
+Write-Host "=== cargo test -p mapserver --lib (resolution 口径守卫) ==="
+& "$cargo\cargo.exe" test -p mapserver --lib *>"E:\rmap_target\test_ogcapi_tiles.log"
 $testCode = $LASTEXITCODE
 Write-Host "test exit code = $testCode"
 Get-Content "E:\rmap_target\test_ogcapi_tiles.log" -Tail 12

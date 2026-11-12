@@ -20,7 +20,7 @@ use std::sync::Arc;
 use axum::extract::{Path, RawQuery, State};
 use axum::http::{header, HeaderMap, StatusCode};
 use axum::response::{IntoResponse, Response};
-use renderer::sld::SldDocument;
+use gisserver::renderer::sld::SldDocument;
 
 use crate::state::AppState;
 
@@ -296,7 +296,7 @@ pub async fn legend(
     };
     let kv = qs
         .as_deref()
-        .map(wms_protocol::kvp::parse_kvp)
+        .map(gisserver::wms_protocol::kvp::parse_kvp)
         .unwrap_or_default();
     let get = |k: &str| -> Option<u32> {
         kv.iter()
@@ -307,10 +307,10 @@ pub async fn legend(
     let h = get("HEIGHT").unwrap_or(if doc.feature_type_styles.len() > 1 { 96 } else { 24 }).clamp(8, 512);
 
     let rt = crate::layer::LayerRuntime {
-        def: wms_common::layer::Layer {
+        def: gisserver::wms_common::layer::Layer {
             name: "style-preview".into(),
             title: String::new(),
-            source: wms_common::layer::SourceKind::Vector { path: String::new() },
+            source: gisserver::wms_common::layer::SourceKind::Vector { path: String::new() },
             src_crs: "EPSG:4326".into(),
             style: None,
             sld: None,

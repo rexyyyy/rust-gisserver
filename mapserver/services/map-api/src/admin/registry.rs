@@ -21,7 +21,7 @@
 use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
 
-use pg_source::PgPool;
+use gisserver::pg_source::PgPool;
 
 /// All valid service states.
 pub const STATES: [&str; 4] = ["active", "stopped", "paused", "deleted"];

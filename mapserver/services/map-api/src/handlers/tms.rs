@@ -13,7 +13,7 @@ use axum::response::{IntoResponse, Response};
 
 use crate::layer::LayerRuntime;
 use crate::state::AppState;
-use wms_common::tile::TileMatrixSet;
+use gisserver::wms_common::tile::TileMatrixSet;
 
 /// GET /tms/1.0.0/{layer}/{z}/{x}/{y}.png (y is TMS-style, bottom-up).
 pub async fn tile(

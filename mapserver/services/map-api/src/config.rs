@@ -73,8 +73,8 @@
 use std::collections::BTreeMap;
 
 use serde::{Deserialize, Serialize};
-use wms_common::layer::Layer;
-use wms_common::tile::{TileMatrixSet, TmLevel};
+use gisserver::wms_common::layer::Layer;
+use gisserver::wms_common::tile::{TileMatrixSet, TmLevel};
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct ServerOpts {
@@ -158,8 +158,8 @@ pub struct S3Opts {
 
 impl S3Opts {
     /// Convert into the storage-layer signing config.
-    pub fn to_storage(&self) -> storage::S3Config {
-        storage::S3Config {
+    pub fn to_storage(&self) -> gisserver::storage::S3Config {
+        gisserver::storage::S3Config {
             endpoint: self.endpoint.clone(),
             region: self.region.clone(),
             access_key: self.access_key.clone(),
@@ -436,7 +436,7 @@ impl GridDef {
             .collect();
         TileMatrixSet {
             id: id.to_string(),
-            crs: wms_common::crs::normalize(&self.crs),
+            crs: gisserver::wms_common::crs::normalize(&self.crs),
             origin_x: self.origin[0],
             origin_y: self.origin[1],
             tile_w: self.tile_px,
@@ -587,12 +587,12 @@ impl ServerConfig {
                 }
                 let mut layer = parsed.layer;
                 let got_type = match &layer.source {
-                    wms_common::layer::SourceKind::Cog { .. } => "cog",
-                    wms_common::layer::SourceKind::Vector { .. } => "vector",
-                    wms_common::layer::SourceKind::Pmtiles { .. } => "pmtiles",
-                    wms_common::layer::SourceKind::Mbtiles { .. } => "mbtiles",
-                    wms_common::layer::SourceKind::Arcgis { .. } => "arcgis",
-                    wms_common::layer::SourceKind::Postgis(_) => "postgis",
+                    gisserver::wms_common::layer::SourceKind::Cog { .. } => "cog",
+                    gisserver::wms_common::layer::SourceKind::Vector { .. } => "vector",
+                    gisserver::wms_common::layer::SourceKind::Pmtiles { .. } => "pmtiles",
+                    gisserver::wms_common::layer::SourceKind::Mbtiles { .. } => "mbtiles",
+                    gisserver::wms_common::layer::SourceKind::Arcgis { .. } => "arcgis",
+                    gisserver::wms_common::layer::SourceKind::Postgis(_) => "postgis",
                 };
                 if got_type != want_type {
                     warnings.push(format!(
@@ -654,10 +654,10 @@ impl ServerConfig {
     ) {
         for layer in layers.iter_mut() {
             let path = match &layer.source {
-                wms_common::layer::SourceKind::Arcgis { path } => path.clone(),
+                gisserver::wms_common::layer::SourceKind::Arcgis { path } => path.clone(),
                 _ => continue,
             };
-            let cache = match arcgis_cache::ArcgisCache::open(std::path::Path::new(&path)) {
+            let cache = match gisserver::arcgis_cache::ArcgisCache::open(std::path::Path::new(&path)) {
                 Ok(c) => c,
                 Err(e) => {
                     // 不在此摘掉图层：打开时 `LayerRuntime::open` 会用同一条
@@ -701,10 +701,10 @@ impl ServerConfig {
                     );
                 }
             }
-            let src = wms_common::crs::normalize(&spec.crs);
-            if wms_common::crs::normalize(&layer.src_crs) != src {
+            let src = gisserver::wms_common::crs::normalize(&spec.crs);
+            if gisserver::wms_common::crs::normalize(&layer.src_crs) != src {
                 // 缺省值就是 EPSG:4326（没写 src_crs），不必告警。
-                if layer.src_crs != wms_common::crs::EPSG_4326 {
+                if layer.src_crs != gisserver::wms_common::crs::EPSG_4326 {
                     warnings.push(format!(
                         "layer '{}': src_crs '{}' overridden by the cache CRS '{src}'",
                         layer.name, layer.src_crs

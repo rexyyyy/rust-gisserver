@@ -1,97 +1,73 @@
-# gisserver workspace
-#
-# Published crates live under the `gisserver-*` namespace. Directory names stay
-# short (`crates/wms-common`, `services/map-api`) and the `package` aliases in
-# [workspace.dependencies] keep the same short Rust import names in source.
-[workspace]
-resolver = "2"
-members = ["crates/*"]
-
-[workspace.package]
+# gisserver —— rust-gisserver 的核心库（唯一 crates.io 包名）
+# 其余功能域全部作为本包模块（src/<module>），由 features 门控；
+# 地图服务器 mapserver 经 path 依赖并以 features = ["full"] 全量启用。
+[package]
+name = "gisserver"
+description = "Core library family of rust-gisserver: bespoke COG/BigTIFF reader, tile rendering, MVT encoding, PMTiles/MBTiles archives, WMS/WFS/OGC API protocols, projections and PostGIS source - pure Rust, no GDAL binding."
 version = "0.1.0"
 edition = "2021"
-# 双许可（D1b 定稿）：任选其一。发布到 crates.io 不提供代码仓库路径，
-# 故不设 repository 字段。
 license = "MIT OR Apache-2.0"
+readme = "README.md"
 
-[workspace.dependencies]
-# --- Internal crates (gisserver-* published names) --------------------------
-# `package` is the crates.io name; the key stays the Rust import name.
-# `version` is required by `cargo publish` to turn a path dep into a registry one.
-wms-common = { package = "gisserver-wms-common", version = "0.1.0", path = "crates/wms-common" }
-wms-protocol = { package = "gisserver-wms-protocol", version = "0.1.0", path = "crates/wms-protocol" }
-projection = { package = "gisserver-projection", version = "0.1.0", path = "crates/projection" }
-storage = { package = "gisserver-storage", version = "0.1.0", path = "crates/storage" }
-cog = { package = "gisserver-cog", version = "0.1.0", path = "crates/cog" }
-renderer = { package = "gisserver-renderer", version = "0.1.0", path = "crates/renderer" }
-mvt = { package = "gisserver-mvt", version = "0.1.0", path = "crates/mvt" }
-pmtiles = { package = "gisserver-pmtiles", version = "0.1.0", path = "crates/pmtiles" }
-arcgis-cache = { package = "gisserver-arcgis-cache", version = "0.1.0", path = "crates/arcgis-cache" }
-vector-query = { package = "gisserver-vector-query", version = "0.1.0", path = "crates/vector-query" }
-wfs-protocol = { package = "gisserver-wfs-protocol", version = "0.1.0", path = "crates/wfs-protocol" }
-ogcapi-features = { package = "gisserver-ogcapi-features", version = "0.1.0", path = "crates/ogcapi-features" }
-ogcapi-tiles = { package = "gisserver-ogcapi-tiles", version = "0.1.0", path = "crates/ogcapi-tiles" }
-pg-source = { package = "gisserver-pg-source", version = "0.1.0", path = "crates/pg-source" }
-gis-encoding = { package = "gisserver-encoding", version = "0.1.0", path = "crates/gis-encoding" }
+[features]
+default = ["encoding", "mvt", "projection", "vector-query"]
+# Windows ANSI code page fallback for gisserver::encoding::Region::from_env.
+# Off by default: core stays zero-FFI / zero-unsafe; region is declared via
+# GIS_ENCODING_REGION in .env (see config/env presets).
+win-acp = []
+encoding = ["dep:encoding_rs"]
+projection = []
+mvt = []
+vector-query = []
+postgis = ["dep:tokio-postgres", "dep:deadpool-postgres", "dep:bytes", "dep:semver"]
+storage = ["dep:foyer", "dep:ureq", "dep:rayon", "dep:hmac", "dep:sha2", "dep:tracing"]
+cog = ["storage", "dep:flate2", "dep:weezl", "dep:zstd"]
+renderer = ["cog", "projection", "storage", "dep:png"]
+pmtiles = ["storage", "dep:flate2"]
+arcgis-cache = ["dep:flate2"]
+wms-protocol = []
+wfs-protocol = ["wms-protocol", "vector-query", "dep:axum"]
+ogcapi-features = ["vector-query", "dep:axum"]
+ogcapi-tiles = []
+full = [
+    "encoding", "projection", "mvt", "vector-query", "postgis", "storage",
+    "cog", "renderer", "pmtiles", "arcgis-cache", "wms-protocol",
+    "wfs-protocol", "ogcapi-features", "ogcapi-tiles",
+]
 
-# --- Runtime / async --------------------------------------------------------
-tokio = { version = "1", features = ["full"] }
-futures = "0.3"
-# Sink trait for PostGIS COPY streaming; keep the full futures facade out of
-# the dependency graph.
-futures-util = { version = "0.3", default-features = false, features = ["sink"] }
-
-# --- HTTP stack -------------------------------------------------------------
-# axum 0.8 uses `{param}` / `{*rest}`; the 0.7 `:param` form panics at route
-# registration under matchit 0.8 instead of failing at compile time.
-axum = { version = "0.8.9", features = ["macros"] }
-hyper = { version = "1", features = ["full"] }
-tower = { version = "0.5", features = ["util"] }
-# tower-http 0.6 pairs with axum 0.8 (http-body 1.x). compression-* serves
-# Capabilities / OGC JSON / WFS GeoJSON; image/* and already-compressed pbf
-# are skipped by NoRecompress. request-id emits and returns x-request-id.
-tower-http = { version = "0.6.11", features = ["cors", "trace", "compression-gzip", "compression-br", "compression-zstd", "request-id", "timeout"] }
-
-# --- Serialization ----------------------------------------------------------
+[dependencies]
+# --- wms_common (always on): shared base types ---
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
-bytes = "1"
-
-# --- Tile payload codecs ----------------------------------------------------
-# Payload codecs only; COG container, IFD parsing, tiling and windowed reads
-# are implemented in this workspace.
-flate2 = "1"      # DEFLATE (zlib) + gzip (PMTiles directories)
-crc32fast = "1"   # PNG CRCs
-weezl = "0.1"     # LZW (TIFF variant)
-zstd = "0.13"     # ZSTD (TIFF compression 50000)
-png = "0.17"      # PNG encode for tile / map output
-
-# --- Remote sources & request signing ---------------------------------------
-# Sync HTTP client for range reads over http(s):// COGs.
-ureq = "2"
-# AWS SigV4 for s3:// COG sources (MinIO / RustFS / AWS); pure Rust.
-hmac = "0.12"
-sha2 = "0.10"
-
-# --- Caching & parallel decode ----------------------------------------------
-# foyer is the sole cache backend: hybrid for output tiles, in-memory for the
-# other process caches. "serde" enables disk serialization of serde types.
-foyer = { version = "0.22", features = ["serde"] }
-rayon = "1"
-
-# --- Observability / errors / CLI / tests -----------------------------------
-tracing = "0.1"
-tracing-subscriber = { version = "0.3", features = ["env-filter", "json"] }
 thiserror = "1"
-anyhow = "1"
-clap = { version = "4", features = ["derive", "env"] }
-tempfile = "3"
 
-# --- Data stores ------------------------------------------------------------
-# MBTiles (SQLite); bundled builds libsqlite3 from source.
-rusqlite = { version = "0.40", features = ["bundled"] }
-# PostGIS source for dynamic vector tiles and feature queries. A pool is built
-# only when a `source.type: postgis` layer is configured.
-tokio-postgres = "0.7"
-deadpool-postgres = "0.14"
-semver = "1"
+# --- encoding ---
+encoding_rs = { version = "0.8", optional = true }
+
+# --- postgis (pg_source) ---
+tokio-postgres = { version = "0.7", optional = true }
+deadpool-postgres = { version = "0.14", optional = true }
+bytes = { version = "1", optional = true }
+semver = { version = "1", optional = true }
+
+# --- storage (also used by cog / renderer / pmtiles) ---
+foyer = { version = "0.22", features = ["serde"], optional = true }
+ureq = { version = "2", optional = true }
+rayon = { version = "1", optional = true }
+hmac = { version = "0.12", optional = true }
+sha2 = { version = "0.10", optional = true }
+tracing = { version = "0.1", optional = true }
+
+# --- cog / pmtiles / arcgis_cache codecs ---
+flate2 = { version = "1", optional = true }   # DEFLATE/zlib + gzip (PMTiles dirs, TPK)
+weezl = { version = "0.1", optional = true }  # LZW (TIFF variant)
+zstd = { version = "0.13", optional = true }  # ZSTD (TIFF compression 50000)
+
+# --- renderer ---
+png = { version = "0.17", optional = true }
+
+# --- wfs-protocol / ogcapi-features (http response types) ---
+axum = { version = "0.8.9", features = ["macros"], optional = true }
+
+[dev-dependencies]
+tempfile = "3"

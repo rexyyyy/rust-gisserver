@@ -158,7 +158,7 @@ pub fn classify(uri: &Uri) -> Option<(String, String)> {
         return None;
     }
     let query = uri.query().unwrap_or("");
-    let kvp = (!query.is_empty()).then(|| wms_protocol::kvp::parse_kvp(query));
+    let kvp = (!query.is_empty()).then(|| gisserver::wms_protocol::kvp::parse_kvp(query));
     let param = |key: &str| -> Option<String> {
         kvp.as_ref().and_then(|kv| {
             kv.iter()

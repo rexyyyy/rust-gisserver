@@ -6,7 +6,7 @@ use std::sync::Arc;
 use axum::extract::{Path, RawQuery, State};
 use axum::http::{HeaderMap, StatusCode};
 use axum::response::{IntoResponse, Response};
-use wms_protocol::wmts::{self, WmtsCapLayer, WmtsError};
+use gisserver::wms_protocol::wmts::{self, WmtsCapLayer, WmtsError};
 
 use crate::state::AppState;
 
@@ -16,8 +16,8 @@ pub async fn kvp(
     RawQuery(query): RawQuery,
     headers: HeaderMap,
 ) -> Response {
-    let kv = wms_protocol::parse_kvp(query.as_deref().unwrap_or(""));
-    let get = |k: &str| wms_protocol::kvp::lookup(&kv, k);
+    let kv = gisserver::wms_protocol::parse_kvp(query.as_deref().unwrap_or(""));
+    let get = |k: &str| gisserver::wms_protocol::kvp::lookup(&kv, k);
     let request = get("request").unwrap_or("").to_ascii_uppercase();
     let base = crate::handlers::base_url(&state, &headers);
 
@@ -164,7 +164,7 @@ fn cap_layers(state: &AppState) -> Vec<WmtsCapLayer> {
         .collect()
 }
 
-fn all_grids(state: &AppState) -> Vec<wms_common::tile::TileMatrixSet> {
+fn all_grids(state: &AppState) -> Vec<gisserver::wms_common::tile::TileMatrixSet> {
     let mut seen: Vec<String> = Vec::new();
     let mut out = Vec::new();
     for l in state.layers.read().unwrap_or_else(|e| e.into_inner()).iter() {

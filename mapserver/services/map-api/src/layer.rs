@@ -3,15 +3,15 @@
 use std::path::Path;
 use std::sync::Arc;
 
-use cog::Cog;
-use pmtiles::PmtilesReader;
-use projection::Transformer;
-use renderer::sld::SldDocument;
-use renderer::vector::VectorStyle;
-use storage::RangeSource;
-use wms_common::crs::EPSG_3857;
-use wms_common::layer::{Layer, SourceKind};
-use wms_common::style::Style;
+use gisserver::cog::Cog;
+use gisserver::pmtiles::PmtilesReader;
+use gisserver::projection::Transformer;
+use gisserver::renderer::sld::SldDocument;
+use gisserver::renderer::vector::VectorStyle;
+use gisserver::storage::RangeSource;
+use gisserver::wms_common::crs::EPSG_3857;
+use gisserver::wms_common::layer::{Layer, SourceKind};
+use gisserver::wms_common::style::Style;
 
 use crate::mbtiles::MbtilesMeta;
 
@@ -47,7 +47,7 @@ fn check_source_path(kind: &SourceKind) -> anyhow::Result<()> {
         // A cache directory without a `Conf.xml` is not a cache (an empty
         // folder, a file path, or the wrong level of the export): fail at
         // startup with the format-specific reason instead of a per-tile 500.
-        arcgis_cache::conf::CacheDocs::load(Path::new(path))
+        gisserver::arcgis_cache::conf::CacheDocs::load(Path::new(path))
             .map_err(|e| anyhow::anyhow!("invalid arcgis cache {path}: {e}"))?;
     }
     Ok(())
@@ -79,7 +79,7 @@ pub struct LayerRuntime {
     /// Opened ArcGIS tile cache (for `arcgis` layers): read-through of a
     /// pre-cut compact cache (v1/v2). Blocking file IO, so tile reads run
     /// inside `spawn_blocking` like every other raster source here.
-    pub arcgis: Option<Arc<arcgis_cache::ArcgisCache>>,
+    pub arcgis: Option<Arc<gisserver::arcgis_cache::ArcgisCache>>,
 }
 
 impl LayerRuntime {
@@ -89,7 +89,7 @@ impl LayerRuntime {
         def: Layer,
         style_dir: Option<&Path>,
         source_id: u64,
-        s3: Option<&storage::S3Config>,
+        s3: Option<&gisserver::storage::S3Config>,
     ) -> anyhow::Result<LayerRuntime> {
         // Startup pre-flight: every local source path must exist BEFORE any
         // reader tries to open it. Without this, a typo'd path surfaces as a
@@ -121,7 +121,7 @@ impl LayerRuntime {
         let sld = def.sld.as_ref().and_then(|p| {
             let path = Path::new(p);
             let text = std::fs::read_to_string(path).ok()?;
-            let doc = renderer::sld::SldDocument::parse(&text)?;
+            let doc = gisserver::renderer::sld::SldDocument::parse(&text)?;
             if doc.feature_type_styles.is_empty() {
                 return None;
             }
@@ -131,7 +131,7 @@ impl LayerRuntime {
         let source_kind = def.source.clone();
         match source_kind {
             SourceKind::Cog { path } => {
-                let source = storage::source_from_uri_with_s3(&path, s3)?;
+                let source = gisserver::storage::source_from_uri_with_s3(&path, s3)?;
                 let cog = Cog::parse_with_id(source.as_ref(), source_id)?;
                 Ok(LayerRuntime {
                     def,
@@ -203,7 +203,7 @@ impl LayerRuntime {
                 // (level list, bundle addressing), then serves tiles from the
                 // compact cache read-through. Bundle index tables are cached
                 // inside the reader, not here.
-                let cache = arcgis_cache::ArcgisCache::open(Path::new(&path))
+                let cache = gisserver::arcgis_cache::ArcgisCache::open(Path::new(&path))
                     .map_err(|e| anyhow::anyhow!("open arcgis cache {path}: {e}"))?;
                 Ok(LayerRuntime {
                     def,
@@ -284,21 +284,21 @@ impl LayerRuntime {
         // the renderer so `renderer` stays decoupled from the `projection`
         // backend. On a projection-backend failure we degrade to a transparent
         // frame instead of panicking.
-        let tr_geo = match Transformer::new_any("EPSG:4326", crs, projection::proj()) {
+        let tr_geo = match Transformer::new_any("EPSG:4326", crs, gisserver::projection::proj()) {
             Ok(t) => t,
             Err(_) => return vec![0u8; width as usize * height as usize * 4],
         };
         if let Some(doc) = &self.sld {
-            let tr_scale = match Transformer::new_any(crs, EPSG_3857, projection::proj()) {
+            let tr_scale = match Transformer::new_any(crs, EPSG_3857, gisserver::projection::proj()) {
                 Ok(t) => t,
                 Err(_) => return vec![0u8; width as usize * height as usize * 4],
             };
-            let scale = renderer::vector::scale_denominator(bbox, width, &tr_scale);
-            return renderer::vector::rasterize_geojson_styled(
+            let scale = gisserver::renderer::vector::scale_denominator(bbox, width, &tr_scale);
+            return gisserver::renderer::vector::rasterize_geojson_styled(
                 fc, bbox, width, height, doc, scale, &tr_geo,
             );
         }
-        renderer::vector::rasterize_geojson(
+        gisserver::renderer::vector::rasterize_geojson(
             fc,
             bbox,
             width,
@@ -327,7 +327,7 @@ impl LayerRuntime {
     }
 
     /// Advertised bounds in the source CRS (config or computed).
-    pub fn bounds(&self) -> Option<wms_common::Bbox> {
+    pub fn bounds(&self) -> Option<gisserver::wms_common::Bbox> {
         if let Some(b) = self.def.bounds() {
             return Some(b);
         }
@@ -338,7 +338,7 @@ impl LayerRuntime {
             let g = c.levels[0].geo;
             let (w, h) = (c.native_width() as f64, c.native_height() as f64);
             let (x1, y0) = g.pix_to_geo(w, h);
-            return Some(wms_common::Bbox::new(g.origin_x, y0, x1, g.origin_y));
+            return Some(gisserver::wms_common::Bbox::new(g.origin_x, y0, x1, g.origin_y));
         }
         if let Some(mb) = &self.mbtiles {
             return mb.bounds();
@@ -379,8 +379,8 @@ fn parse_hex3(s: &str) -> Option<[u8; 3]> {
 }
 
 /// FeatureCollection bounds in EPSG:4326.
-pub fn vector_bounds(fc: &serde_json::Value) -> Option<wms_common::Bbox> {
-    let mut bbox: Option<wms_common::Bbox> = None;
+pub fn vector_bounds(fc: &serde_json::Value) -> Option<gisserver::wms_common::Bbox> {
+    let mut bbox: Option<gisserver::wms_common::Bbox> = None;
     for feat in fc.get("features").and_then(|f| f.as_array()).into_iter().flatten() {
         if let Some(g) = feat.get("geometry") {
             collect_geom_bounds(g, &mut bbox);
@@ -389,11 +389,11 @@ pub fn vector_bounds(fc: &serde_json::Value) -> Option<wms_common::Bbox> {
     bbox
 }
 
-fn collect_geom_bounds(g: &serde_json::Value, bbox: &mut Option<wms_common::Bbox>) {
+fn collect_geom_bounds(g: &serde_json::Value, bbox: &mut Option<gisserver::wms_common::Bbox>) {
     let gtype = g.get("type").and_then(|t| t.as_str()).unwrap_or("");
     let coords = g.get("coordinates");
     let mut update = |lon: f64, lat: f64| {
-        let b = wms_common::Bbox::new(lon, lat, lon, lat);
+        let b = gisserver::wms_common::Bbox::new(lon, lat, lon, lat);
         *bbox = Some(match *bbox {
             Some(mut cur) => {
                 cur.merge(&b);

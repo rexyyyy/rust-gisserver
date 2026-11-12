@@ -85,10 +85,10 @@ use serde::Serialize;
 use serde_json::Value;
 use tokio::sync::OnceCell;
 
-use ogcapi_features::CollectionInfo;
-use ogcapi_tiles::TiledCollection;
-use wms_common::Bbox;
-use wms_common::tile::TileMatrixSet;
+use gisserver::ogcapi_features::CollectionInfo;
+use gisserver::ogcapi_tiles::TiledCollection;
+use gisserver::wms_common::Bbox;
+use gisserver::wms_common::tile::TileMatrixSet;
 
 use crate::config::DiskCacheOpts;
 use crate::layer::LayerRuntime;
@@ -316,15 +316,15 @@ fn tiled_collection(state: &AppState, name: &str) -> Option<TiledCollection> {
         .clone();
     let vector = layer.is_vector() || layer.is_postgis();
     let (data_type, formats): (&'static str, &'static [&'static str]) = if vector {
-        ("vector", ogcapi_tiles::VECTOR_FORMATS)
+        ("vector", gisserver::ogcapi_tiles::VECTOR_FORMATS)
     } else {
-        ("map", ogcapi_tiles::MAP_FORMATS)
+        ("map", gisserver::ogcapi_tiles::MAP_FORMATS)
     };
     let tile_matrix_sets: Vec<String> = layer
         .def
         .grids
         .iter()
-        .map(|g| wms_common::tile::strip_size_suffix(g))
+        .map(|g| gisserver::wms_common::tile::strip_size_suffix(g))
         .collect();
     let extent = layer.bounds().map(|b| [b.minx, b.miny, b.maxx, b.maxy]);
     let zoom_range = state.default_grid(&layer).map(|g| {
@@ -422,7 +422,7 @@ pub struct CacheStats {
     pub docs: CacheCounters,
     pub catalog: CacheCounters,
     pub features: CacheCounters,
-    /// Decoded-tile cache (lives in `storage::TileCache`, reported here too).
+    /// Decoded-tile cache (lives in `gisserver::storage::TileCache`, reported here too).
     pub decoded_tiles: CacheCounters,
     /// L2 disk tier of the foyer `output` cache (present only when
     /// `server.disk_cache` is configured). `entries` is approximate; `bytes`
@@ -738,7 +738,7 @@ impl CacheHub {
     }
 
     /// Live counters for every cache (`decoded_tiles` is passed in from the
-    /// `storage::TileCache`, which lives outside the hub).
+    /// `gisserver::storage::TileCache`, which lives outside the hub).
     ///
     /// foyer evicts in the background, so `entries` here is an upper bound
     /// (tracked inserts since the last purge) rather than moka's exact count.
