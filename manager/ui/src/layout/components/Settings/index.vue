@@ -166,7 +166,7 @@ const sideTheme = ref(settingsStore.sideTheme);
 const storeSettings = computed(() => settingsStore);
 // 预设主题色（与 utils/theme.ts 的 sidebarPresets 一一对应）
 const themeOptions = ref([
-  { label: 'GeoServer 青蓝', value: GS_THEME.primary },
+  { label: '经典青蓝', value: GS_THEME.primary },
   { label: '经典蓝', value: '#409EFF' },
   { label: '绿色', value: '#009688' },
   { label: '黑色', value: '#1b2a47' },
@@ -221,7 +221,7 @@ const dynamicTitleChange = () => {
   useDynamicTitle();
 };
 
-// 是否为默认主题色（GeoServer 青蓝主题自带白底菜单，不允许再手动切换侧边栏风格）
+// 是否为默认主题色（默认主题自带白底菜单，不允许再手动切换侧边栏风格）
 const isDefaultTheme = computed(() => theme.value !== GS_THEME.primary);
 
 const themeChange = (val: string) => {

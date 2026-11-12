@@ -31,7 +31,7 @@ pub enum SourceKind {
     Postgis(crate::wms_common::PgSourceDef),
 }
 
-/// One published layer. Mirrors JoeGCServices' `LayerConfig` shape: a named
+/// One published layer: a named
 /// layer, its data source, source CRS, style and the grids it publishes on.
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct Layer {

@@ -187,7 +187,7 @@ watch(
   height: 50px;
   overflow: hidden;
   position: relative;
-  // GeoServer 经典主题：自上而下由深到浅的青蓝导航带 + 底部 2px 绿色分隔线
+  // 自上而下由深到浅的青蓝导航带 + 底部 2px 绿色分隔线
   background: linear-gradient(180deg, var(--gs-navbar-top) 0%, var(--gs-navbar-bottom) 100%);
   border-bottom: 2px solid var(--gs-accent);
   color: var(--gs-navbar-text);

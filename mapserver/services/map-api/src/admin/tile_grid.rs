@@ -5,7 +5,7 @@
 //! 的定位规则一致）。发布向导也允许选择同构的瓦片方案文件（如 `tile_schema.xml`，
 //! 只有 `TileCacheInfo`、没有缓存包/cdi）：此时直接按该文件解析，缺少 `conf.cdi`
 //! 时用 origin 推导兜底包络。只抽取本系统发布/预览所需字段：CRS、左上原点、
-//! 瓦片尺寸、LOD 阶梯与对齐后的包络，忽略 ESRI 专有标记。
+//! 瓦片尺寸、LOD 阶梯与对齐后的包络。
 
 use std::path::{Path, PathBuf};
 use std::sync::Arc;

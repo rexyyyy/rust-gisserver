@@ -27,7 +27,7 @@ pub async fn list(
     let sql = format!("SELECT {DEPT_COLS} FROM sys_dept{where_sql} ORDER BY order_num, dept_id");
     let rows = query(&state.pool, &sql, &refs).await?;
     let vos: Vec<DeptVO> = rows.iter().map(crate::models::dept_from_row).collect();
-    // 上游 RuoYi 语义：菜单/部门类列表返回 AjaxResult(data)，前端 res.data 消费
+    // 菜单/部门类列表返回 AjaxResult(data)，前端 res.data 消费
     Ok(Json(json!({ "code": 200, "msg": "查询成功", "data": vos })))
 }
 
@@ -138,7 +138,7 @@ pub async fn exclude(State(state): State<Arc<AppState>>, Path(id): Path<i64>) ->
     let sql = format!("SELECT {DEPT_COLS} FROM sys_dept WHERE del_flag = '0' AND dept_id <> $1 ORDER BY order_num");
     let rows = query(&state.pool, &sql, &[&id]).await?;
     let vos: Vec<DeptVO> = rows.iter().map(crate::models::dept_from_row).collect();
-    // 上游 RuoYi 语义：菜单/部门类列表返回 AjaxResult(data)，前端 res.data 消费
+    // 菜单/部门类列表返回 AjaxResult(data)，前端 res.data 消费
     Ok(Json(json!({ "code": 200, "msg": "查询成功", "data": vos })))
 }
 

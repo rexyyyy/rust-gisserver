@@ -1,7 +1,7 @@
 /**
- * GeoServer 经典主题（Wicket 默认主题）取色 —— 全系统配色唯一真源
+ * 经典青蓝主题取色 —— 全系统配色唯一真源
  *
- * 所有色值均由 GeoServer 管理界面截图逐像素采样得到（采样脚本见 .tmp_refs）：
+ * 色值基准（逐像素采样）：
  *   - Logo 文字 / "Logged in as admin." / 链接：rgb(0,146,200) = #0092C8
  *   - 顶部蓝色导航带：自上而下 rgb(0,118,161) → rgb(0,145,198)（向下渐浅）
  *   - 白色页眉与蓝色导航带之间的 2px 分隔线：rgb(198,224,155) = #C6E09B
@@ -28,7 +28,7 @@ export const GS_THEME = {
   title: '#0082B6',
   /** 侧栏分组标题色 */
   groupTitle: '#0082B6',
-  /** GeoServer 绿：顶栏分隔线、主按钮底色 */
+  /** 强调绿：顶栏分隔线、主按钮底色 */
   accent: '#C6E09B',
   /** 绿按钮描边 */
   accentBorder: '#9CC45C',
@@ -62,7 +62,7 @@ export const GS_THEME = {
  * 浏览器 localStorage 里存的是上一版主题配置（useStorage 不会自动合并默认值），
  * 版本号用于在启动时触发一次性迁移，把陈旧配置纠正到当前默认主题。
  */
-export const THEME_VERSION = 'v2-geoserver';
+export const THEME_VERSION = 'v2-classic';
 
 /**
  * 历史主题色 → 当前默认主题色（键为小写，匹配时统一转小写）。

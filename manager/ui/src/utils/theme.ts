@@ -38,7 +38,7 @@ export const handleThemeStyle = (theme: string) => {
 };
 
 /**
- * 主按钮配色：默认 GeoServer 主题用「浅绿底 + 深绿字」的经典按钮，
+ * 主按钮配色：默认主题用「浅绿底 + 深绿字」的经典按钮，
  * 切换到其它主题色时按钮跟随主题色，保证同一套主题下观感一致。
  */
 const buttonAccentPresets: Record<string, Record<string, string>> = {
@@ -95,14 +95,14 @@ const sidebarPresets: Record<string, Record<string, string>> = {
     subMenuHover: '#f0f1f5', subMenuTitleHover: '#f0f1f5',
     menuGroupTitle: '#0082b6', menuDivider: '#dadada'
   },
-  // GeoServer 经典主题：白底 + 青蓝链接 + 蓝灰分隔线
+  // 经典主题：白底 + 青蓝链接 + 蓝灰分隔线
   [GS_THEME.primary]: {
     menuBg: GS_THEME.sidebarBg, menuColor: GS_THEME.link, menuActiveText: GS_THEME.primary,
     menuHover: GS_THEME.sidebarHover, subMenuBg: GS_THEME.sidebarBg, subMenuActiveText: GS_THEME.primary,
     subMenuHover: GS_THEME.sidebarHover, subMenuTitleHover: GS_THEME.sidebarHover,
     menuGroupTitle: GS_THEME.groupTitle, menuDivider: GS_THEME.divider
   },
-  // 兼容上一版默认色（旧值直接映射到 GeoServer 主题，避免历史用户停留在旧皮肤）
+  // 兼容上一版默认色（旧值映射到当前默认主题，避免历史用户停留在旧皮肤）
   '#1D9CC9': {
     menuBg: GS_THEME.sidebarBg, menuColor: GS_THEME.link, menuActiveText: GS_THEME.primary,
     menuHover: GS_THEME.sidebarHover, subMenuBg: GS_THEME.sidebarBg, subMenuActiveText: GS_THEME.primary,

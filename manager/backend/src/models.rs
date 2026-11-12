@@ -229,7 +229,7 @@ pub fn menu_from_row(row: &Row) -> MenuVO {
 
 /// `getRouters` 返回的动态路由节点（字段与 plus-ui permission store 对齐）。
 ///
-/// 字段名/省略规则对齐上游 RuoYi-Vue-Plus 5.X 的 `RouterVo`：
+/// 字段名/省略规则与 `RouterVo` 一致：
 /// * `JsonInclude(NON_EMPTY)` → 空值字段不下发
 /// * `alwaysShow` 仅在目录节点置 `true`
 #[derive(Debug, Serialize)]
@@ -244,28 +244,28 @@ pub struct RouterVO {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub query: Option<String>,
     pub hidden: bool,
-    /// 有子路由时置 `true`（上游 `RouterVo.alwaysShow`）。
+    /// 有子路由时置 `true`（`RouterVo.alwaysShow`）。
     #[serde(skip_serializing_if = "Option::is_none")]
     pub always_show: Option<bool>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub children: Option<Vec<RouterVO>>,
-    /// 上游 `isMenuFrame` 分支会把父级 meta 置空，此处用 `None` 表达。
+    /// `isMenuFrame` 分支会把父级 meta 置空，此处用 `None` 表达。
     #[serde(skip_serializing_if = "Option::is_none")]
     pub meta: Option<MetaVO>,
 }
 
-/// 路由显示信息（对齐上游 `MetaVo`）。
+/// 路由显示信息（`MetaVo`）。
 #[derive(Debug, Serialize, Default)]
 #[serde(rename_all = "camelCase")]
 pub struct MetaVO {
     pub title: String,
     pub icon: String,
-    /// 内链地址（http(s):// 开头）；上游仅在 path 是合法 URL 时赋值。
+    /// 内链地址（http(s):// 开头）；仅在 path 是合法 URL 时赋值。
     #[serde(skip_serializing_if = "Option::is_none")]
     pub link: Option<String>,
-    /// 是否禁用 keep-alive 缓存；上游取 `isCache == "1"`。
+    /// 是否禁用 keep-alive 缓存；取 `isCache == "1"`。
     pub no_cache: bool,
-    /// 侧边栏高亮目标菜单；上游取 remark 以 `/` 开头时的值。
+    /// 侧边栏高亮目标菜单；取 remark 以 `/` 开头时的值。
     #[serde(skip_serializing_if = "Option::is_none")]
     pub active_menu: Option<String>,
 }

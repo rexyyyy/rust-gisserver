@@ -23,5 +23,8 @@ Thumbs.db
 .vscode/
 *.user
 
+# ===== local assistant data (not for distribution) =====
+.workbuddy/
+
 # ===== local build artifacts =====
 *.log

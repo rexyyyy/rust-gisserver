@@ -1,7 +1,7 @@
 //! OGC API - Tiles - Part 1 (1.0.0): landing page, conformance declaration,
 //! tileMatrixSets, tiled collections and tileset metadata.
 //!
-//! Path layout follows GeoServer's `ogcapi-tiles` module: landing at the mount
+//! Path layout: landing at the mount
 //! point (`/ogc/tiles/v1`), `tileMatrixSets[/{id}]`, `collections[/{id}]` and
 //! tiles under `collections/{collectionId}/tiles/{tileMatrixSetId}`. The tile
 //! bytes themselves are served by the map-api service (which reuses the WMS

@@ -1,6 +1,5 @@
 //! WFS `DescribeFeatureType`: an XSD schema for one feature type, inferred
-//! from the collection's GeoJSON attributes (mirrors GeoServer's
-//! `DescribeFeatureType` response for GeoJSON-backed stores).
+//! from the collection's GeoJSON attributes.
 
 use crate::vector_query::{attribute_schema, primary_geometry_type};
 

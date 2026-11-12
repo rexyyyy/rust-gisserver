@@ -1,6 +1,5 @@
-//! Shared building blocks for the map server (structure follows JoeGCServices'
-//! `crates/wms-common`): bounding boxes, CRS helpers, the tile-grid model, layer
-//! and style types, and the crate-wide error.
+//! Shared building blocks for the map server: bounding boxes, CRS helpers,
+//! the tile-grid model, layer and style types, and the crate-wide error.
 
 pub mod bbox;
 pub mod crs;

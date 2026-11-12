@@ -3,7 +3,7 @@
     <router-view v-slot="{ Component, route }">
       <transition :enter-active-class="animate" mode="out-in">
         <!-- 外层 keyed div：transition 直接包裹 keep-alive 时，页面内嵌 transition
-             （el-dialog/el-table 等）会在多 tab 来回切换时静默白屏（RuoYi-Vue3 已知问题） -->
+             （el-dialog/el-table 等）会在多 tab 来回切换时静默白屏 -->
         <div :key="route.path">
           <keep-alive :include="tagsViewStore.cachedViews">
             <component :is="Component" v-if="!route.meta.link" />

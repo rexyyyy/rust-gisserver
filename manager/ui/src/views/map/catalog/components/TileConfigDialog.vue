@@ -4,7 +4,6 @@
     <el-alert type="info" :closable="false" show-icon class="mb-[10px]">
       <template #title>
         选择工作空间数据根目录下的 ArcGIS <b>Conf.xml</b>（或其所在缓存目录），读取坐标系、原点、瓦片尺寸与 LOD 阶梯。
-        ESRI 专有标记会被忽略。
       </template>
     </el-alert>
 

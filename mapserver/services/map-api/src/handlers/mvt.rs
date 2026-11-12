@@ -164,7 +164,7 @@ pub async fn tilejson(
 }
 
 /// GET /mvt/{layer}/style.json -- the configured vector style served verbatim
-/// (client-side MapLibre style), or a minimal default.
+/// (client-side vector style JSON), or a minimal default.
 pub async fn style(
     State(state): State<Arc<AppState>>,
     Path(layer_name): Path<String>,
@@ -228,7 +228,7 @@ async fn serve_pg(
     headers: &axum::http::HeaderMap,
 ) -> Response {
     enum Iface {
-        /// Standard XYZ over EPSG:3857 (MapLibre / OpenLayers / Cesium).
+        /// Standard XYZ over EPSG:3857.
         WebMercator,
         /// A published grid: the tile envelope comes from its own origin and
         /// resolution, geometry is cut in the grid's CRS.

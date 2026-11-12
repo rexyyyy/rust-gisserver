@@ -2,7 +2,7 @@
 //! collections and items. GeoJSON output plus a minimal HTML rendering of the
 //! same resources (the `html` conformance class).
 //!
-//! Path layout follows GeoServer's OGC API modules: the landing page is the
+//! Path layout: the landing page is the
 //! mount point (`/ogc/features/v1`), collections live under `/collections`,
 //! features under `/collections/{collectionId}/items[/{featureId}]`.
 
@@ -288,7 +288,7 @@ pub fn item(base: &str, collection_id: &str, feature: &Value, feature_id: &str) 
     serde_json::to_string_pretty(&doc).unwrap_or_else(|_| "{}".into())
 }
 
-/// OGC API error document (`application/json` problem style used by GeoServer).
+/// OGC API error document (`application/json`, problem style).
 pub fn error_json(err: &OgcError) -> String {
     let doc = json!({
         "code": err.code,

@@ -11,7 +11,7 @@
 //!
 //! # 范围（extent）的算法
 //!
-//! 与 GeoWebCache 的 `GridSetBuilder` 一致：左上角固定为 `TileOrigin`，右下按
+//! 左上角固定为 `TileOrigin`，右下按
 //! **最细一级**分辨率对齐到整数瓦片（`ceil` 后回推），使自左上与自左下计算的
 //! 包络对客户端都成立。`conf.cdi` 给出数据范围；缺失时用 bundle 目录名探测出的
 //! 最大行列回推（见 [`crate::arcgis_cache::bundle::CacheProbe`]）。

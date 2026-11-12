@@ -2,7 +2,7 @@
 //!
 //! 参照 `G:\net\编码检测\编码检测\IdentifyEncoding.cs`（lion, Microshaoft.Text, 2005）
 //! 的概率打分思路移植（GBK/BIG5 频度表为原表机械移植）；EUC-KR / EUC-TW /
-//! Shift_JIS / CP932 为按同构打分法新写（原 C# 无）。
+//! Shift_JIS / CP932 按同构打分法实现。
 //!
 //! **探测集合由语言区域（locale）决定**，UTF-8/ASCII 恒为公共候选：
 //!
@@ -283,7 +283,7 @@ pub fn detect_for(bytes: &[u8], region: Region) -> Encoding {
     }
 }
 
-/// GBK 可能性打分（0-100），对应参考实现 `GBKProbability`。
+/// GBK 可能性打分（0-100），见 `GBKProbability`。
 /// 范围校验 + 频度表加权；对短字符串（路径）同样有效。
 pub fn gbk_probability(rawtext: &[u8]) -> i32 {
     let n = rawtext.len();
@@ -338,7 +338,7 @@ pub fn gbk_probability(rawtext: &[u8]) -> i32 {
     (rangeval + freqval) as i32 - 1
 }
 
-/// Big5 可能性打分（0-100），对应参考实现 `BIG5Probability`（原 C# 中被注释停用，
+/// Big5 可能性打分（0-100），见 `BIG5Probability`（早期版本中被停用，
 /// 此处按原算法放开）。lead 0xA1-0xF9，trail 0x40-0x7E 或 0xA1-0xFE。
 pub fn big5_probability(rawtext: &[u8]) -> i32 {
     let n = rawtext.len();
@@ -430,7 +430,7 @@ fn is_japanese(c: char) -> bool {
     )
 }
 
-/// EUC-KR / CP949 可能性打分（0-100）。原 C# 无此编码，按同构打分法新写：
+/// EUC-KR / CP949 可能性打分（0-100）。按同构打分法实现：
 /// 结构分（合法双字节占比）+ 脚本分（解码后 Hangul 占比）。
 /// lead 0x81-0xFE，trail 0x41-0xFE（不含 0x7F）。
 pub fn euc_kr_probability(rawtext: &[u8]) -> i32 {
@@ -457,7 +457,7 @@ pub fn euc_kr_probability(rawtext: &[u8]) -> i32 {
     (rangeval + scriptval) as i32
 }
 
-/// Shift_JIS / CP932 可能性打分（0-100）。原 C# 无此编码，按同构打分法新写：
+/// Shift_JIS / CP932 可能性打分（0-100）。按同构打分法实现：
 /// 结构分（合法双字节占比）+ 脚本分（解码后假名/日文汉字占比）。
 /// lead 0x81-0x9F / 0xE0-0xFC（CP932 IBM 扩展），trail 0x40-0x7E / 0x80-0xFC（不含 0x7F）。
 /// 注意：单字节 0xA1-0xDF（半角片假名）不计入结构分——GBK 中文大量落在该区，

@@ -17,7 +17,7 @@
       var BASES = [
         'https://cdn.jsdelivr.net/npm/cesium@' + V + '/Build/Cesium/',
         'https://unpkg.com/cesium@' + V + '/Build/Cesium/',
-        // 国内 npm 镜像（阿里）：前两者不可达时走这里，已验证含 Build/Cesium 全目录
+        // 国内 npm 镜像：前两者不可达时走这里
         'https://registry.npmmirror.com/cesium/' + V + '/files/Build/Cesium/',
         'https://cesium.com/downloads/cesiumjs/releases/' + V + '/Build/Cesium/'
       ];
@@ -186,7 +186,7 @@
         });
         viewer.scene.primitives.add(t);
 
-        // 某些数据转换工具（如 osgb2tiles）计算 root.transform 的 ECEF 平移时会把
+        // 某些数据转换工具计算 root.transform 的 ECEF 平移时会把
         // mesh 整体抬升到地表上方几十公里。仅对这种极端离群做保守拉回。
         autoAnchor(t, svc.name);
 

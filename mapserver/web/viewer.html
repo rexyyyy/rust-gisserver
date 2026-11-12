@@ -76,7 +76,7 @@
 <div id="bar">
   <span>图层：</span>
   <select id="layer"><option>加载中…</option></select>
-  <label title="OSM 在线底图：需外网。内网/离线环境下每张底图瓦会挂几十秒超时，并占满 OpenLayers 每帧 16 个瓦片加载名额，把数据瓦堵在后面，故默认关。"><input type="checkbox" id="base"/>底图</label>
+  <label title="底图需外网，离线环境下会拖慢数据瓦片，故默认关闭。"><input type="checkbox" id="base"/>底图</label>
   <span id="hint"></span>
   <span class="spacer"></span>
   <button id="codeBtn" type="button" title="显示本页调用当前预览图层的示例代码（含 LOD / resolutions / 坐标系常量）">代码</button>
@@ -104,14 +104,8 @@ const map = new ol.Map({
   layers: []   // 底图改由下方开关按需加入，默认不在图里
 });
 
-// OSM 在线底图开关。
-// 默认关闭的原因：本服务的数据图层自己就是完整影像，而
-// tile.openstreetmap.org 在离线/内网环境不可达，每张底图瓦要挂 20~85s 才
-// 超时。OpenLayers 所有图层的瓦片共用一个加载队列，每帧最多 16 张在建
-// （Map.handlePostRender 里的 tileQueue_.loadMoreTiles(16, 16)），底图把这 16
-// 个名额占满后，COG 数据瓦只能排在后面等超时 —— 表现成“放大 COG 就慢
-// 了”，实际卡的不是 COG（服务端实测同一区间 5~59ms）。
-// 勾选后才把底图层加入 map（不加入就一律不发请求），选择记在 localStorage。
+// 底图默认关闭：离线/内网环境不可达，且会占满瓦片加载队列拖慢数据瓦。
+// 勾选后才加入 map，选择记在 localStorage。
 const baseToggle = document.getElementById('base');
 let baseLayer = null;
 function applyBaseLayer(on) {
@@ -139,11 +133,8 @@ const params = new URLSearchParams(location.search);
 const wanted = params.get('layer');
 const tilesTpl = params.get('tiles'); // XYZ 模板直载（mbtiles 等无 WMS 图层的来源）
 
-// 图层渲染源类型：mvt（矢量瓦片，客户端渲染最快）/ xyz（栅格瓦片）/
-// wms（GetMap 兜底，服务端现渲最慢）。预览卡顿的根因是此前统一走 WMS，
-// 缩放/平移都让服务端现渲整片区域；改用瓦片端点后缩放自然刷新。
-// kind 以「真实瓦片探活」为准——tilejson 存在不代表瓦片可用（栅格归档也会
-// 给出 /mvt 的 tilejson 桩），所以必须打一张实际瓦片确认。
+// 渲染源：mvt（矢量瓦片）/ xyz（栅格瓦片）/ wms（GetMap 兜底）。
+// kind 以真实瓦片探活为准：tilejson 存在不代表瓦片可用。
 function lonLatToTile(lon, lat, z) {
   const n = 2 ** z;
   const x = Math.floor((lon + 180) / 360 * n);
@@ -190,9 +181,7 @@ async function probeKind(name, bbox, srcType) {
   const lat = bbox ? (bbox[1] + bbox[3]) / 2 : 25.0;
   const cand = srcType === 'raster' ? ['xyz'] : ['mvt', 'xyz'];
   for (const kind of cand) {
-    // z 阶梯只两级：常见数据 z=12 就有瓦；归档类（样例 mbtiles 常只到 z0~z3）
-    // z=12 会回 404，不往下试就会把能直读瓦片的归档误判成 wms，
-    // 而归档类根本不支持 WMS GetMap（实测 400），实际上什么都出不来。
+    // 归档类常只到 z0~z3，z=12 会 404，必须降级再试，否则误判成 wms。
     for (const z of [12, 0]) {
       const [zz, x, y] = lonLatToTile(lon, lat, z);
       const url = kind === 'mvt' ? `/mvt/${name}/${zz}/${x}/${y}.pbf` : `/tiles/${name}/${zz}/${x}/${y}.png`;
@@ -223,12 +212,8 @@ function parseLayers(xmlText) {
         if ([w, e, s, n].every(Number.isFinite)) own = [w, s, e, n];
       }
       if (!own) {
-        // 兜底：<BoundingBox CRS="..." minx..maxy>。只取度数坐标系的条目——
-        // 服务端支持三层 CRS（内置 4326/CRS:84/3857、同名 CRS 恒等直出、
-        // 跨 CRS 靠 PROJ），地理系除 WGS84 外还可能是 CGCS2000(4490)、
-        // 西安 80(4214)、WGS72(4258)，它们的范围同样是经纬度；而投影带
-        // （3857 / 4491..=4554 高斯-克吕格 / 32648..=32660 UTM）是米值，
-        // 直接当经纬度用会把地图甩到几万公里外，必须跳过。
+        // 只取度数坐标系（4326/CRS:84/4490/4214/4258）；
+        // 投影带（3857/高斯-克吕格/UTM）是米值，必须跳过。
         const bb = pick('BoundingBox');
         const bbCrs = (bb && bb.getAttribute('CRS')) || 'EPSG:4326';
         // 短名 / URN / def-URI 写法都只看尾部 EPSG 码（服务端 normalize 同理）
@@ -262,9 +247,8 @@ function buildLayer(name, kind) {
     return new ol.layer.Tile({
       source: new ol.source.XYZ({
         url: `/tiles/${name}/{z}/{x}/{y}.png`,
-        // 服务端 WebMercatorQuad 只建到 z=25（wms-common/src/tile.rs），而 OL 的
-        // XYZ 默认网格到 z=42，超限仍照发请求 → 深缩放整屏 404，画面退化成父瓦
-        // 拉伸的纯色。声明 maxZoom 后 OL 在 z>25 自动 overzoom 复用 z25 瓦片。
+        // 服务端网格只到 z=25，OL 默认到 z=42；声明 maxZoom 让 OL 在 z>25
+        // overzoom 复用 z25 瓦片，避免深缩放整屏 404。
         tileGrid: ol.tilegrid.createXYZ({ tileSize: 256, maxZoom: 25 }),
         crossOrigin: 'anonymous'
       })
@@ -359,11 +343,8 @@ function loadWmtsMeta() {
   return wmtsMetaPromise;
 }
 
-// 解析瓦片矩阵集。优先用 OGC API Tiles 的 JSON 端点取服务端下发的
-// resolutions.native（源 LOD，CRS 单位/px）——2026-11-10 A/B 实测确认：
-// 自定义网格（ArcGIS Conf.xml / 4490 / CGCS2000 高斯带）只有 native 与
-// /tiles、/mvt 的 z/col/row 寻址一致；ogc28mm（×0.00028）整体偏 5.83%，
-// arcgis96dpi（×0.0254/96）还可能差 1 列。WMTS XML 端点仅作老服务降级。
+// 优先用 OGC API Tiles JSON 端点的 resolutions.native（源 LOD，CRS 单位/px），
+// 它与 /tiles、/mvt 的 z/col/row 寻址一致；WMTS XML 仅作老服务降级。
 const OGC_PX = 0.00028;
 const gridCache = {};
 async function loadGrid(id) {

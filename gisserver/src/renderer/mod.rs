@@ -1,4 +1,4 @@
-//! Windowed raster rendering (ported from TerraServe's `render.rs`).
+//! Windowed raster rendering.
 //!
 //! Given a request bbox (in the request CRS), the renderer reprojects output
 //! pixel centers into the COG's native pixel space, selects the coarsest

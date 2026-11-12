@@ -5,7 +5,7 @@ Creates fixtures/test.mbtiles: a PNG archive over z0..z3 in WebMercatorQuad
 scheme (tiles stored in TMS rows, bottom-up, per the MBTiles spec).
 
 Also builds fixtures/test-vector.mbtiles: a vector archive (format=pbf) whose
-tiles are gzip-compressed payloads (the common tippecanoe/OpenMapTiles layout),
+tiles are gzip-compressed payloads (common vector-archive layout),
 so the gzip pass-through path is exercised too.
 
 Run:  python make_mbtiles_fixture.py

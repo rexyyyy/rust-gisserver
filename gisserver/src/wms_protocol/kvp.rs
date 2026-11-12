@@ -1,5 +1,4 @@
 //! KVP (key=value&key=value) query-string parsing with URL decoding.
-//! Ported from TerraServe's `wms.rs::parse_kvp`.
 
 /// Decode a percent-encoded byte (plus signs become spaces only inside query
 /// values, which is standard `application/x-www-form-urlencoded` behaviour).

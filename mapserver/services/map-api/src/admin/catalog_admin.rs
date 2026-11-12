@@ -561,7 +561,7 @@ pub async fn update_config(
 /// （避免以「deleted 回收站」形态残留），最后热重载。
 ///
 /// 与 `state=deleted`（软删除 / 回收站，保留配置与数据、仅停止服务）区分：
-/// 此接口是物理移除配置文件，语义对齐 GeoServer REST `DELETE`。
+/// 此接口是物理移除配置文件。
 pub async fn delete_service(
     State(state): State<Arc<AppState>>,
     headers: axum::http::HeaderMap,

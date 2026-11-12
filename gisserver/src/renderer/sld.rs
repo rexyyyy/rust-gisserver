@@ -16,7 +16,7 @@
 //!              └ RasterSymbolizer (parsed, not applied — see docs)
 //! ```
 //!
-//! **Rule evaluation follows GeoServer semantics**: rules are evaluated in
+//! **Rule evaluation**: rules are evaluated in
 //! document order; *every* rule whose filter matches (and whose scale window
 //! contains the request scale) contributes its symbolizers, so symbolizers
 //! stack (e.g. a line rule over a fill rule). `<ElseFilter/>` matches only
@@ -28,8 +28,7 @@
 //! (`BBOX`, `Intersects`, `DWithin`, …) parse to [`Filter::Unsupported`] and
 //! never match (the rule is skipped, with a one-time warning).
 //!
-//! Deliberate boundaries (documented in `docs/cache-moka-2026-10-24.md`'s
-//! successor doc `docs/service-comparison-geoserver-2026-10-24.md`):
+//! Deliberate boundaries:
 //! `ExternalGraphic` marks (no PNG decoder), `RasterSymbolizer` color maps
 //! (raster palettes live in the JSON `Style`), geometry expressions
 //! (`<Geometry>`), recoding `<ogc:Function>` operands, and uom-aware sizes
@@ -147,7 +146,7 @@ pub struct TextSymbolizer {
     pub displacement: (f64, f64),
 }
 
-/// SLD well-known mark names (GeoServer's set).
+/// SLD well-known mark names.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum MarkKind {
     Circle,
@@ -163,7 +162,7 @@ pub enum MarkKind {
 
 impl MarkKind {
     /// SLD `<WellKnownName>` (case-insensitive). `hexagon`/`pentagon` are
-    /// GeoServer extensions rendered as regular polygons.
+    /// Extension names rendered as regular polygons.
     pub fn from_wellknown(name: &str) -> Option<MarkKind> {
         Some(match name.trim().to_ascii_lowercase().as_str() {
             "circle" => MarkKind::Circle,
@@ -495,7 +494,7 @@ impl SldDocument {
     }
 
     /// Rules that apply to a feature at the given scale denominator, in
-    /// document order (GeoServer semantics: all matching rules stack;
+    /// document order (all matching rules stack;
     /// `ElseFilter` matches only when no earlier rule in the same
     /// FeatureTypeStyle matched).
     pub fn matching_rules(&self, props: &Map<String, Json>, scale: f64) -> Vec<&Rule> {
@@ -1422,7 +1421,7 @@ mod tests {
     }
 
     #[test]
-    fn rule_evaluation_matches_geoserver_semantics() {
+    fn rule_evaluation_stacks_all_matching_rules() {
         let doc = SldDocument::parse(SAMPLE_SLD).unwrap();
         let big = props(&[("name", Json::from("Kunming")), ("pop", Json::from(8460088.0))]);
         let small = props(&[("name", Json::from("Dali")), ("pop", Json::from(400000.0))]);

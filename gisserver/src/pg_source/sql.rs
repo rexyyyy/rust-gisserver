@@ -1,11 +1,14 @@
-//! SQL templates for PostGIS sources, modeled on Martin's table sources:
+//! SQL templates for PostGIS-backed layers.
 //!
 //! * dynamic MVT tiles via `ST_AsMVT` / `ST_AsMVTGeom` / `ST_TileEnvelope`
 //! * feature reads via `ST_AsGeoJSON` (WMS / WFS / OGC API paths)
 //! * `count(*)` and `ST_Extent` for metadata
 //!
-//! All identifiers are quoted, all literals escaped; tile queries use
-//! `$1/$2/$3` parameters so the prepared statement stays cached.
+//! Every template is assembled from the layer definition on this crate's own
+//! terms: identifiers are quoted, literals escaped, and tile queries bind
+//! `$1/$2/$3` so the prepared statement stays cached. Spatial predicates
+//! follow the documented PostGIS function semantics (see
+//! [`tile_index_filter`]); the tile row set is folded into MVT in a CTE.
 
 use crate::pg_source::{PgPool, PgSourceDef};
 use bytes::BytesMut;
@@ -36,8 +39,12 @@ impl From<tokio_postgres::Error> for QueryError {
     }
 }
 
-/// Earth circumference in degrees (for the 4326 `ST_Expand` bbox margin).
-const EARTH_CIRCUMFERENCE_DEGREES: f64 = 360.0;
+/// Degrees in one full turn; used to scale a tile buffer into EPSG:4326 units.
+const DEGREES_PER_FULL_TURN: f64 = 360.0;
+
+/// Bound z/x/y tile address, shared by the geometry envelope and the index
+/// predicate so both are built from a single definition.
+const ZXY_ARGS: &str = "$1::integer, $2::integer, $3::integer";
 
 /// Web Mercator world width in meters (the 3857 simplify tolerance baseline:
 /// tolerance(z) = world / 2^z / extent * tile_units).
@@ -138,56 +145,72 @@ fn extra_cols(def: &PgSourceDef) -> String {
     cols
 }
 
-/// Build the dynamic MVT tile SQL (Martin's table-source template).
+/// Compose the index-friendly geometry predicate for a Web-Mercator tile.
 ///
-/// Parameters: `$1` z, `$2` x, `$3` y (all `::integer`).
+/// A non-zero tile buffer widens the search envelope so features straddling
+/// the tile edge are still encoded. PostGIS >= 3.1 accepts a `margin`
+/// fraction on `ST_TileEnvelope`, but only in EPSG:3857; EPSG:4326 needs the
+/// widening in degrees via `ST_Expand` (a degree spans a full turn at z=0,
+/// hence the `2^z` divisor). Any other SRID keeps the plain transformed
+/// envelope. The predicate always tests the source geometry column, so a GiST
+/// index on that column remains usable.
+fn tile_index_filter(pool: &PgPool, buffer: u32, extent: u32, srid: i32) -> String {
+    let envelope = format!("ST_TileEnvelope({ZXY_ARGS})");
+    let transformed = format!("ST_Transform({envelope}, {srid})");
+    if buffer == 0 {
+        return transformed;
+    }
+
+    let margin = f64::from(buffer) / f64::from(extent);
+    match srid {
+        3857 if pool.envelope_margin_available() => format!(
+            "ST_Transform(ST_TileEnvelope({ZXY_ARGS}, margin => {margin}), {srid})"
+        ),
+        4326 => format!(
+            "ST_Expand({transformed}, ({margin} * {DEGREES_PER_FULL_TURN}) / 2^$1::integer)"
+        ),
+        _ => transformed,
+    }
+}
+
+/// Build the dynamic MVT tile SQL for a PostGIS layer.
+///
+/// Parameters: `$1` z, `$2` x, `$3` y (all `::integer`). Clipped feature rows
+/// are collected in a CTE and folded into one MVT row afterwards; keeping the
+/// geometry predicate on the source column lets PostGIS use its spatial index.
 pub fn tile_sql(pool: &PgPool, def: &PgSourceDef, layer_id: &str) -> String {
     let extent = def.extent();
     let buffer = def.buffer();
     let clip = if def.clip_geom() { "true" } else { "false" };
-    let srid = def.srid;
     let geom = quote_ident(&def.geometry_column);
-    let margin = f64::from(buffer) / f64::from(extent);
-
-    // BBox search with buffer: the `margin` parameter of `ST_TileEnvelope`
-    // only exists for SRID 3857 (PostGIS >= 3.1); 4326 uses `ST_Expand`
-    // because of antimeridian wrap-around; other SRIDs fall back to the
-    // plain envelope.
-    let bbox_search = if buffer == 0 {
-        format!("ST_Transform(ST_TileEnvelope($1::integer, $2::integer, $3::integer), {srid})")
-    } else if pool.supports_tile_margin() && srid == 3857 {
-        format!(
-            "ST_Transform(ST_TileEnvelope($1::integer, $2::integer, $3::integer, margin => {margin}), {srid})"
-        )
-    } else if srid == 4326 {
-        format!(
-            "ST_Expand(ST_Transform(ST_TileEnvelope($1::integer, $2::integer, $3::integer), {srid}), ({margin} * {EARTH_CIRCUMFERENCE_DEGREES}) / 2^$1::integer)"
-        )
-    } else {
-        format!("ST_Transform(ST_TileEnvelope($1::integer, $2::integer, $3::integer), {srid})")
-    };
-
+    let cols = extra_cols(def);
+    let geom_expr = mercator_geom_expr(def, &geom, extent);
+    let spatial_filter = tile_index_filter(pool, buffer, extent, def.srid);
     let limit = def
         .limit
         .map(|v| format!("LIMIT {v}"))
         .unwrap_or_default();
-    let cols = extra_cols(def);
-    let geom_expr = mercator_geom_expr(def, &geom, extent);
 
-    let mut sql = String::from(
-        r"
-SELECT
-  ST_AsMVT(tile, ",
-    );
-    let _ = write!(sql, "{}, {extent}, 'geom') FROM (\n  SELECT\n    ST_AsMVTGeom(\n        {geom_expr},\n        ST_TileEnvelope($1::integer, $2::integer, $3::integer),\n        {extent}, {buffer}, {clip}\n    ) AS geom{cols}\n  FROM\n    {table}\n  WHERE\n    {geom} && {bbox_search}\n  {limit}\n) AS tile",
-        quote_literal(layer_id),
+    format!(
+        r#"WITH clipped AS (
+  SELECT
+    ST_AsMVTGeom(
+        {geom_expr},
+        ST_TileEnvelope({ZXY_ARGS}),
+        {extent}, {buffer}, {clip}
+    ) AS geom{cols}
+  FROM {table}
+  WHERE {geom} && {spatial_filter}
+  {limit}
+)
+SELECT ST_AsMVT(tile, {lid}, {extent}, 'geom') FROM clipped AS tile"#,
         geom_expr = geom_expr,
         cols = cols,
         table = qualified(def),
-        bbox_search = bbox_search,
+        spatial_filter = spatial_filter,
         limit = limit,
-    );
-    sql.trim().to_string()
+        lid = quote_literal(layer_id),
+    )
 }
 
 /// Property columns for feature reads: configured list, or (when empty) the
@@ -560,7 +583,7 @@ pub fn tile_sql_env(def: &PgSourceDef, layer_id: &str, out_srid: i32) -> String 
     // Grid CRS differs from the data SRID: reproject the geometry once. The
     // WHERE filter still tests the *source* geometry against the envelope
     // transformed back into the source SRID, so the GiST index is used.
-    let (geom_expr, bbox_search) = if reproject {
+    let (geom_expr, spatial_filter) = if reproject {
         (
             format!("ST_Transform({geom_expr}, {srid})"),
             format!(
@@ -586,12 +609,12 @@ pub fn tile_sql_env(def: &PgSourceDef, layer_id: &str, out_srid: i32) -> String 
   FROM
     {table}
   WHERE
-    {geom} && {bbox_search}
+    {geom} && {spatial_filter}
   {limit}
 ) AS tile"#,
         lid = quote_literal(layer_id),
         geom_expr = geom_expr,
-        bbox_search = bbox_search,
+        spatial_filter = spatial_filter,
         cols = cols,
         table = qualified(def),
         geom = geom,
@@ -738,6 +761,44 @@ pub async fn query_tile_env(
 mod projected_tests {
     use super::*;
     use crate::pg_source::PgPool;
+
+    #[test]
+    fn tile_index_predicate_branches() {
+        // `for_tests()` pretends to be PostGIS 3.5, so margins are available.
+        let pool = PgPool::for_tests();
+        let unbuffered = tile_index_filter(&pool, 0, 4096, 3857);
+        assert_eq!(
+            unbuffered,
+            "ST_Transform(ST_TileEnvelope($1::integer, $2::integer, $3::integer), 3857)"
+        );
+
+        let mercator = tile_index_filter(&pool, 64, 4096, 3857);
+        assert!(mercator.contains("margin => 0.015625"), "{mercator}");
+        assert!(mercator.contains(", 3857)"), "{mercator}");
+
+        let geographic = tile_index_filter(&pool, 64, 4096, 4326);
+        assert!(geographic.starts_with("ST_Expand("), "{geographic}");
+        assert!(geographic.contains("360"), "{geographic}");
+        assert!(geographic.contains("2^$1::integer"), "{geographic}");
+
+        let projected = tile_index_filter(&pool, 64, 4096, 4543);
+        assert!(!projected.contains("margin"), "{projected}");
+        assert!(!projected.contains("ST_Expand"), "{projected}");
+        assert!(projected.ends_with(", 4543)"), "{projected}");
+    }
+
+    #[test]
+    fn mercator_tile_sql_uses_cte_and_keeps_contract() {
+        let def = test_def();
+        let sql = tile_sql(&PgPool::for_tests(), &def, "wuhua");
+        assert!(sql.starts_with("WITH clipped AS ("), "{sql}");
+        assert!(sql.contains("ST_AsMVT(tile, 'wuhua', 4096, 'geom')"), "{sql}");
+        assert!(sql.contains("ST_AsMVTGeom("), "{sql}");
+        assert!(sql.contains("ST_TileEnvelope($1::integer, $2::integer, $3::integer)"), "{sql}");
+        assert!(sql.contains("\"geom\" &&"), "{sql}");
+        assert!(sql.contains("FROM \"public\".\"wuhua_buildings\""), "{sql}");
+        assert!(sql.contains("FROM clipped AS tile"), "{sql}");
+    }
 
     fn test_def() -> PgSourceDef {
         PgSourceDef {

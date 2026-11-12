@@ -1,6 +1,6 @@
 //! WFS capabilities document (`GetCapabilities`) — WFS 1.0.0 / 1.1.0 / 2.0.0.
 //!
-//! Mirrors GeoServer's `CapabilitiesTransformer`: ServiceIdentification /
+//! Capabilities sections: ServiceIdentification /
 //! ServiceProvider / OperationsMetadata / FeatureTypeList, built from the
 //! server's vector layers. Version differences live in element names and
 //! namespaces (WFS 2.0 moved metadata under `ows:`).

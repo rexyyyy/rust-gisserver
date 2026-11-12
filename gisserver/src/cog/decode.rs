@@ -1,4 +1,4 @@
-//! Tile codecs (ported from TerraServe's `decode.rs`).
+//! Tile codecs.
 //!
 //! DEFLATE (+ horizontal predictor) is the required path; LZW and ZSTD are
 //! supported as bonus codecs. Output is always a 4-channel RGBA tile buffer

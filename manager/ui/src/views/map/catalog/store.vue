@@ -3,7 +3,7 @@
     <!-- 红线提示：数据源只是指针，不落地数据 -->
     <el-alert type="info" :closable="false" show-icon class="mb-[10px]">
       <template #title>
-        数据源（对应 GeoServer Store）只登记<b>指针</b>：目录路径或 PostGIS 连接串。「只读发现」仅扫描文件头 / 归档元数据 /
+        数据源只登记<b>指针</b>：目录路径或 PostGIS 连接串。「只读发现」仅扫描文件头 / 归档元数据 /
         geometry_columns，不导入数据、不复制文件、不重投影落库。
       </template>
     </el-alert>

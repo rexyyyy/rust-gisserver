@@ -35,7 +35,7 @@ pub async fn online_list(State(state): State<Arc<AppState>>) -> Json<Value> {
     Json(json!({ "code": 200, "msg": "查询成功", "total": rows.len() as i64, "rows": rows }))
 }
 
-/// GET /monitor/online —— 当前登录用户自己的在线设备（上游 `getInfo`，无需按钮权限）。
+/// GET /monitor/online —— 当前登录用户自己的在线设备（`getInfo`，无需按钮权限）。
 pub async fn online_info(
     State(state): State<Arc<AppState>>,
     Extension(user): Extension<CurrentUser>,

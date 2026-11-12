@@ -111,7 +111,7 @@ pub fn parse_get_feature(
     let is20 = version.starts_with("2.");
 
     // TYPENAMES is the WFS 2.0 spelling; TYPENAME the 1.x one. Accept both
-    // (lenient, like GeoServer's KVP dispatcher). A namespace prefix
+    // (lenient). A namespace prefix
     // (`ws:places`) is stripped: rust-gisserver layers are flat.
     let type_names: Vec<String> = get("typeNames")
         .or_else(|| get("typeName"))

@@ -1,6 +1,6 @@
 //! Bounded in-memory cache of decoded tiles (RGBA buffers), keyed by a
-//! `(source_id, level_idx, tile_x, tile_y)` composite. Modeled on TerraServe's
-//! decoded-tile cache; runs on **foyer** (in-memory cache, no moka) with a
+//! `(source_id, level_idx, tile_x, tile_y)` composite; runs on **foyer**
+//! (in-memory cache, no moka) with a
 //! hard memory cap and explicit purge (see `map-api`'s `CacheHub`).
 
 use foyer::Cache as FoyerCache;

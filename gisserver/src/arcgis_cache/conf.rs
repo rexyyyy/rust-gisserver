@@ -1,6 +1,6 @@
 //! `Conf.xml` / `conf.cdi` 解析：ArcGIS 切片缓存的自描述元数据。
 //!
-//! 一个 ArcGIS 预切片缓存目录的骨架（本机 E 盘样例与 GeoWebCache 测试资源同形）：
+//! 预切片缓存目录的骨架：
 //!
 //! ```text
 //! <缓存服务根>/
@@ -102,7 +102,7 @@ impl CacheInfo {
             .ok_or("Conf.xml 缺少 TileCacheInfo")?;
 
         // 空间参考：TileCacheInfo 下常有内嵌 SpatialReference；WKID 有时只在
-        // LatestWKID（高版本），因此两条都认。**LatestWKID 优先**：它是 ESRI 对
+        // LatestWKID（高版本），因此两条都认。**LatestWKID 优先**：它是
         // 同一空间参考给出的现行官方码（如 Web Mercator 的 WKID=102100 已废弃、
         // LatestWKID=3857），旧产出里两值相同（本仓库 E 盘样例 4490/4490），
         // 优先它不改变既有行为。
@@ -231,8 +231,8 @@ impl Cdi {
 
 /// 从 WKT 里取 EPSG 码（ArcGIS 常把 WKID 省略只留 WKT）。
 ///
-/// ESRI 产出的写法是 `AUTHORITY["EPSG",4490]`——**码不带引号**，少数工具会写成
-/// `"4490"`，两种都认。取**最后**一个 AUTHORITY：ESRI 把外层对象（即 CRS 本身）
+/// 常见写法是 `AUTHORITY["EPSG",4490]`——**码不带引号**，少数工具会写成
+/// `"4490"`，两种都认。取**最后**一个 AUTHORITY：外层对象（即 CRS 本身）
 /// 的 AUTHORITY 写在括号末尾，内层的 SPHEROID/DATUM/UNIT 各有一个。
 fn wkt_authority(wkt: &str) -> Option<u32> {
     let pos = wkt.rfind("AUTHORITY")?;
@@ -407,8 +407,8 @@ mod tests {
         assert_eq!(c.crs, "EPSG:4490");
     }
 
-    /// LatestWKID 是现行官方码：与废弃的 ESRI 码并存时必须取前者
-    /// （GWC compactcacheV2 参考样例即 WKID=102100 + LatestWKID=3857）。
+    /// LatestWKID 是现行官方码：与废弃码并存时必须取前者
+    /// （例：WKID=102100 + LatestWKID=3857）。
     #[test]
     fn latest_wkid_wins_over_legacy_wkid() {
         let text = CONF.replace("<WKID>4490</WKID><LatestWKID>4490</LatestWKID>", "<WKID>102100</WKID><LatestWKID>3857</LatestWKID>");

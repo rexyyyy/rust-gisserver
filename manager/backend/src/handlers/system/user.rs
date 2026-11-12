@@ -414,7 +414,7 @@ pub async fn list_by_dept(
     let pat = format!("%{}%", dept_id);
     let rows = query(&state.pool, &sql, &[&dept_id, &pat, &limit, &offset]).await?;
     let vos: Vec<UserVO> = rows.iter().map(row_to_vo).collect();
-    // 上游 RuoYi 语义：菜单/部门类列表返回 AjaxResult(data)，前端 res.data 消费
+    // 菜单/部门类列表返回 AjaxResult(data)，前端 res.data 消费
     Ok(Json(json!({ "code": 200, "msg": "查询成功", "data": vos })))
 }
 

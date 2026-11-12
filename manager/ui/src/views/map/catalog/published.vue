@@ -3,7 +3,7 @@
     <!-- 红线提示：账本与引擎配置同源，生命周期只动引擎登记簿 -->
     <el-alert type="info" :closable="false" show-icon class="mb-[10px]">
       <template #title>
-        已发布服务（对应 GeoServer Layer preview）是发布动作的<b>账本</b>：实体配置落在 rust-gisserver 的 XML 里，
+        已发布服务是发布动作的<b>账本</b>：实体配置落在 rust-gisserver 的 XML 里，
         启停 / 暂停 / 删除只改引擎登记簿并热重载，不物理删除配置文件。
       </template>
     </el-alert>

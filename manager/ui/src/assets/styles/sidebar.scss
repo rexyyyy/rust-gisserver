@@ -29,7 +29,7 @@
     -webkit-box-shadow: 2px 0 6px rgba(0, 21, 41, 0.35);
     box-shadow: 0 0 8px 0 rgba(0, 0, 0, 0.1);
 
-    // 覆写 Element Plus 菜单 active 色变量（GeoServer 风格：深蓝色文字）
+    // 覆写 Element Plus 菜单 active 色变量（深蓝色文字）
     --el-menu-active-color: #0082b6 !important;
 
     // reset element-ui css
@@ -107,14 +107,14 @@
       }
     }
 
-    /* ===== GeoServer 风格：顶级分组标题加粗青蓝 + 组间分隔线 ===== */
+    /* ===== 顶级分组标题加粗青蓝 + 组间分隔线 ===== */
     .sub-menu-title-noDropdown,
     .el-sub-menu__title {
       font-weight: 700;
       color: var(--menuGroupTitle);
     }
 
-    // 顶级分组之间的分隔线（灰绿色系，与 GeoServer 侧栏一致）
+    // 顶级分组之间的分隔线（灰绿色系）
     > .el-menu > .el-sub-menu,
     > .el-menu > .sub-menu-title-noDropdown {
       margin-bottom: 4px;

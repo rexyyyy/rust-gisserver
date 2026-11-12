@@ -1,5 +1,9 @@
-//! Connection pool with the PostGIS/PostgreSQL version pre-flight Martin
-//! performs (`ST_TileEnvelope` needs PostGIS >= 3.0).
+//! Connection pool with a startup version pre-flight.
+//!
+//! `ST_TileEnvelope` and its `margin` argument only exist from certain
+//! PostGIS releases onwards, so the pool records which SQL features the
+//! server supports before any tile template is assembled. A plain pool
+//! variant skips the PostGIS probe for metadata-only connections.
 
 use deadpool_postgres::{Manager, ManagerConfig, Object, Pool, RecyclingMethod};
 use semver::Version;
@@ -11,8 +15,14 @@ use tokio_postgres::NoTls;
 const MIN_POSTGRES_VERSION: Version = Version::new(11, 0, 0);
 /// Minimum PostGIS version: `ST_TileEnvelope` was added in 3.0.0.
 const MIN_POSTGIS_VERSION: Version = Version::new(3, 0, 0);
-/// PostGIS >= 3.1 supports the `margin` parameter of `ST_TileEnvelope`.
-const ST_TILE_ENVELOPE_POSTGIS_VERSION: Version = Version::new(3, 1, 0);
+/// First PostGIS release that accepts `margin` on `ST_TileEnvelope`.
+const MARGIN_SINCE_POSTGIS: Version = Version::new(3, 1, 0);
+
+/// Whether the connected server can take the `margin` argument; older
+/// servers need the widened-envelope fallback in the tile predicate.
+fn has_envelope_margin(v: &Version) -> bool {
+    *v >= MARGIN_SINCE_POSTGIS
+}
 /// PostGIS >= 3.5 fixed missing geometry on some zoom levels.
 const RECOMMENDED_POSTGIS_VERSION: Version = Version::new(3, 5, 0);
 
@@ -53,7 +63,8 @@ pub struct PgPool {
     id: String,
     pool: Pool,
     postgis_version: Version,
-    supports_tile_margin: bool,
+    /// Whether `ST_TileEnvelope` accepts the `margin` argument.
+    margin_capable: bool,
 }
 
 impl fmt::Debug for PgPool {
@@ -90,8 +101,8 @@ impl PgPool {
 
     /// Create a pool WITHOUT the PostGIS probe, for plain-SQL use on
     /// databases that may not have PostGIS at all (service registry,
-    /// metadata tables). `supports_tile_margin` stays false — never use this
-    /// pool for tile SQL.
+    /// metadata tables). Version-gated SQL features stay disabled — never
+    /// use this pool for tile SQL.
     pub async fn new_plain(dsn: &str, max_size: usize) -> Result<Self, PgPoolError> {
         let (id, pool) = Self::build_pool(dsn, max_size)?;
         // One probe connection to fail fast on an unreachable server.
@@ -99,7 +110,7 @@ impl PgPool {
             id,
             pool,
             postgis_version: Version::new(0, 0, 0),
-            supports_tile_margin: false,
+            margin_capable: false,
         };
         let conn = this.get().await?;
         let pg_ver = probe_version(&conn, "SHOW server_version_num").await?;
@@ -124,7 +135,7 @@ impl PgPool {
             id,
             pool,
             postgis_version: Version::new(0, 0, 0),
-            supports_tile_margin: false,
+            margin_capable: false,
         };
         let conn = this.get().await?;
         let pg_ver = probe_version(&conn, "SHOW server_version_num").await?;
@@ -147,7 +158,7 @@ impl PgPool {
                 minimum: MIN_POSTGIS_VERSION.to_string(),
             });
         }
-        this.supports_tile_margin = postgis_version >= ST_TILE_ENVELOPE_POSTGIS_VERSION;
+        this.margin_capable = has_envelope_margin(&postgis_version);
         if postgis_version < RECOMMENDED_POSTGIS_VERSION {
             tracing::warn!(
                 pool.id = %this.id,
@@ -177,9 +188,9 @@ impl PgPool {
         &self.id
     }
 
-    /// `ST_TileEnvelope` supports the `margin` parameter (PostGIS >= 3.1).
-    pub fn supports_tile_margin(&self) -> bool {
-        self.supports_tile_margin
+    /// Whether `ST_TileEnvelope` accepts the `margin` argument (PostGIS >= 3.1).
+    pub fn envelope_margin_available(&self) -> bool {
+        self.margin_capable
     }
 
     pub fn postgis_version(&self) -> &Version {
@@ -193,7 +204,7 @@ impl PgPool {
 
     /// Never-connected pool handle for pure-SQL-template unit tests: deadpool
     /// connects lazily (build never dials), so only `tile_sql`'s
-    /// `supports_tile_margin` branch consults this — preset to PostGIS 3.5.
+    /// the tile predicate consults this flag — preset to PostGIS 3.5.
     #[cfg(test)]
     pub(crate) fn for_tests() -> PgPool {
         let config: tokio_postgres::Config = "postgres://u:p@127.0.0.1:1/gis"
@@ -208,7 +219,7 @@ impl PgPool {
                 .build()
                 .expect("deadpool build never dials"),
             postgis_version: Version::new(3, 5, 2),
-            supports_tile_margin: true,
+            margin_capable: true,
         }
     }
 }

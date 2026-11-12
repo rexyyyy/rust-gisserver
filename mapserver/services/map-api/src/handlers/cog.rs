@@ -1,5 +1,5 @@
 //! COG serving: `/cog/{layer}` streams the layer's COG bytes with HTTP Range
-//! support, so external COG clients (QGIS / rasterio / tifffile) can open it
+//! support, so external COG clients can open it
 //! over HTTP. Local COGs are read fully; remote `http(s)://` COGs are proxied
 //! range-by-range.
 

@@ -120,7 +120,7 @@ pub async fn auth_mw(
 
     let (roles, perms) = crate::perm::load(&state, claims.sub).await?;
     let admin = claims.sub == 1 || roles.iter().any(|r| r == "admin");
-    // 上游 RuoYi 语义：超级管理员持有全部权限码（前端 v-hasPermi 依赖
+    // 超级管理员持有全部权限码（前端 v-hasPermi 依赖
     // "*:*:*" 判定按钮可见性，不给它会把 admin 的所有操作按钮都隐藏）。
     let perms = if admin { vec!["*:*:*".to_string()] } else { perms };
 

@@ -31,7 +31,7 @@ impl Default for ItemsQuery {
 }
 
 /// Parse `limit`, `offset` and `bbox` from KVP pairs. Unknown parameters are
-/// ignored (lenient, like GeoServer).
+/// ignored (lenient).
 ///
 /// `bbox` accepts 4 numbers (`minx,miny,maxx,maxy`) or 6 numbers
 /// (`minx,miny,minz,maxx,maxy,maxz` —— 高程位不能占掉 max 的位）。

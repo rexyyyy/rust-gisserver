@@ -8,7 +8,7 @@
       </template>
     </el-alert>
 
-    <!-- 功能入口：对应 GeoServer Data 组的 Workspaces / Stores / Layers 分工 -->
+    <!-- 功能入口：工作空间 / 数据源 / 图层分工 -->
     <el-row :gutter="10" class="mb-[10px]">
       <el-col v-for="e in entries" :key="e.path" :lg="6" :md="12" :sm="12" :xs="24">
         <el-card shadow="hover" class="entry-card" @click="go(e.path)">

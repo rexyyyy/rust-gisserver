@@ -35,7 +35,7 @@ fn is_projected_epsg(code: i32) -> bool {
 /// 合规客户端报 400：
 /// * 短名 `EPSG:4326`；
 /// * OGC URN `urn:ogc:def:crs:EPSG::4326`（WMS 1.3.0 §6.6、WMTS
-///   `<SupportedCRS>`、WFS `<DefaultCRS>` 都用这个形式，QGIS/ArcGIS/owslib
+///   `<SupportedCRS>`、WFS `<DefaultCRS>` 都用这个形式，多数客户端
 ///   常常发这种）；版本式 `...:EPSG:6.6:4326` 与 GML 3.1 旧式
 ///   `urn:x-ogc:def:crs:EPSG:4326` 同等接受；
 /// * OGC def-URI `http://www.opengis.net/def/crs/EPSG/0/4326`（OGC API 用）。

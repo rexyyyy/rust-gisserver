@@ -432,7 +432,7 @@ const open = (row: ResourceVO, wsId = 0) => {
     crsAlert: suspicious,
     crsAlertTitle: !row.srcCrs ? '数据未声明坐标系' : '坐标系与坐标值范围不匹配',
     crsAlertDesc: !row.srcCrs
-      ? '该数据源未声明坐标系。请先用 GIS 软件（如 QGIS）赋予正确坐标系后重新导入，或在下方坐标系树中选择一个（WGS84 系的地理/投影坐标、CGCS2000 系的地理坐标与高斯投影）。'
+      ? '该数据源未声明坐标系。请先用 GIS 软件赋予正确坐标系后重新导入，或在下方坐标系树中选择一个（WGS84 系的地理/投影坐标、CGCS2000 系的地理坐标与高斯投影）。'
       : `该数据声明为 ${row.srcCrs}，但其坐标值范围与该坐标系的合理范围明显不符（疑似局部坐标或坐标系写错）。请核实后在下方选择正确坐标系；无法配准时请勿发布。`
   });
   resetBox(row.bbox);

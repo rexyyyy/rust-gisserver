@@ -1,6 +1,5 @@
 //! Style library: SLD files under `<catalog.root>/styles` managed through the
-//! admin surface (manager scope doc §10 P1, lightweight by decision — no
-//! online editor, QGIS is the editing tool).
+//! admin surface (lightweight: no online editor; styles are edited externally).
 //!
 //! * `GET    /admin/styles`              — list (parsed summary + usage)
 //! * `GET    /admin/styles/:name/content`— raw SLD text

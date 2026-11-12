@@ -7,7 +7,7 @@
 //! 轴序：`srsName` 宣告什么序，坐标就必须写什么序。EPSG 注册表里 4326 的轴序是
 //! （纬度, 经度），而内部几何是 GeoJSON 的（经度, 纬度）——早先版本无论
 //! `srsName` 怎么写都按经度在前输出，声明与内容相互矛盾，严格按声明解析的
-//! 客户端（QGIS/GeoTools）会把整个图层读成转置。现在由 [`northing_first`] 根据
+//! 客户端会把整个图层读成转置。现在由 [`northing_first`] 根据
 //! 实际宣告的 CRS 决定书写序，见 [`resolve_srs`]。
 
 use serde_json::Value;

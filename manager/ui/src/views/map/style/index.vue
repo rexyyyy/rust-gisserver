@@ -1,6 +1,6 @@
 <template>
   <div class="p-2">
-    <!-- 编辑引导（§9.5.5：不做 Web 编辑器，引导 QGIS） -->
+    <!-- 编辑引导（不提供 Web 编辑器） -->
     <div class="mb-[10px]">
       <el-card shadow="hover">
         <template #header>
@@ -10,7 +10,7 @@
           type="info"
           :closable="false"
           class="mb-2"
-          title="编辑引导：建议使用 QGIS 编辑后放回图层同名目录"
+          title="编辑引导：建议使用桌面 GIS 工具编辑后放回图层同名目录"
           description="图层属性 → 样式 → 导出 SLD 1.1（.sld）；将文件放在对应图层同名目录（vector/ 或 postgis/ 下），map-api 按请求读取、purge 即生效，无需 reload。本页不提供规则级 Web 设计器。"
         />
         <el-descriptions :column="2" border size="small">

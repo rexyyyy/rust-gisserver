@@ -1,4 +1,4 @@
-//! Bespoke Cloud-Optimized GeoTIFF reader (ported from TerraServe's `cog.rs`).
+//! Cloud-Optimized GeoTIFF reader.
 //!
 //! NO `gdal` / `tiff` / `geotiff` / COG-reader crates: we parse the TIFF and
 //! BigTIFF container ourselves -- header, IFD chain, tile offsets/bytecounts,

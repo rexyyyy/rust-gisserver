@@ -1,9 +1,9 @@
-//! Legend rendering for WMS `GetLegendGraphic` (GeoServer-aligned subset).
+//! Legend rendering for WMS `GetLegendGraphic` (supported KVP subset).
 //!
 //! Draws a small PNG swatch per (rule, symbolizer): point marks, line
 //! samples, polygon blocks, text labels — or a palette ramp for raster
 //! layers. Supports `LAYER`, `STYLE`, `RULE`, `FORMAT=image/png`,
-//! `WIDTH`, `HEIGHT` (GeoServer's common KVP subset; `SCALE`, `DPI`,
+//! `WIDTH`, `HEIGHT` (common KVP subset; `SCALE`, `DPI`,
 //! `TRANSPARENT`, legend *rules* JSON and font metrics are out of scope).
 
 use gisserver::renderer::sld::{MarkKind, SldDocument, Symbolizer};
@@ -18,7 +18,7 @@ const PAD: i64 = 2;
 
 /// Default legend height when the request omits `HEIGHT`.
 ///
-/// A swatch legend stacks one row per (rule, symbolizer); GeoServer's fixed
+/// A swatch legend stacks one row per (rule, symbolizer); a fixed
 /// 20x20 default would squeeze a multi-rule style into 2px rows, so the
 /// default grows with the style (still clamped to the canvas budget).
 pub fn auto_height(layer: &LayerRuntime, rule: Option<&str>) -> u32 {

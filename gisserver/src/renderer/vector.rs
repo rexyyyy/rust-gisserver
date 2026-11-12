@@ -3,10 +3,10 @@
 //! Two entry points:
 //!
 //! * [`rasterize_geojson`] — legacy flat style: one [`VectorStyle`] applied
-//!   uniformly to every feature (kept for the MapLibre-JSON paint path).
+//!   uniformly to every feature (kept for the vector-style JSON paint path).
 //! * [`rasterize_geojson_styled`] — SLD path: an [`SldDocument`] is evaluated
-//!   **per feature** at the request scale denominator (GeoServer semantics:
-//!   every matching rule stacks its symbolizers, `ElseFilter` chains), then
+//!   **per feature** at the request scale denominator (all matching rules
+//!   stack their symbolizers, `ElseFilter` chains), then
 //!   all ops render in painter order (polygon fills → polygon outlines →
 //!   lines → point marks → labels).
 //!

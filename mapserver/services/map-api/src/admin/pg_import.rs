@@ -60,7 +60,7 @@ pub async fn pg_import_shp_stream(
             .await
             .unwrap_or_default();
         let mut v: Value =
-            serde_json::from_slice(&bytes).unwrap_or_else(|_| json!({"error": "上游返回无法解析"}));
+            serde_json::from_slice(&bytes).unwrap_or_else(|_| json!({"error": "引擎返回无法解析"}));
         if let Value::Object(m) = &mut v {
             m.insert("stage".into(), json!(if ok { "done" } else { "error" }));
         }
@@ -513,7 +513,7 @@ fn detect_srid(shp: &Path) -> (i32, bool) {
         if !projected {
             return (4490, true);
         }
-        // ESRI WKT 没有 AUTHORITY，只能按「3 度带 / 6 度带 + 带号或中央经线」换算 EPSG。
+        // WKT 缺少 AUTHORITY 时，只能按「3 度带 / 6 度带 + 带号或中央经线」换算 EPSG。
         if let Some(v) = cgcs2000_gk_srid(&up) {
             return (v, true);
         }

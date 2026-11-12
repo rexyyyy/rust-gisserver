@@ -4,8 +4,8 @@
 //! 设计要点：
 //! * rust-gisserver 后端是 map-api admin 面的**唯一**调用方（内网部署）；
 //!   可选 `mapsvc.token` 与 map-api `admin.token` 一致（X-Admin-Token 头）。
-//! * 上游返回 JSON 原样塞进 `data` 字段（统一 `{code,msg,data}` 契约）；
-//!   上游非 2xx 时转为 `AppError::Msg`（HTTP 200 + code 500，前端拦截器弹 msg）。
+//! * 引擎返回 JSON 原样塞进 `data` 字段（统一 `{code,msg,data}` 契约）；
+//!   引擎非 2xx 时转为 `AppError::Msg`（HTTP 200 + code 500，前端拦截器弹 msg）。
 //! * map-api 停机时给出明确中文提示，不裸抛连接错误。
 //! * 二进制端点（样式图例 PNG）走 `upstream_bytes` 直通，不包 JSON 契约。
 use std::sync::Arc;
@@ -522,7 +522,7 @@ pub async fn create_service(
     State(state): State<Arc<AppState>>,
     Json(mut body): Json<Value>,
 ) -> AppResult<Json<Resp<Value>>> {
-    // 摘出 engineId / serviceGroup（不透传上游），解析目标引擎；kind/name 从请求体提取。
+    // 摘出 engineId / serviceGroup（不透传引擎），解析目标引擎；kind/name 从请求体提取。
     let engine_id = body
         .get("engineId")
         .and_then(|v| v.as_str())
@@ -647,7 +647,7 @@ pub async fn cache_stats(State(state): State<Arc<AppState>>) -> AppResult<Json<R
 }
 
 /// `POST /map/cache/purge?scope=all|output|docs|catalog|features|layers`
-/// 清缓存（代理 map-api `/api/cache/purge`）。scope 透传，非法值由上游拒绝。
+/// 清缓存（代理 map-api `/api/cache/purge`）。scope 透传，非法值由引擎拒绝。
 pub async fn cache_purge(
     State(state): State<Arc<AppState>>,
     RawQuery(qs): RawQuery,

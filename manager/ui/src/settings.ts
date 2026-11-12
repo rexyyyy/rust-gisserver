@@ -8,7 +8,7 @@ const setting: DefaultSettings = {
    */
   title: import.meta.env.VITE_APP_TITLE,
 
-  // 默认主题色：GeoServer 经典主题青蓝（与 utils/theme.ts 的 sidebarPresets 一一对应）
+  // 默认主题色：经典青蓝（与 utils/theme.ts 的 sidebarPresets 一一对应）
   theme: GS_THEME.primary,
 
   /**

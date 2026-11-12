@@ -2,9 +2,9 @@
 //!
 //! This crate is the **only** new code needed to serve a PostGIS table
 //! through rust-gisserver: it owns the connection pool, the SQL templates
-//! (modeled on Martin's `ST_AsMVT` table functions), and the OGC-Filter →
-//! SQL-WHERE translation used to push WFS/OGC API filters down to the
-//! database.
+//! (built from the documented `ST_AsMVT` / `ST_AsMVTGeom` semantics),
+//! and the OGC-Filter → SQL-WHERE translation used to push WFS/OGC API
+//! filters down to the database.
 //!
 //! Runtime enablement is config-driven: [`PgRegistry`](crate::pg_source::PgRegistry) is
 //! built by the service **only** when at least one layer declares

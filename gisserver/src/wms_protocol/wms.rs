@@ -250,8 +250,7 @@ pub fn capabilities_xml(layers: &[CapLayer], version: &str, base_url: &str) -> S
     s.push_str(&format!("        <DCPType><HTTP><Get><OnlineResource xlink:href=\"{}\"/></Get></HTTP></DCPType>\n", xml_escape(&format!("{base_url}/wms"))));
     s.push_str("      </GetLegendGraphic>\n    </Request>\n");
     s.push_str("    <Exception><Format>XML</Format></Exception>\n");
-    // GeoServer advertises SLD support here; we support UserStyle documents
-    // (SLD parameter itself is a documented boundary).
+    // UserStyle documents are supported; the SLD parameter itself is out of scope.
     s.push_str("    <UserDefinedSymbolization SupportSLD=\"1\" UserLayer=\"0\" UserStyle=\"1\" RemoteWFS=\"0\"/>\n");
 
     // Root layer: common CRSs + bounding boxes.

@@ -3,7 +3,7 @@
     <!-- 红线提示：这里是「发现」出来的元数据清单，不是数据本体 -->
     <el-alert type="info" :closable="false" show-icon class="mb-[10px]">
       <template #title>
-        数据源（Store）是目录 / 连接串指针；数据图层（Resource，对应 GeoServer Resource / Feature type）是「只读发现」
+        数据源（Store）是目录 / 连接串指针；数据图层（Resource）是「只读发现」
         扫描该数据源后得到的实体清单，一个数据源可含 0..N 个图层。首次选中空数据源会自动发现一次；「发布」只写引擎的
         Layer / TilesetService 配置并热重载，不导入数据、不生成瓦片。
       </template>

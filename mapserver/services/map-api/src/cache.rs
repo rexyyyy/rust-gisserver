@@ -38,7 +38,7 @@
 //! oat-tileset/{base}/{id}/{tms}        one tileset
 //! mvt-tilejson/{base}/{layer}          TileJSON (file-vector layers)
 //! mvt-tilejson-pg/{base}/{layer}/{tms} TileJSON (PostGIS, P2: DB probes cached)
-//! mvt-style/{layer}                    MapLibre style (base-free)
+//! mvt-style/{layer}                    vector style JSON (base-free)
 //! ```
 //!
 //! ## TTL
@@ -811,8 +811,7 @@ mod tests {
     /// Hybrid output cache WITH the foyer disk tier: insert/get must complete.
     /// Guards the Windows block-engine path (a hang here means the disk tier
     /// is unusable and `server.disk_cache` must stay off until fixed).
-    /// Multi-thread flavor: mirrors the serving runtime (the single-thread
-    /// variant passed even when the live server hung).
+    /// Multi-thread flavor: mirrors the serving runtime.
     #[tokio::test(flavor = "multi_thread", worker_threads = 4)]
     async fn output_hybrid_disk_roundtrip() {
         let dir = std::env::temp_dir().join(format!("foyer-wb-test-{}", std::process::id()));

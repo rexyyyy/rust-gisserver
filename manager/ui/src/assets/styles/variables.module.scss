@@ -1,6 +1,6 @@
 // 全局SCSS变量
 :root {
-  // 菜单栏（默认 GeoServer 经典主题：白底 + 青蓝链接）
+  // 菜单栏（默认主题：白底 + 青蓝链接）
   --menuBg: #ffffff;
   --menuColor: #0076a1;
   --menuActiveText: #0092c8;
@@ -11,7 +11,7 @@
   --subMenuHover: #e4f1f8;
   --subMenuTitleHover: #e4f1f8;
 
-  // 侧栏分组标题色与分组分隔线（GeoServer：加粗青蓝 + 灰绿细线）
+  // 侧栏分组标题色与分组分隔线（加粗青蓝 + 灰绿细线）
   --menuGroupTitle: #0082b6;
   --menuDivider: #dadada;
 

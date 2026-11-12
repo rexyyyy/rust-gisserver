@@ -53,7 +53,7 @@ const activeMenu = computed(() => {
 
 // 侧栏配色统一走 CSS 变量（--menuBg / --menuColor），
 // 由 utils/theme.ts 的 updateSidebarTheme() 按主题色在运行时切换，
-// 浅色（GeoServer 白底青蓝链接）与暗色两套预设共用同一组变量。
+// 浅色（白底青蓝链接）与暗色两套预设共用同一组变量。
 const bgColor = computed(() => variables.menuBackground);
 const textColor = computed(() => variables.menuColor);
 </script>

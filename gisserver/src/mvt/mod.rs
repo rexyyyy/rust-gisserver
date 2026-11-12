@@ -1,12 +1,12 @@
-//! MVT (Mapbox Vector Tile, spec 2.1) encoder.
+//! MVT (spec 2.1) encoder.
 //!
 //! Two tile schemes are supported:
 //! * [`encode`] — input GeoJSON is EPSG:4326, output tiles on the Web Mercator
 //!   grid (the classic XYZ interface).
 //! * [`encode_projected`] — input GeoJSON is already in a projected/planar CRS
 //!   and tiles stay in that **source projection** (linear map into the tile's
-//!   local space, no reprojection). This mirrors the PostGIS `Iface::Projected`
-//!   design so CGCS2000 / Gauss-Kruger vector layers emit real features instead
+//!   local space, no reprojection), so CGCS2000 / Gauss-Kruger vector layers
+//!   emit real features instead
 //!   of empty tiles.
 
 mod proto;

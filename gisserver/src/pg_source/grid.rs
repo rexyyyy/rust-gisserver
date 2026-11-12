@@ -7,7 +7,7 @@
 //! in the **source projection** — no `ST_Transform` in the query, which is
 //! both faster and avoids reprojection error for downstream GIS clients.
 //!
-//! Grid definition (mirrors WebMercatorQuad's structure so zoom levels have
+//! Grid definition (WebMercatorQuad structure, so zoom levels have
 //! comparable ground resolution):
 //!
 //! * world extent: `±20037508.342789244` metres on **both** axes (same

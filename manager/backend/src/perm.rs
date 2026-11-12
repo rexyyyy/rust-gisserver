@@ -36,11 +36,11 @@ WHERE ur.user_id = $1"#;
 
 /// 由「HTTP 方法 + 路径」查出所需的权限码；无需按钮级校验时返回空串。
 ///
-/// **不做通用推导**：上游 RuoYi 用控制器注解 `@SaCheckPermission("...")` 显式声明权限，
+/// **不做通用推导**：权限码由控制器注解显式声明，
 /// 同一资源下不同端点的权限码可能不同（如 `GET /system/user/{id}` 是 `query` 而非 `list`），
 /// 且带 id 的路径无法从路径本身反推动作名（`DELETE /system/post/7` 会误推成 `system:post:7`，
 /// 导致非超管角色的删除操作全部被拒）。
-/// 因此这里用显式模式表逐条对齐上游注解，`{x}` 段表示匹配任意单段。
+/// 因此这里用显式模式表逐条匹配，`{x}` 段表示匹配任意单段。
 ///
 /// 模式表按「静态段优先、参数段靠后」排序，保证 `/system/user/list` 不会被
 /// `/system/user/{userId}` 抢先匹配。
@@ -121,8 +121,8 @@ fn match_pattern(pattern: &str, path: &str) -> bool {
 
 /// 权限规则表：(HTTP 方法, 路径模式, 权限码)。
 ///
-/// 逐条对齐上游 RuoYi-Vue-Plus 5.X 控制器上的 `@SaCheckPermission` 注解。
-/// 上游无注解的端点（个人资料、自身会话等）不在表内 —— 只需登录态。
+/// 逐条匹配权限注解模式。
+/// 无权限注解的端点（个人资料、自身会话等）不在表内 —— 只需登录态。
 const PERM_RULES: &[(&str, &str, &str)] = &[
     // ---- 用户 ----
     ("GET", "/system/user/list", "system:user:list"),
@@ -177,7 +177,7 @@ const PERM_RULES: &[(&str, &str, &str)] = &[
     ("PUT", "/system/post", "system:post:edit"),
     ("GET", "/system/post/{postId}", "system:post:query"),
     ("DELETE", "/system/post/{postId}", "system:post:remove"),
-    // ---- 字典（上游 type 与 data 共用 system:dict:* 权限码）----
+    // ---- 字典（type 与 data 共用 system:dict:* 权限码）----
     ("GET", "/system/dict/type/list", "system:dict:list"),
     ("DELETE", "/system/dict/type/refreshCache", "system:dict:remove"),
     ("POST", "/system/dict/type", "system:dict:add"),
@@ -325,9 +325,9 @@ fn is_open_read(path: &str) -> bool {
         || path.contains("/optionselect")
 }
 
-/// 上游**明确没有** `@SaCheckPermission` 注解的端点：只需登录态，不做按钮级校验。
+/// **没有**权限注解的端点：只需登录态，不做按钮级校验。
 ///
-/// 对齐上游 5.X：`SysProfileController`（个人资料/改密/头像）、`SysUserController.getInfo`、
+/// 无需按钮级校验的端点：`SysProfileController`（个人资料/改密/头像）、`SysUserController.getInfo`、
 /// `SysUserOnlineController`（自身会话）、`SysConfigController.getConfigKey`、
 /// `SysDictTypeController.optionselect`、`SysDictDataController.dictType`。
 const NO_PERM_PATTERNS: &[(&str, &str)] = &[
@@ -350,7 +350,7 @@ pub fn allows(method: &str, path: &str, admin: bool, perms: &[String]) -> Result
     if method == "GET" && is_open_read(path) {
         return Ok(());
     }
-    // 上游无注解端点：仅需登录态
+    // 无注解端点：仅需登录态
     if NO_PERM_PATTERNS
         .iter()
         .any(|(m, p)| *m == method && match_pattern(p, path))
@@ -395,7 +395,7 @@ pub fn build_tree(items: Vec<crate::models::MenuVO>) -> Vec<crate::models::MenuV
 
 /// 菜单 → 前端动态路由节点。
 ///
-/// 严格镜像 RuoYi-Vue-Plus 5.X `SysMenuServiceImpl.buildMenus` + `SysMenu.getRouterPath/getComponentInfo`：
+/// 路由构建规则（`buildMenus` / `getRouterPath` / `getComponentInfo`）：
 ///
 /// * `is_frame`：`"0"`=是外链（YES_FRAME，新窗口打开），`"1"`=非外链（NO_FRAME，站内嵌）
 /// * 一级目录（parent_id=0 且 type=M 且 is_frame="1"）→ path 补前导 `/`，component=`Layout`
@@ -403,7 +403,7 @@ pub fn build_tree(items: Vec<crate::models::MenuVO>) -> Vec<crate::models::MenuV
 /// * 真外链（is_frame="0" 且 path 是 http 开头）→ path 保持原始 http 地址，前端按外链渲染不注册路由
 /// * 内链（is_frame="1" 且 path 是 http 开头）→ path 经 `inner_link_replace_each` 转义，component=`InnerLink`
 /// * 目录节点带子菜单时 `redirect = noRedirect` 且 `alwaysShow = true`
-/// * `meta.noCache` 取 `is_cache == "1"`（上游 `MetaVo` 构造器语义）
+/// * `meta.noCache` 取 `is_cache == "1"`（`MetaVo` 构造器语义）
 pub fn to_routers(items: Vec<crate::models::MenuVO>) -> Vec<crate::models::RouterVO> {
     items
         .into_iter()
@@ -412,19 +412,19 @@ pub fn to_routers(items: Vec<crate::models::MenuVO>) -> Vec<crate::models::Route
             let is_top = m.parent_id == 0;
             let raw_component = m.component.as_deref().unwrap_or("").trim();
             let has_component = !raw_component.is_empty();
-            // 上游 isMenuFrame：顶级 + 菜单类型 + 非外链
+            // isMenuFrame：顶级 + 菜单类型 + 非外链
             let is_menu_frame = is_top && m.menu_type == "C" && m.is_frame == "1";
-            // 上游 isInnerLink：非外链标记 + http(s) 地址
+            // isInnerLink：非外链标记 + http(s) 地址
             let is_inner_link = m.is_frame == "1" && is_http(&m.path);
 
-            // name（上游 getRouteName + menuId）：isMenuFrame 时 routeName 为空串
+            // name（getRouteName + menuId）：isMenuFrame 时 routeName 为空串
             let name = if is_menu_frame {
                 m.menu_id.to_string()
             } else {
                 format!("{}{}", capitalize(&m.path), m.menu_id)
             };
 
-            // path（上游 getRouterPath）
+            // path（getRouterPath）
             let path = if !is_top && is_inner_link {
                 inner_link_replace_each(&m.path)
             } else if is_top && m.menu_type == "M" && m.is_frame == "1" {
@@ -435,7 +435,7 @@ pub fn to_routers(items: Vec<crate::models::MenuVO>) -> Vec<crate::models::Route
                 m.path.clone()
             };
 
-            // component（上游 getComponentInfo）
+            // component（getComponentInfo）
             let component = if has_component && !is_menu_frame {
                 raw_component.to_string()
             } else if !has_component && !is_top && is_inner_link {
@@ -455,7 +455,7 @@ pub fn to_routers(items: Vec<crate::models::MenuVO>) -> Vec<crate::models::Route
                 Some(m.query_param.clone())
             };
 
-            // meta（上游 MetaVo 5 参构造器：link 仅当 http 时赋值，activeMenu 仅当以 / 开头时赋值）
+            // meta（MetaVo 5 参构造器：link 仅当 http 时赋值，activeMenu 仅当以 / 开头时赋值）
             let meta = crate::models::MetaVO {
                 title: m.menu_name.clone(),
                 icon: m.icon.clone(),
@@ -569,17 +569,17 @@ pub fn to_routers(items: Vec<crate::models::MenuVO>) -> Vec<crate::models::Route
         .collect()
 }
 
-/// 上游 `SysMenu.isParentView`：非顶级 + 目录类型。
+/// `SysMenu.isParentView`：非顶级 + 目录类型。
 fn is_parent_view(m: &crate::models::MenuVO) -> bool {
     m.parent_id != 0 && m.menu_type == "M"
 }
 
-/// 是否是 http(s) 地址（上游 `StringUtils.ishttp` 的实用近似）。
+/// 是否是 http(s) 地址（`StringUtils.ishttp` 的实用近似）。
 fn is_http(path: &str) -> bool {
     path.starts_with("http://") || path.starts_with("https://")
 }
 
-/// 上游 `SysMenu.innerLinkReplaceEach`：把协议与域名分隔符换成 `/`。
+/// `SysMenu.innerLinkReplaceEach`：把协议与域名分隔符换成 `/`。
 fn inner_link_replace_each(path: &str) -> String {
     path.replace("http://", "")
         .replace("https://", "")

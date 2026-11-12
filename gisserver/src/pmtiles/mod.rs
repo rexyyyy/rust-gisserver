@@ -1,6 +1,5 @@
-//! Bespoke PMTiles v3 support: TileID (Hilbert) + the on-disk archive format
-//! (ported from TerraServe's `vector/pmtiles`). Both the reader (serving) and
-//! a minimal packer (fixture/tooling) are provided.
+//! PMTiles v3 support: TileID (Hilbert) + the on-disk archive format.
+//! Both the reader (serving) and a minimal packer (fixture/tooling) are provided.
 
 pub mod codec;
 pub mod pack;
@@ -71,7 +70,7 @@ fn zoom_base(z: u32) -> u64 {
     (0..z).fold(0u64, |a, tz| a + (1u64 << (2 * tz)))
 }
 
-/// (z,x,y) -> PMTiles Hilbert TileID (matches the reference js `zxyToTileId`).
+/// (z,x,y) -> PMTiles Hilbert TileID.
 pub fn zxy_to_tileid(z: u32, x: u32, y: u32) -> u64 {
     debug_assert!(z <= 26, "zoom > 26 exceeds PMTiles interop cap");
     let n: u64 = 1 << z;

@@ -111,7 +111,7 @@ def probe_tiles():
     s, _, _ = get(f"/mvt/{LAYER}/3857/14/{x}/{y}.pbf")
     check("3857 explicit alias 200", s == 200, f"HTTP {s}")
 
-    # Both tiles are valid MapBox vector tiles: leading layer message field
+    # Both tiles are valid vector tiles: leading layer message field
     # (tag 3, wire type 2 -> byte 0x1a) and a layer name follows.
     gx, gy = projected_tile(PX, PY, 14)
     _, b1, _ = get(f"/mvt/{LAYER}/{SRID}/{gx and 14}/{gx}/{gy}.pbf")

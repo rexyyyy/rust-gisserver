@@ -37,7 +37,7 @@ pub async fn list(
     let sql = format!("SELECT {MENU_COLS} FROM sys_menu{where_sql} ORDER BY parent_id, order_num");
     let rows = query(&state.pool, &sql, &refs).await?;
     let vos: Vec<MenuVO> = rows.iter().map(row_menu).collect();
-    // 上游 RuoYi 语义：菜单/部门类列表返回 AjaxResult(data)，前端 res.data 消费
+    // 菜单/部门类列表返回 AjaxResult(data)，前端 res.data 消费
     Ok(Json(json!({ "code": 200, "msg": "查询成功", "data": vos })))
 }
 

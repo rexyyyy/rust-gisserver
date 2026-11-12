@@ -133,7 +133,7 @@ fn cap_layers(state: &AppState) -> Vec<CapLayer> {
 }
 
 /// GetLegendGraphic: render a small PNG swatch for a layer's style
-/// (GeoServer KVP subset: LAYER / STYLE / RULE / FORMAT / WIDTH / HEIGHT).
+/// (KVP subset: LAYER / STYLE / RULE / FORMAT / WIDTH / HEIGHT).
 async fn get_legend_graphic(
     state: Arc<AppState>,
     kv: &[(String, String)],
@@ -448,7 +448,7 @@ async fn get_feature_info(
     if i >= width || j >= height {
         return wms_error_response(version, &WmsError::coded("InvalidPoint", "query point outside the map"));
     }
-    // INFO_FORMAT negotiation (GeoServer's common set).
+    // INFO_FORMAT negotiation (supported set).
     let info_format = get("info_format").unwrap_or("text/plain");
     if !matches!(
         info_format.to_ascii_lowercase().as_str(),
@@ -464,7 +464,7 @@ async fn get_feature_info(
     }
     let bbox_arr = bbox.unwrap().to_array();
     // Vector layers: hit-test features at the click point and return their
-    // attributes (GeoServer's GetFeatureInfo on a vector layer).
+    // attributes (GetFeatureInfo on a vector layer).
     if layer.vector_fc.is_some() {
         return match vector_feature_info(
             Arc::clone(&state),
@@ -553,7 +553,7 @@ async fn vector_feature_info(
 }
 
 /// Format GetFeatureInfo attributes per INFO_FORMAT. `None` props = "nothing
-/// under the click": 200 with empty content (GeoServer semantics).
+/// under the click": 200 with empty content.
 fn info_response(fmt: &str, layer_name: &str, props: Option<JsonMap<String, serde_json::Value>>) -> Response {
     let Some(props) = props else {
         let body = if fmt == "application/json" { "{}" } else { "" };
@@ -663,8 +663,7 @@ fn vector_hit_blocking(
     j: u32,
 ) -> Result<Option<JsonMap<String, serde_json::Value>>, String> {
     // Err is reserved for invalid requests (bad CRS / transform failure);
-    // "nothing under the click" is Ok(None) -> 200 with an empty body,
-    // matching GeoServer's GetFeatureInfo semantics.
+    // "nothing under the click" is Ok(None) -> 200 with an empty body.
     let transformer = gisserver::projection::Transformer::new_any(crs, gisserver::wms_common::crs::EPSG_4326, gisserver::projection::proj())
         .map_err(|e| e.to_string())?;
     let [minx, miny, maxx, maxy] = bbox;

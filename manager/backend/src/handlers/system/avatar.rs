@@ -1,6 +1,6 @@
 //! 用户头像：本地文件存储 + 静态回显。
 //!
-//! 背景：5.X 原结构 `sys_user.avatar` 为 bigint（OSS 文件 id），本项目不引入 OSS，
+//! 背景：早期结构 `sys_user.avatar` 为 bigint（OSS 文件 id），本项目不引入 OSS，
 //! 改为 varchar(500) 存放相对路径（如 `/profile/avatar/2026/10/26/u1_a1b2c3.png`），
 //! 与前端 `user.avatar` 为「可直接访问的 URL 字符串」的期望一致。
 //!

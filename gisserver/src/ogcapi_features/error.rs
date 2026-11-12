@@ -1,4 +1,4 @@
-//! OGC API error model: GeoServer-style JSON `{"code", "description"}` with
+//! OGC API error model: JSON `{"code", "description"}` with
 //! the matching HTTP status.
 
 use axum::http::StatusCode;

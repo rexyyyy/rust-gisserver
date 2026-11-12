@@ -62,7 +62,7 @@ impl OnlineRegistry {
             })
             .collect()
     }
-    /// 列出某个用户的在线会话（上游 `GET /monitor/online` 返回当前登录用户的设备）。
+    /// 列出某个用户的在线会话（`GET /monitor/online` 返回当前登录用户的设备）。
     pub fn list_by_user(&self, user_id: i64) -> Vec<crate::models::OnlineVO> {
         self.inner
             .lock()

@@ -33,7 +33,7 @@
 //! * **路径穿越防护**：`tower-http` 的 `ServeDir` 内部经 `open_file` 校验，
 //!   含 `..` 的路径会被判为 `InvalidFilename`（见 tower-http 的
 //!   `serve_dir/open_file.rs`），另有 `percent-encoding` 解码环节。
-//!   这里额外做一次显式校验，不依赖上游实现的细节。
+//!   这里额外做一次显式校验，不依赖底层库的实现细节。
 //!
 //!   实测（tower-http 0.6.11）：`%2e%2e` 这类会被 axum/matchit 在**路由匹配阶段**
 //!   解码并规范化（`/%2e%2e/x` → `/x`），路径被收敛到 dist 目录内，安全；
@@ -83,7 +83,7 @@ pub fn build_service(opts: &StaticOptions) -> ServeDir<ServeFile> {
 ///
 /// `tower-http` 的 `ServeDir` 内部经 `open_file` 校验，含 `..` 的路径会被判为
 /// `InvalidFilename`（见 tower-http `serve_dir/open_file.rs`）。这里是**纵深防御**：
-/// 不依赖上游实现的细节。
+/// 不依赖底层库的实现细节。
 pub fn is_unsafe_path(path: &str) -> bool {
     // percent-decode 后再判定（解码失败时退回原始串）
     let decoded = percent_encoding::percent_decode_str(path)
@@ -130,7 +130,7 @@ pub fn apply_cache_control(resp: Response, path: &str) -> Response {
 /// 只包裹静态服务，不影响 API 与其它顶层路由的响应头。
 pub async fn cache_middleware(req: axum::extract::Request, next: axum::middleware::Next) -> Response {
     let path = req.uri().path().to_string();
-    // 纵深防御：即便上游 ServeDir 已有防护，这里再拦一道，
+    // 纵深防御：即便底层静态文件处理器已有防护，这里再拦一道，
     // 保证任何含 `..` / 反斜杠 / 盘符的路径都不会去碰文件系统。
     if is_unsafe_path(&path) {
         return (StatusCode::BAD_REQUEST, "非法路径").into_response();

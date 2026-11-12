@@ -154,7 +154,7 @@ onBeforeUnmount(() => {
   background: v-bind(getLogoBackground);
   text-align: center;
   overflow: hidden;
-  // GeoServer：Logo 区块下方的 2px 绿色分隔线（用内阴影避免撑高布局）
+  // Logo 区块下方的 2px 绿色分隔线（用内阴影避免撑高布局）
   box-shadow: inset 0 -2px 0 0 var(--gs-accent);
 
   & .sidebar-logo-link {

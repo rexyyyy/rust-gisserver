@@ -1,4 +1,4 @@
-//! 数据目录：Workspace → Store → Resource → 已发布服务（对齐 GeoServer 组织层）。
+//! 数据目录：Workspace → Store → Resource → 已发布服务。
 //!
 //! 边界（计划 §1 红线，本模块逐条遵守）：
 //! * 只做**服务发布与管理**的组织元数据；组织元数据全部落 rust-gisserver PostgreSQL。
@@ -523,7 +523,7 @@ pub struct TileGridBody {
 
 /// `POST /map/catalog/tile-grid` — 解析服务器上的 ArcGIS `Conf.xml`，返回发布
 /// 向导需要的网格参数（CRS/原点/瓦片尺寸/LOD 阶梯），由引擎复用 `arcgis-cache`
-/// 的解析逻辑（含 DPI、瓦片对齐），忽略 ESRI 专有标记。
+/// 的解析逻辑（含 DPI、瓦片对齐）。
 pub async fn tile_grid_parse(
     State(state): State<Arc<AppState>>,
     Json(form): Json<TileGridBody>,
@@ -1037,7 +1037,7 @@ pub async fn store_restore(
 /// * PostGIS → map-api `/admin/pg-test`；
 /// * 目录型 → map-api `/admin/discover?depth=1`，能列出条目即为可达。
 ///
-/// 上游失败不抛错，返回 `{ok:false, detail}`，让「测试连接」按钮拿到可读结论。
+/// 引擎请求失败不抛错，返回 `{ok:false, detail}`，让「测试连接」按钮拿到可读结论。
 pub async fn store_connect(
     State(state): State<Arc<AppState>>,
     AxumPath(id): AxumPath<i64>,
@@ -2416,7 +2416,7 @@ pub async fn publish(
     };
     if !is_3d && src_crs_in.trim().is_empty() {
         return Err(AppError::Msg(format!(
-            "资源「{}」未声明坐标系，无法发布。请先用 GIS 软件（如 QGIS）赋予正确坐标系后重新导入，\
+            "资源「{}」未声明坐标系，无法发布。请先用 GIS 软件赋予正确坐标系后重新导入，\
              或在坐标系树中选择一个（WGS84 系的地理/投影坐标、CGCS2000 系的地理坐标与高斯投影）。",
             res.name
         )));
@@ -2793,7 +2793,7 @@ pub async fn published_update(
     })))
 }
 
-/// 上游失败时补一句本地上下文，便于运维直接定位是哪个资源/文件出了问题。
+/// 引擎请求失败时补一句本地上下文，便于运维直接定位是哪个资源/文件出了问题。
 fn enrich(e: &AppError, extra: &Value) -> AppError {
     let src = extra.get("source").and_then(|v| v.as_str()).unwrap_or("");
     AppError::Msg(format!("{e}（资源数据：{src}）"))

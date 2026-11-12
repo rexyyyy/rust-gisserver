@@ -81,7 +81,7 @@ pub fn data_router(state: Arc<AppState>) -> Router {
         ));
 
     Router::new()
-        // OGC API - Features (`/ogc/features/v1`, GeoServer-compatible path)
+        // OGC API - Features (`/ogc/features/v1`)
         .route("/ogc/features/v1", get(ogcapi_features::landing))
         .route("/ogc/features/v1/", get(ogcapi_features::landing))
         .route("/ogc/features/v1/conformance", get(ogcapi_features::conformance))
@@ -262,7 +262,7 @@ pub fn ops_router(state: Arc<AppState>) -> Router {
 
 /// 管理面路由（`/admin/*`）：统一前缀，由 [`router`] 通过 `nest("/admin", …)` 挂载。
 /// 服务 CRUD 完整覆盖：GET/PUT/DELETE `/services/:kind/:name` + POST `…/rename`
-/// （对齐 GeoServer REST 配置 API 的图层增删改查）。
+/// （图层配置的增删改查）。
 pub fn admin_router(state: Arc<AppState>) -> Router {
     Router::new()
         // Manager integration: admin surface + usage metering (`admin::http`).

@@ -5,7 +5,7 @@
 //! 故下沉到本模块，保持「基础类型零重依赖、PostGIS 运行时可选」的依赖方向。
 //! pg_source 模块经 `pub use` 再导出这些名字，旧调用点（`pg_source::PgSourceDef`）不变。
 
-/// Default MVT tile extent (4096, same as Martin / Mapbox).
+/// Default MVT tile extent (4096, the usual vector-tile coordinate space).
 pub const DEFAULT_EXTENT: u32 = 4096;
 /// Default tile buffer in tile units (64).
 pub const DEFAULT_BUFFER: u32 = 64;
@@ -15,9 +15,9 @@ pub const MIN_POSTGIS_VERSION: &str = "3.0.0";
 /// One PostGIS-backed layer source, as declared in the layer XML under
 /// `source:` (with `type: postgis`).
 ///
-/// Mirrors Martin's `TableInfo`: schema/table/geometry column plus the
-/// rendering knobs a tile server needs. Everything has a default except
-/// `dsn`, `table` and `srid`.
+/// One layer's connection, table, geometry and rendering knobs.
+/// Everything has a default except `dsn`, `table` and `srid`; the field
+/// set covers the PostGIS/MVT parameters this server needs.
 use serde::{Deserialize, Serialize};
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
@@ -62,8 +62,7 @@ pub struct PgSourceDef {
     /// Clip geometries to the tile envelope (default true).
     #[serde(default)]
     pub clip_geom: Option<bool>,
-    /// Max features per tile (Martin's `max_feature_count`; unbounded by
-    /// default).
+    /// Max features per tile (unbounded by default).
     #[serde(default)]
     pub limit: Option<u32>,
     /// Data extent `[minx, miny, maxx, maxy]` in EPSG:4326. Computed from the

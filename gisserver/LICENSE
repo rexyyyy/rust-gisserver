@@ -1,5 +1,7 @@
 The rust gisserver library family (gisserver-* crates) is dual-licensed
-under either of the following, at your option:/n/n  * MIT License            (text below, section 1)
+under either of the following, at your option:
+
+  * MIT License            (text below, section 1)
   * Apache License 2.0     (text below, section 2)
 
 SPDX: MIT OR Apache-2.0

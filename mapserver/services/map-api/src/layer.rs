@@ -310,7 +310,7 @@ impl LayerRuntime {
 
     /// Effective flat vector style (legacy path, used when no SLD is
     /// configured), in precedence:
-    /// 1. legacy MapLibre JSON paint (`style.vector.paint.fill-color`);
+    /// 1. legacy style JSON paint (`style.vector.paint.fill-color`);
     /// 2. [`VectorStyle::default`].
     pub fn effective_vector_style(&self) -> VectorStyle {
         if let Some(v) = self.style.as_ref().and_then(|s| s.vector.as_ref()) {
@@ -363,7 +363,7 @@ impl LayerRuntime {
 }
 
 /// Parse `#rrggbb` / `#rrggbbaa` into `[r,g,b]` (alpha ignored). Used by
-/// [`LayerRuntime::effective_vector_style`] to lift a legacy MapLibre JSON
+/// [`LayerRuntime::effective_vector_style`] to lift a legacy style JSON
 /// `paint.fill-color` into a flat [`VectorStyle`].
 fn parse_hex3(s: &str) -> Option<[u8; 3]> {
     let s = s.trim();

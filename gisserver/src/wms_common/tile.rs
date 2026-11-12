@@ -1,7 +1,7 @@
 //! Generic tile-grid model: `TileMatrixSet` + presets.
 //!
-//! One internal model serves TMS, WMTS, MVT and XYZ (ported from TerraServe's
-//! `tms.rs`): WMTS/top-left convention, origin = top-left corner, row increases
+//! One internal model serves TMS, WMTS, MVT and XYZ:
+//! WMTS/top-left convention, origin = top-left corner, row increases
 //! south. A tile request is a GetMap with a computed bbox.
 
 use serde::{Deserialize, Serialize};

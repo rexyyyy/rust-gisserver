@@ -20,15 +20,14 @@
 //!   PacketSize * (row % PacketSize) + (col % PacketSize)`（**行优先**，与 v1 相反）。
 //!
 //! v1 的列优先 / v2 的行优先是这类读取最容易写错、且错了**不报错**（只会整体镜像
-//! 错位）的一处，因此 [`tests`] 用「按两种顺序分别解出矩阵，再与 conf.cdi 的真实
-//! 范围对齐」的方式来判定，而不是照搬文档结论。
+//! 错位）的一处，因此 [`tests`] 用两种顺序分别解出矩阵，再与 conf.cdi 的真实
+//! 范围比对判定。
 //!
 //! # 行列朝向
 //!
-//! ArcGIS 缓存的 row 自 `TileOrigin`（左上角）向南递增，与本仓库
-//! [`crate::wms_common::tile::TileMatrixSet`] 的 WMTS/左上约定**一致**，因此不需要像
-//! MBTiles（TMS 行）那样翻转。GeoWebCache 之所以在取瓦片前做
-//! `row = coverageMaxY - tileIndex[1]`，是因为它内部按左下起算，与本实现无关。
+//! 缓存 row 自 `TileOrigin`（左上角）向南递增，与本仓库
+//! [`crate::wms_common::tile::TileMatrixSet`] 的 WMTS/左上约定一致，无需像
+//! MBTiles（TMS 行）那样翻转。
 
 use std::collections::HashMap;
 use std::io::{Read, Seek, SeekFrom};
@@ -380,7 +379,7 @@ fn sidecar(base: &Path, ext: &str) -> Result<PathBuf, String> {
     if p.exists() {
         return Ok(actual_case(p));
     }
-    // bundle 基名里的十六进制可能大小写不一（ESRI 默认小写，部分产出大写）。
+    // bundle 基名里的十六进制大小写可能不一致。
     if let Some(dir) = base.parent() {
         if let Some(stem) = base.file_name().and_then(|s| s.to_str()) {
             let want = format!("{stem}.{ext}").to_ascii_lowercase();

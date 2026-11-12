@@ -2,8 +2,8 @@
 //!
 //! Raster layers carry an optional color style: either a value-domain palette
 //! (min..max mapped onto a list of colors) or plain RGB passthrough. Vector
-//! layers carry an optional style object that is served verbatim to MapLibre
-//! clients; a minimal internal style drives WMS rasterization.
+//! layers carry an optional style object served verbatim to clients;
+//! a minimal internal style drives WMS rasterization.
 
 use serde::{Deserialize, Serialize};
 

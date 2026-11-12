@@ -58,7 +58,7 @@ print()
 print("=== 2) 覆盖率检查：本项目实际注册的所有端点 ===")
 # 从 handlers/mod.rs 提取路由
 src = open(SRC_ROOT / "handlers" / "mod.rs", encoding="utf-8").read()
-# 上游明确无注解的端点（NO_PERM_PATTERNS）
+# 无权限注解的端点（NO_PERM_PATTERNS）
 NO_PERM = [
     ("GET", "/system/user/profile"),
     ("PUT", "/system/user/profile"),
@@ -96,7 +96,7 @@ if not missing:
     print("  ✓ 全部命中（PERM_RULES / NO_PERM_PATTERNS / 白名单）")
 
 print()
-print("=== 3) 关键语义抽查（对照上游 @SaCheckPermission）===")
+print("=== 3) 关键语义抽查（权限注解模式）===")
 CASES = [
     ("GET", "/system/user/list", "system:user:list"),
     ("GET", "/system/user/1", "system:user:query"),

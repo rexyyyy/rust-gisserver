@@ -1,10 +1,10 @@
 /**
- * GeoServer 经典主题样式覆写
+ * 经典主题样式覆写
  *
  * 本文件必须在 index.scss 中**最后引入**，才能盖住 element-plus/dist/index.css
  * 里的默认主色与按钮配色，避免出现「改了没生效」。
  *
- * 色值说明见 @/utils/gsTheme（全部由 GeoServer 界面截图逐像素采样得到）。
+ * 色值说明见 @/utils/gsTheme。
  */
 
 :root,
@@ -35,7 +35,7 @@ html.dark {
 }
 
 :root {
-  /* ---- GeoServer 设计令牌 ---- */
+  /* ---- 主题设计令牌 ---- */
   --gs-navbar-top: #0076a1;
   --gs-navbar-bottom: #0091c6;
   --gs-navbar-text: #ffffff;
@@ -52,7 +52,7 @@ html.dark {
   --gs-border: #dddddd;
 }
 
-/* ---- 顶部蓝色导航带（白色页眉 + 绿线 + 蓝带的 GeoServer 结构）---- */
+/* ---- 顶部蓝色导航带（白色页眉 + 绿线 + 蓝带）---- */
 .navbar {
   background: linear-gradient(180deg, var(--gs-navbar-top) 0%, var(--gs-navbar-bottom) 100%) !important;
   border-bottom: 2px solid var(--gs-accent) !important;
@@ -99,7 +99,7 @@ html.dark {
   color: var(--gs-accent) !important;
 }
 
-/* ---- 主按钮：GeoServer 经典「浅绿底 + 深绿字」----
+/* ---- 主按钮：「浅绿底 + 深绿字」----
    --gs-btn-* 由 utils/theme.ts 的 applyButtonAccent() 运行时注入；
    切换到其它主题色时会退回主题色本身。 */
 .el-button--primary {
@@ -128,14 +128,14 @@ html.dark {
   --el-button-active-text-color: var(--gs-btn-text, #ffffff);
 }
 
-/* ---- 表单区块标题：GeoServer 的蓝色标题 + 淡绿双层横线 ---- */
+/* ---- 表单区块标题：蓝色标题 + 淡绿双层横线 ---- */
 .form-header {
   color: var(--gs-title);
   border-bottom: 2px solid var(--gs-accent-line);
   box-shadow: 0 1px 0 0 var(--gs-accent-faint);
 }
 
-/* ---- 输入框 / 表格边框：GeoServer 的浅灰细边框 ----
+/* ---- 输入框 / 表格边框：浅灰细边框 ----
    focus 态沿用 element-ui.scss 的 2px 光晕，这里不覆盖，避免丢失聚焦提示 */
 .el-input__wrapper,
 .el-textarea__inner,

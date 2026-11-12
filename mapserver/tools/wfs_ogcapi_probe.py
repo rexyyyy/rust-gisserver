@@ -219,7 +219,7 @@ def probe_wfs():
     check("GML numberMatched/numberReturned", 'numberMatched=' in x and 'numberReturned="2"' in x)
     check("GML member + gml:id", "<wfs:member>" in x and 'gml:id="places.' in x)
     # Default srsName is urn:ogc:def:crs:EPSG::4326 -> EPSG axis order
-    # (lat lon), same as GeoServer for WFS 2.0. CRS:84 would be lon/lat.
+    # (lat lon) per EPSG:4326 axis order. CRS:84 would be lon/lat.
     check(
         "GML pos encoding",
         'srsName="urn:ogc:def:crs:EPSG::4326"' in x
@@ -498,7 +498,7 @@ def probe_wms_sld():
     check("GetFeatureInfo vector json", ok, f"HTTP {s}")
     s, h, b = req(base + "&info_format=application/vnd.ogc.gml")
     check("GetFeatureInfo bad INFO_FORMAT 400", s == 400 and "InvalidFormat" in b.decode("utf-8", "replace"), f"HTTP {s}")
-    # No feature under the click: GeoServer answers 200 with empty content
+    # No feature under the click: 200 with empty content
     # (the fixture polygon covers the whole Kunming frame, so probe an empty
     # bbox east of every feature instead).
     empty = ("/wms?service=WMS&version=1.1.1&request=GetFeatureInfo&layers=places"

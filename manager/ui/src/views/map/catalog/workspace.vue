@@ -3,7 +3,7 @@
     <!-- 红线提示：这里只登记命名空间容器，不含任何数据本体 -->
     <el-alert type="info" :closable="false" show-icon class="mb-[10px]">
       <template #title>
-        工作空间是服务与数据源的<b>命名空间容器</b>（对应 GeoServer Workspace）。删除只作用于容器：其下仍有数据源或在服服务时会被服务端拒绝。
+        工作空间是服务与数据源的<b>命名空间容器</b>。删除只作用于容器：其下仍有数据源或在服服务时会被服务端拒绝。
       </template>
     </el-alert>
 

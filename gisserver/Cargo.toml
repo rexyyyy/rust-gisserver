@@ -19,7 +19,9 @@ encoding = ["dep:encoding_rs"]
 projection = []
 mvt = []
 vector-query = []
-postgis = ["dep:tokio-postgres", "dep:deadpool-postgres", "dep:bytes", "dep:semver"]
+# pg_source/pool.rs logs version results unconditionally, so tracing must be
+# enabled whenever `postgis` is on (not only via the `storage` feature).
+postgis = ["dep:tokio-postgres", "dep:deadpool-postgres", "dep:bytes", "dep:semver", "dep:tracing"]
 storage = ["dep:foyer", "dep:ureq", "dep:rayon", "dep:hmac", "dep:sha2", "dep:tracing"]
 cog = ["storage", "dep:flate2", "dep:weezl", "dep:zstd"]
 renderer = ["cog", "projection", "storage", "dep:png"]

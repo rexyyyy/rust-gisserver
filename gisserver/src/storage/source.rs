@@ -1,4 +1,4 @@
-//! Positioned byte-range sources (ported from TerraServe's `RangeSource` seam).
+//! Positioned byte-range sources.
 //!
 //! Every COG / PMTiles byte read flows through [`RangeSource`], so a source can
 //! be a local file or a remote `http(s)://` object (including S3 presigned
