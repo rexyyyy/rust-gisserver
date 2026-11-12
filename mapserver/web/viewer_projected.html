@@ -1,0 +1,182 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8"/>
+<title>r-mapserver · 投影坐标系 MVT 浏览（EPSG:4522）</title>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<!--
+  投影坐标系（CGCS2000 分带 / UTM 等米单位投影）矢量瓦片浏览验证页。
+  与内置 /viewer（纯 Web Mercator）不同：本页数据驱动——
+    1) 读 /ogc/tiles/v1/tileMatrixSets/{grid} 的 JSON，拿到 crs / tileMatrices
+       (origin、scaleDenominator、matrixW/H) 与 proj4 定义串；
+    2) 用返回的 proj4 动态注册该 EPSG 码（无需硬编码），使 4522 及任意
+       同类投影带都能建图；
+    3) 在该投影上建 OL View 与 TileGrid，请求留在源投影的矢量瓦片
+       /mvt/{layer}/{grid}/{z}/{x}/{y}.pbf，验证 mvt::encode_projected 产出。
+  可用 URL 参数覆盖：?layer=e2e-fp&grid=wh_custom_grid_4522。
+  若服务端未加载 PROJ（JSON 无 proj4），回退到页内置表（仅 4522）。
+  依赖库 proj4 / OpenLayers 已本地化到 web/vendor/ 并由服务端同源内嵌伺服，
+  无需联网 CDN（proj4 版本取 npmmirror 上的 2.22.0，旧版 2.11.1 该 registry 无此版）。
+-->
+<script src="/vendor/proj4.js"></script>
+<link href="/vendor/ol.css" rel="stylesheet"/>
+<script src="/vendor/ol.js"></script>
+<style>
+  html, body, #map { height: 100%; margin: 0; }
+  #bar { position: absolute; top: 10px; left: 12px; z-index: 1000; background: rgba(255,255,255,.92);
+         padding: 6px 10px; border-radius: 6px; font: 13px/1.5 sans-serif; box-shadow: 0 1px 4px rgba(0,0,0,.3);
+         display: flex; align-items: center; gap: 8px; max-width: calc(100% - 24px); }
+  #hint { color: #b06000; }
+  #info { position: absolute; bottom: 8px; right: 12px; z-index: 1000; background: rgba(0,0,0,.72);
+          color: #fff; padding: 4px 10px; border-radius: 4px; font: 12px/1.6 monospace;
+          pointer-events: none; white-space: nowrap; }
+</style>
+</head>
+<body>
+<div id="bar">
+  <span id="title">投影网格浏览</span>
+  <span id="hint">加载中…</span>
+</div>
+<div id="map"></div>
+<div id="info">层级: - | 分辨率: - | x: - y: -</div>
+<script>
+(function () {
+  if (!window.proj4) { document.getElementById('hint').textContent = 'proj4 未加载（需 web/vendor/proj4.js）'; return; }
+  if (!window.ol) { document.getElementById('hint').textContent = 'OpenLayers 未加载（需 web/vendor/ol.js）'; return; }
+
+  // 可经 URL 参数覆盖，默认验证页的目标图层/网格。
+  var Q = new URLSearchParams(location.search);
+  var LAYER = Q.get('layer') || 'e2e-fp';
+  var GRID = Q.get('grid') || 'wh_custom_grid_4522';
+  document.getElementById('title').textContent = '投影网格浏览：' + LAYER + ' · ' + GRID;
+
+  // 无 PROJ 后端的最后兜底（仅本页历史 4522）；正常情况下 proj4 来自服务端。
+  var FALLBACK_PROJ4 = { 'EPSG:4522': '+proj=tmerc +lat_0=0 +lon_0=102 +k=1 +x_0=34500000 +y_0=0 +ellps=GRS80 +units=m +no_defs' };
+  var BUILTIN = { 'EPSG:4326': 1, 'EPSG:3857': 1 };
+  function setHint(t) { document.getElementById('hint').textContent = t; }
+
+  // 从 crs URI / 短名（EPSG:n、urn:ogc:def:crs:EPSG::n、.../def/crs/EPSG/0/n）取 EPSG:n。
+  function toEpsgCode(crs) {
+    var m = /(?:EPSG[:/]|EPSG\/0\/)(\d+)\s*$/i.exec(String(crs || ''));
+    if (!m) { var alt = /(\d+)\D*$/.exec(String(crs || '')); m = alt; }
+    return m ? 'EPSG:' + m[1] : String(crs || '');
+  }
+
+  fetch('/ogc/tiles/v1/tileMatrixSets/' + encodeURIComponent(GRID), { cache: 'no-store' })
+    .then(function (r) { return r.ok ? r.json() : Promise.reject('HTTP ' + r.status); })
+    .then(function (j) {
+      var code = toEpsgCode(j.crs);
+      // 动态注册坐标系：OL 内置直接可用；否则用服务端 proj4 串（缺则兜底）。
+      if (!BUILTIN[code]) {
+        var p4 = j.proj4 || FALLBACK_PROJ4[code];
+        if (!p4) { setHint('服务端未下发 ' + code + ' 的 proj4 定义（需加载 PROJ），且无内置兜底'); return; }
+        proj4.defs(code, p4);
+        ol.proj.proj4.register(proj4);
+      }
+      var tms = (j.tileMatrices || []).slice().sort(function (a, b) { return (+a.id) - (+b.id); });
+      if (!tms.length) { setHint('网格无 tileMatrix 定义'); return; }
+      var res = [], zs = [];
+      tms.forEach(function (t) { res.push(t.scaleDenominator * 0.00028); zs.push(String(t.id)); });
+      var z0 = tms[0];
+      var origin = z0.topLeftCorner;                       // [easting, northing]（左上）
+      var tileW = z0.tileWidth || 256, tileH = z0.tileHeight || 256;
+      // 用最深级矩阵计算实际数据覆盖范围（精度最高，减少 extent 与数据不一致）
+      var zLast = tms[tms.length - 1];
+      var lastRes = res[res.length - 1];
+      var W = zLast.matrixWidth * tileW * lastRes;
+      var H = zLast.matrixHeight * tileH * lastRes;
+      var extent = [origin[0], origin[1] - H, origin[0] + W, origin[1]];
+      build(code, zs, res, origin, extent, j.proj4 ? '服务端 PROJ' : '内置兜底', tms);
+    })
+    .catch(function (e) { setHint('读取网格定义失败：' + e); });
+
+  function build(code, zs, resolutions, origin, extent, srcName, tms) {
+    var grid = new ol.tilegrid.TileGrid({
+      extent: extent, origin: origin, resolutions: resolutions, tileSize: [256, 256]
+    });
+    // 构建各级矩阵尺寸表，用于 tileUrlFunction 越界拦截（z1 col=3 等问题）
+    var matrixBounds = {};
+    tms.forEach(function (t) {
+      matrixBounds[String(t.id)] = { w: t.matrixWidth, h: t.matrixHeight };
+    });
+    var baseUrl = '/mvt/' + LAYER + '/' + GRID;
+    function tileUrlFn(tileCoord, pixelRatio, projection) {
+      if (!projection || projection.getCode() !== code) return undefined;
+      var z = String(tileCoord[0]);
+      var b = matrixBounds[z];
+      if (!b) return undefined; // 超出已定义层级
+      var col = tileCoord[1], row = tileCoord[2];
+      if (col < 0 || col >= b.w || row < 0 || row >= b.h) return undefined; // 越界不请求
+      return baseUrl + '/' + z + '/' + col + '/' + row + '.pbf';
+    }
+    var style = new ol.style.Style({
+      fill: new ol.style.Fill({ color: 'rgba(34,170,34,0.30)' }),
+      stroke: new ol.style.Stroke({ color: '#1f8f1f', width: 1 })
+    });
+    var src = new ol.source.VectorTile({
+      format: new ol.format.MVT(),
+      projection: code,           // 源必须显式声明为 4522，否则回落 3857 与视图不兼容、不渲染
+      tileUrlFunction: tileUrlFn,
+      tileGrid: grid,
+      crossOrigin: 'anonymous'
+    });
+    var layer = new ol.layer.VectorTile({ source: src, style: function () { return style; } });
+    var map = new ol.Map({
+      target: 'map',
+      layers: [layer],
+      view: new ol.View({
+        projection: code,
+        center: [(extent[0] + extent[2]) / 2, (extent[1] + extent[3]) / 2],
+        resolution: resolutions[0],
+        maxResolution: resolutions[0],
+        constrainResolution: true
+      })
+    });
+    // fit 到数据范围（用最深级 extent，约等于实际数据 bbox）让要素初始可见
+    map.getView().fit(extent, { padding: [20, 20, 20, 20] });
+    setHint(code + ' · ' + zs.length + ' 级 · 网格定义来源：' + srcName + ' · 加载中…');
+    var loaded = 0;
+    src.on('tileloadend', function () {
+      loaded++;
+      setHint('已加载瓦片 ' + loaded + ' 张（' + code + ' / ' + GRID + '）');
+    });
+    src.on('tileloaderror', function (e) {
+      loaded++;
+      setHint('已加载瓦片 ' + loaded + ' 张（含空瓦片，' + code + ' / ' + GRID + '）');
+    });
+    window.__r6 = { map: map, src: src, grid: grid, layer: layer, code: code };
+
+    // 右下角实时信息标签：层级、分辨率、鼠标坐标
+    var infoEl = document.getElementById('info');
+    function fmtRes(r) {
+      if (r >= 1) return r.toFixed(3) + ' m/px';
+      if (r >= 0.01) return r.toFixed(4) + ' m/px';
+      return r.toExponential(2) + ' m/px';
+    }
+    function updateInfo(resolution, x, y) {
+      var z = grid.getZForResolution(resolution);
+      var maxZ = resolutions.length - 1;
+      var lvl = (z >= 0 && z < zs.length) ? (z > maxZ ? zs[maxZ] + '+' : zs[z]) : '?';
+      // overzoom: resolution finer than last grid level
+      if (resolution < resolutions[maxZ] && lvl !== '?') lvl = zs[maxZ] + '+';
+      var parts = '层级: ' + lvl + ' | 分辨率: ' + fmtRes(resolution);
+      if (x != null && y != null) parts += ' | x: ' + x.toFixed(2) + ' y: ' + y.toFixed(2);
+      infoEl.textContent = parts;
+    }
+    map.on('pointermove', function (e) {
+      var view = map.getView();
+      updateInfo(view.getResolution(), e.coordinate[0], e.coordinate[1]);
+    });
+    map.on('moveend', function () {
+      var view = map.getView();
+      var c = view.getCenter();
+      updateInfo(view.getResolution(), c[0], c[1]);
+    });
+    // 初始状态
+    var v0 = map.getView();
+    updateInfo(v0.getResolution(), v0.getCenter()[0], v0.getCenter()[1]);
+  }
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,13 @@
+[package]
+name = "gisserver-projection"
+# PUBLISHED name carries the gisserver- prefix; the Rust import name is unchanged.
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "Coordinate transforms: EPSG:4326 <-> EPSG:3857 (Web Mercator), and a small reprojection helper for the render pipeline."
+
+[dependencies]
+wms-common = { workspace = true }
+
+[target.'cfg(unix)'.dependencies]
+libc = "0.2"

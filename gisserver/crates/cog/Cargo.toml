@@ -1,0 +1,19 @@
+[package]
+name = "gisserver-cog"
+# PUBLISHED name carries the gisserver- prefix; the Rust import name is unchanged.
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "Bespoke Cloud-Optimized GeoTIFF reader (classic TIFF + BigTIFF, IFD chain, windowed tile reads) and a minimal COG writer for fixtures/tests. No GDAL/tiff/geotiff reader crates."
+
+[dependencies]
+wms-common = { workspace = true }
+storage = { workspace = true }
+flate2 = { workspace = true }
+weezl = { workspace = true }
+zstd = { workspace = true }
+rayon = { workspace = true }
+tracing = { workspace = true }
+
+[dev-dependencies]
+tempfile = { workspace = true }

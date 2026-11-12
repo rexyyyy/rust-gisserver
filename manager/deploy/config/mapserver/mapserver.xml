@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  r-mapserver 容器运行配置模板（P0-1 一键部署 / P0-3 密钥占位）
+  =============================================================================
+  本文件是「模板」：容器 entrypoint 用 envsubst 把 ${VAR} 渲染后写到
+  /app/config/mapserver.xml。DB 口令经环境变量（compose .env）注入，
+  明文既不进镜像、也不进仓库。
+  - catalog / disk_cache 用容器内绝对路径（守 WORKDIR /app）。
+  - 默认零图层：镜像启动即可演示 /health、WMS GetCapabilities、/admin。
+    挂真实图层/数据：把 cog/ vector/ 等图层 xml 放入本目录、数据卷 ./data
+    映射到 /app/data，详见 ../README.md。
+-->
+<config>
+  <server host="0.0.0.0" port="8080" cache_mib="512" cache_ttl_secs="300" cache_stats_secs="60" data_root="/app/data">
+    <disk_cache dir="/app/cache" capacity_mib="512"/>
+  </server>
+  <!-- 目录真理源两选一：
+       · files（默认）：扫描本目录下的图层 XML（<catalog.root>/<type>/*.xml），零配置即可演示。
+       · db（PG 配置发布）：改 backend="db" 并从共享库 sys_published_layer.service_doc 读图层，
+         与 manager 发布链路对接；需先建库表（挂 backend/sql 初始化）。两后端的
+         ${DATA_ROOT} 占位都会在加载时展开（r-mapserver db_catalog 已接 expand_env）。 -->
+  <catalog root="/app/config" backend="files"/>
+  <admin dsn="postgresql://postgres:${MAPSERVER_DB_PASSWORD}@postgis:5432/mapserver_manager"/>
+</config>

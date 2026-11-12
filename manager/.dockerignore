@@ -1,0 +1,26 @@
+# r-manager 构建上下文忽略（P0-1）：Dockerfile 需要 backend/ 与 ui/ 源码，
+# 其余生成物 / 备份 dist / 依赖目录一律排除，缩小上下文、避免污染镜像层。
+.git/
+.gitignore
+*.log
+
+# 后端编译产物（镜像内重新构建）
+backend/target/
+backend/storage/
+
+# 前端：只送源码，依赖与历史构建产物全部排除
+ui/node_modules/
+ui/dist/
+ui/dist_bak/
+ui/dist_gs2/
+ui/dist_gs3/
+ui/dist_old_gs/
+ui/dist_paged/
+
+# 本仓 tools/ 调试脚本、暂存区与编排目录不进 build 上下文
+tools/
+deploy/
+
+Dockerfile
+.dockerignore
+docker-entrypoint.sh

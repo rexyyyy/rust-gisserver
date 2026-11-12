@@ -1,0 +1,10 @@
+[package]
+name = "gisserver-mvt"
+# PUBLISHED name carries the gisserver- prefix; the Rust import name is unchanged.
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "Mapbox Vector Tile (MVT) encoder: GeoJSON -> protobuf vector tile (spec 2.1), plus a TileJSON helper."
+
+[dependencies]
+serde_json = { workspace = true }

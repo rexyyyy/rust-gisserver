@@ -1,0 +1,11 @@
+[package]
+name = "gisserver-vector-query"
+# PUBLISHED name carries the gisserver- prefix; the Rust import name is unchanged.
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "In-memory GeoJSON FeatureCollection querying: bbox filter, pagination, property projection, GML/CSV encoding."
+
+[dependencies]
+serde_json = { workspace = true }
+wms-common = { workspace = true }

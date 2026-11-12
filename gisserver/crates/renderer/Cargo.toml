@@ -1,0 +1,20 @@
+[package]
+name = "gisserver-renderer"
+# PUBLISHED name carries the gisserver- prefix; the Rust import name is unchanged.
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "Windowed raster rendering (COG -> RGBA -> PNG), nearest/bilinear resampling, palette styling, and a simple vector rasterizer for WMS GetMap of GeoJSON layers."
+
+[dependencies]
+wms-common = { workspace = true }
+storage = { workspace = true }
+cog = { workspace = true }
+png = { workspace = true }
+serde_json = { workspace = true }
+
+# Only the renderer's unit tests build a Transformer (via the `Reprojector`
+# trait). The production render path receives an injected transformer and no
+# longer depends on the concrete `projection` crate.
+[dev-dependencies]
+projection = { workspace = true }

@@ -1,0 +1,33 @@
+[package]
+name = "manager"
+version = "0.1.0"
+edition = "2021"
+description = "r-mapserver 系统管理后端（axum + tokio-postgres，仅 PostgreSQL）"
+license = "AGPL-3.0-only"
+
+[dependencies]
+axum = { version = "0.8.9", features = ["multipart"] }
+tokio = { version = "1", features = ["full"] }
+# http-body：自定义 TraceLayer MakeSpan 需要 Body trait 约束（axum 已转译依赖，此处显式声明）。
+http-body = "1"
+tokio-postgres = { version = "0.7.18", features = ["with-chrono-0_4"] }
+deadpool-postgres = "0.14.2"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+chrono = { version = "0.4.41", features = ["serde"] }
+uuid = { version = "1.17.0", features = ["v4"] }
+rand = "0.8.5"
+base64 = "0.22.1"
+jsonwebtoken = "9.3.1"
+bcrypt = "0.15.1"
+thiserror = "2"
+tracing = "0.1.41"
+tracing-subscriber = { version = "0.3.23", features = ["env-filter"] }
+# compression（gzip/br）用于前端静态资源压缩传输；trace 逐请求追踪；
+# request-id 为每个请求生成并回传 x-request-id，串联日志与前端排查。
+tower-http = { version = "0.6.11", features = ["cors", "fs", "compression-gzip", "compression-br", "trace", "request-id"] }
+# 静态资源路径穿越检查需要把 URI 路径做 percent-decoding 后再判定
+# （Uri::path() 返回的是原始编码路径，%2e%2e 这类绕过只有解码后才可见）
+percent-encoding = "2.3"
+# map-api 管理面代理（内网 http，无需 TLS）
+reqwest = { version = "0.12", default-features = false, features = ["json", "stream"] }

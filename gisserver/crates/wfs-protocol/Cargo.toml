@@ -1,0 +1,14 @@
+[package]
+name = "gisserver-wfs-protocol"
+# PUBLISHED name carries the gisserver- prefix; the Rust import name is unchanged.
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "WFS 1.0/1.1/2.0 protocol: capabilities, DescribeFeatureType and GetFeature (GML/GeoJSON/CSV) on in-memory GeoJSON layers."
+
+[dependencies]
+wms-common = { workspace = true }
+wms-protocol = { workspace = true }
+vector-query = { workspace = true }
+serde_json = { workspace = true }
+axum = { workspace = true }

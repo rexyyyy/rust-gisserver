@@ -1,0 +1,16 @@
+[package]
+name = "gisserver-pg-source"
+# PUBLISHED name carries the gisserver- prefix; the Rust import name is unchanged.
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+tokio-postgres = { workspace = true }
+deadpool-postgres = { workspace = true }
+bytes = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+tracing = { workspace = true }
+thiserror = { workspace = true }
+semver = { workspace = true }

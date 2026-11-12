@@ -1,0 +1,26 @@
+# r-mapserver 构建上下文忽略（P0-1）：只把编译 workspace 所需的 crates/ 与
+# services/ 送进 daemon，排除一切体积大 / 生成物 / 与镜像无关的东西。
+target/
+**/target/
+.git/
+.gitignore
+*.log
+*.exit
+/tmp*
+/.tmp*
+_tmp*
+.workbuddy/
+fixtures/
+cache/
+/proj_9.dll
+/share/
+/config/terrain/
+**/node_modules/
+
+# 容器编排与本机配置不进 build 上下文（map-api 镜像不 COPY config，运行期挂载）。
+# 注意：docker-entrypoint.sh 必须留在上下文里（Dockerfile 要 COPY 它）。
+config/
+deploy/
+docker-compose.yml
+Dockerfile
+.dockerignore

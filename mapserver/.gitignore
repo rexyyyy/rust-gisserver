@@ -1,0 +1,30 @@
+/target
+*.log
+/Cargo.lock
+/cache/
+*.exit
+
+# manager 子系统已拆分为独立项目：D:\mycomputer\documents\gis-wt\thirdparty\manager
+# 本目录残留的 node_modules/target 构建垃圾待清理（可整目录删除）
+manager/
+# 仓库根目录的一次性诊断输出
+/*.txt
+
+# 会话级调试产物（临时输出/日志/一次性脚本），不入库
+/.tmp*
+/.tmp-stress/
+/_tmp*
+
+# 运行期下载的 PROJ 运行时（proj_9.dll + share/proj 数据目录），不入库
+/proj_9.dll
+/share/
+
+# 地形数据包（terrainpack 及其备份，体积大且为生成物）
+/config/terrain/
+
+# MVT 解码探针（node_modules 体积大）
+/.workbuddy/mvt_test/node_modules/
+
+# 会话级测试产物：配置备份、导出的 WMTS 能力文档快照（不入库）
+*.bak
+/wmts_caps.xml

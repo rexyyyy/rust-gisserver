@@ -1,0 +1,43 @@
+# 构建产物
+backend/target/
+ui/node_modules/
+ui/_node_modules_broken/
+ui/dist/
+ui/dist_bak/
+ui/dist_paged/
+# 临时构建目录（本机 safe-delete 无法回收 trash，构建后需手工清理）
+ui/dist_*/
+ui/.vite/
+
+# 主题预览页（引用带 hash 的产物 CSS，每次构建后需改文件名，不入库）
+ui/theme-preview.html
+
+# 本机会话临时校验脚本（含机器专属绝对路径，不共享）
+backend/check_backend.ps1
+
+# 运行时数据（头像存储等）
+backend/storage/
+
+# 探针与诊断产物（可重新生成，不入库）
+mgr_probe.txt
+ui_menu_probe.txt
+ui_route_probe.txt
+mgr_dbg.txt
+tools/routers_*.json
+tools/_upstream/
+tools/__pycache__/
+*.log
+backend/manager.pid
+backend/manager_run.log
+
+# 会话截图产物（浏览器实测证据，可重生成，不入库）
+.workbuddy/*.png
+
+# 会话级诊断脚本与数据快照（含本机专属路径，不共享）
+/_tmp_*.py
+.workbuddy/*.py
+.workbuddy/*.json
+
+# IDE（Trae）自动生成的文档目录，不入库
+.trae/
+/ui/pnpm-lock.yaml

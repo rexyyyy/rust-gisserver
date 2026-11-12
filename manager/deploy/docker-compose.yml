@@ -1,0 +1,91 @@
+# ============================================================================
+# r-mapserver 数据底座 — 一键部署 Compose（开发计划 P0-1 第一阶段）
+#
+# 位置：r-manager/deploy/（管理与集成平面）。两个 build 上下文指向兄弟仓：
+#   map-api  → ../../r-mapserver      （发布服务平面，:8080）
+#   manager  → ..                     （r-manager 管理平面，:6180）
+#   postgis  → 镜像 postgis/postgis   （单库 mapserver_manager，:5434→5432）
+#
+# 使用：
+#   cd r-manager/deploy
+#   copy .env.example .env      # 填 MAPSERVER_DB_PASSWORD / MANAGER_JWT_SECRET
+#   docker compose up -d --build
+#   # 前端 http://localhost:6180/  map-api http://localhost:8080/health
+#
+# 密钥：容器配置模板 config/**.xml 用 ${VAR} 占位，由各服务 entrypoint 的
+# envsubst 依环境变量渲染 —— 口令/JWT 不进镜像、不进仓库（P0-3）。
+# ============================================================================
+
+name: gis-data-base
+
+services:
+  postgis:
+    image: postgis/postgis:16-3.4
+    container_name: gis-postgis
+    environment:
+      POSTGRES_DB: mapserver_manager
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: ${MAPSERVER_DB_PASSWORD:?MAPSERVER_DB_PASSWORD 未设置，请在 .env 中配置}
+    ports:
+      - "${MAPSERVER_DB_PORT:-5434}:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      # 首次启动自动执行建表脚本（system.sql + map.sql）
+      - ../backend/sql:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d mapserver_manager"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+    restart: unless-stopped
+
+  map-api:
+    build:
+      context: ../../r-mapserver
+      dockerfile: Dockerfile
+    image: gis/map-api:0.1
+    container_name: gis-map-api
+    depends_on:
+      postgis:
+        condition: service_healthy
+    environment:
+      MAPSERVER_DB_PASSWORD: ${MAPSERVER_DB_PASSWORD}
+    volumes:
+      - ./config/mapserver:/app/config.template:ro
+      - map_cache:/app/cache
+      # 图层数据根：放入 COG/GeoJSON/归档等，容器内以 /app/data 只读访问
+      - ./data:/app/data:ro
+    ports:
+      - "8080:8080"
+    restart: unless-stopped
+
+  manager:
+    build:
+      context: ..
+      dockerfile: Dockerfile
+    image: gis/manager:0.1
+    container_name: gis-manager
+    depends_on:
+      postgis:
+        condition: service_healthy
+    environment:
+      MAPSERVER_DB_PASSWORD: ${MAPSERVER_DB_PASSWORD}
+      MANAGER_JWT_SECRET: ${MANAGER_JWT_SECRET:?MANAGER_JWT_SECRET 未设置，请在 .env 中配置}
+    volumes:
+      - ./config/manager:/app/config.template:ro
+      - mgr_storage:/app/storage
+    ports:
+      - "6180:6180"
+    restart: unless-stopped
+
+  # 能力底座 / 数据工厂 / MCP（gis-wt/gis-srv，:7070）——P0-1 不含，留 profile 占位。
+  # 启用：docker compose --profile gis-srv up -d（需本地存在 gis-srv 仓与镜像）。
+  # gis-srv:
+  #   image: gis/gis-srv:0.1
+  #   profiles: ["gis-srv"]
+  #   ports: ["7070:7070"]
+
+volumes:
+  pgdata:
+  map_cache:
+  mgr_storage:

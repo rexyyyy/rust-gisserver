@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  r-manager 容器运行配置模板（P0-1 一键部署 / P0-3 密钥占位）
+  =============================================================================
+  容器 entrypoint 用 envsubst 把 ${VAR} 渲染后写到 /app/config/manager.xml。
+  DB 口令与 JWT 密钥经环境变量（compose .env）注入，明文不进镜像/仓库。
+  - static_dir 绝对指向镜像内构建好的前端 /app/ui/dist（后端同端口托管）。
+  - avatar_dir 指向数据卷 /app/storage/avatar。
+  - mapsvc 走 compose 服务名 http://map-api:8080（容器网络内直连）。
+-->
+<config>
+  <server addr="0.0.0.0:6180" base_api="/manager-api" static_dir="/app/ui/dist">
+    <cors_origins>
+      <item>http://localhost:6180</item>
+      <item>http://127.0.0.1:6180</item>
+    </cors_origins>
+  </server>
+  <database url="postgresql://postgres:${MAPSERVER_DB_PASSWORD}@postgis:5432/mapserver_manager" pool_max="16"/>
+  <storage avatar_dir="/app/storage/avatar"/>
+  <mapsvc base_url="http://map-api:8080"/>
+  <security jwt_secret="${MANAGER_JWT_SECRET}" token_expire_minutes="1440" captcha_enabled="false">
+    <white_list>
+      <item>/auth/login</item>
+      <item>/auth/code</item>
+      <item>/captchaImage</item>
+    </white_list>
+  </security>
+</config>

@@ -1,0 +1,27 @@
+# ===== Rust =====
+/target
+**/target
+Cargo.lock.bak
+*.rlib
+
+# ===== Node (manager/ui) =====
+node_modules/
+manager/ui/node_modules/
+manager/ui/dist/
+manager/ui/dist_*/
+manager/ui/_node_modules_broken/
+
+# ===== OS / editor =====
+.DS_Store
+Thumbs.db
+*.swp
+*.swo
+*.tmp
+
+# ===== IDE =====
+.idea/
+.vscode/
+*.user
+
+# ===== local build artifacts =====
+*.log
