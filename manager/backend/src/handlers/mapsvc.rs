@@ -1,8 +1,8 @@
 //! 地图服务管理代理：把前端对 map-api 管理面的访问统一转发到
-//! r-mapserver `map-api` 服务的 `/admin/*` 与 `/api/usage`。
+//! rust-gisserver `map-api` 服务的 `/admin/*` 与 `/api/usage`。
 //!
 //! 设计要点：
-//! * r-manager 后端是 map-api admin 面的**唯一**调用方（内网部署）；
+//! * rust-gisserver 后端是 map-api admin 面的**唯一**调用方（内网部署）；
 //!   可选 `mapsvc.token` 与 map-api `admin.token` 一致（X-Admin-Token 头）。
 //! * 上游返回 JSON 原样塞进 `data` 字段（统一 `{code,msg,data}` 契约）；
 //!   上游非 2xx 时转为 `AppError::Msg`（HTTP 200 + code 500，前端拦截器弹 msg）。

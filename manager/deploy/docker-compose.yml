@@ -1,13 +1,13 @@
 # ============================================================================
-# r-mapserver 数据底座 — 一键部署 Compose（开发计划 P0-1 第一阶段）
+# rust-gisserver 数据底座 — 一键部署 Compose（开发计划 P0-1 第一阶段）
 #
-# 位置：r-manager/deploy/（管理与集成平面）。两个 build 上下文指向兄弟仓：
-#   map-api  → ../../r-mapserver      （发布服务平面，:8080）
-#   manager  → ..                     （r-manager 管理平面，:6180）
+# 位置：rust-gisserver/deploy/（管理与集成平面）。两个 build 上下文指向兄弟仓：
+#   map-api  → ../../rust-gisserver      （发布服务平面，:8080）
+#   manager  → ..                     （rust-gisserver 管理平面，:6180）
 #   postgis  → 镜像 postgis/postgis   （单库 mapserver_manager，:5434→5432）
 #
 # 使用：
-#   cd r-manager/deploy
+#   cd rust-gisserver/deploy
 #   copy .env.example .env      # 填 MAPSERVER_DB_PASSWORD / MANAGER_JWT_SECRET
 #   docker compose up -d --build
 #   # 前端 http://localhost:6180/  map-api http://localhost:8080/health
@@ -41,7 +41,7 @@ services:
 
   map-api:
     build:
-      context: ../../r-mapserver
+      context: ../../rust-gisserver
       dockerfile: Dockerfile
     image: gis/map-api:0.1
     container_name: gis-map-api

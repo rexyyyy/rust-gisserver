@@ -1,6 +1,6 @@
 # 三仓联通链路与 data_root（开发计划 P0-4 · 第一阶段）
 
-目标：把 **gis-srv 加工产物 → r-mapserver 发布 → r-manager 管理/发布** 串成一条
+目标：把 **gis-srv 加工产物 → rust-gisserver 发布 → rust-gisserver 管理/发布** 串成一条
 与机器无关的链路。核心是一个统一的**数据根 `data_root`**，配置里只写占位、
 绝不写死盘符（换机不碎）。
 
@@ -12,11 +12,11 @@ gis-srv（能力底座/数据工厂, :7070）
       ▼
 DATA_ROOT（本机数据根，env 注入）
       │
-r-mapserver map-api（发布平面, :8080）
+rust-gisserver map-api（发布平面, :8080）
       │  图层配置文件 <source path="${DATA_ROOT}\…">；
       │  server.data_root 限定「新增服务」只能引用其内文件
       ▼
-r-manager（管理平面, :6180）
+rust-gisserver（管理平面, :6180）
          Workspace → Store(base_path，须在 DATA_ROOT 内) → Resource → 发布
 两种目录后端（map-api `catalog.backend`）：
   · files：POST /admin/services 让 map-api 落图层 XML（<catalog.root>/<type>/*.xml）
@@ -27,7 +27,7 @@ r-manager（管理平面, :6180）
 ## data_root 机制
 
 - **配置加载即展开**：`xmlcfg::parse_to_value` 顶部调 `expand_env`，把
-  `${VAR}` / `${VAR:-默认}` 用环境变量替换（r-manager 与 r-mapserver 两份同构
+  `${VAR}` / `${VAR:-默认}` 用环境变量替换（rust-gisserver 与 rust-gisserver 两份同构
   `xmlcfg.rs`）。因此 `${DATA_ROOT}` 可写在 mapserver.xml、各图层 xml、以及
   任何经该入口解析的配置里。
 - **两条目录后端都展开**：`files` 后端的图层 XML 经 `parse_to_value` 展开；
@@ -75,7 +75,7 @@ $env:TESTDATA_ROOT = 'D:\mycomputor\documents\gis-wt\.testdata'
 ## 自检 / 一键
 
 ```powershell
-cd r-manager/deploy
+cd rust-gisserver/deploy
 copy .env.example .env          # 填口令 + 本地 DATA_ROOT/TESTDATA_ROOT（容器无需）
 pwsh -File start.ps1            # 构建起栈 -> 等 PostGIS healthy -> 自动 validate
 pwsh -File validate.ps1 -CheckDataRoot   # 也可对已在跑的服务单独自检

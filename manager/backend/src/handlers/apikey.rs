@@ -1,12 +1,12 @@
-//! API Key 管理：为 r-mapserver 生成/管理访问凭证（名称 + Key）。
+//! API Key 管理：为 rust-gisserver 生成/管理访问凭证（名称 + Key）。
 //!
-//! 两种用途与 r-mapserver 现有令牌护栏一一对应：
+//! 两种用途与 rust-gisserver 现有令牌护栏一一对应：
 //! * `admin` —— manager → server 管理面，请求头 `X-Admin-Token`；
 //!   「应用到引擎」把 key 写入 `sys_engine.admin_token`，管理代理立即带上。
 //! * `data`  —— server → 客户端数据面，`X-Data-Token` / `Authorization: Bearer`
 //!   / `?token=`；可复制下发给不同客户端。
 //!
-//! r-mapserver 从同一共享库定时读取启用中的 key 作为附加认可凭证
+//! rust-gisserver 从同一共享库定时读取启用中的 key 作为附加认可凭证
 //! （见 map-api `apikeys` 模块），主令牌仍是「是否启用校验」的开关。
 //! 明文存储是为了管理端可随时复制分发；库在内网，访问受登录态 +
 //! `map:apikey:list` / `map:apikey:edit` 约束。

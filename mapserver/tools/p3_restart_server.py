@@ -1,5 +1,5 @@
 import subprocess, time, socket, os
-ROOT = r"D:\mycomputer\documents\gis-wt\thirdparty\r-mapserver"
+ROOT = r"D:\mycomputer\documents\gis-wt\thirdparty\rust-gisserver"
 
 # 1) kill old server
 out = subprocess.run(['tasklist', '/FO', 'CSV'], capture_output=True, text=True, encoding='gbk', errors='replace').stdout

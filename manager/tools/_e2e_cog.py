@@ -22,7 +22,7 @@ print("  result.output=%s layout=%s compress=%s overviews=%s" % (
     res.get("output"), res.get("layout"), res.get("compression"), res.get("overviews")))
 print("  COG ok=%s exists=%s" % (res.get("layout") == "COG", os.path.exists(DST)))
 
-print("== 2) r-manager 发布 cog_dir ==")
+print("== 2) rust-gisserver 发布 cog_dir ==")
 C.login()
 pub_id = C.catalog_publish(
     "e2ecogws", "e2ecogdir", "cog_dir", OUTDIR, "e2e_dom",
@@ -31,7 +31,7 @@ print("  PUB_ID=", pub_id)
 if pub_id:
     C.endpoints(pub_id)
 
-print("== 3) r-mapserver 浏览探测 ==")
+print("== 3) rust-gisserver 浏览探测 ==")
 # WMTS GetCapabilities
 for label, url in [
     ("WMTS Cap", C.MAP + "/wmts?service=WMTS&version=1.0.0&request=GetCapabilities"),

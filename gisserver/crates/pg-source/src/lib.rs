@@ -1,7 +1,7 @@
-//! PostGIS data source for r-mapserver.
+//! PostGIS data source for rust-gisserver.
 //!
 //! This crate is the **only** new code needed to serve a PostGIS table
-//! through r-mapserver: it owns the connection pool, the SQL templates
+//! through rust-gisserver: it owns the connection pool, the SQL templates
 //! (modeled on Martin's `ST_AsMVT` table functions), and the OGC-Filter →
 //! SQL-WHERE translation used to push WFS/OGC API filters down to the
 //! database.

@@ -1,4 +1,4 @@
-"""r-manager catalog 发布 OSGB4326 3D Tiles：登录 -> 工作区 -> Store(3dtiles_dir)
+"""rust-gisserver catalog 发布 OSGB4326 3D Tiles：登录 -> 工作区 -> Store(3dtiles_dir)
 -> discover -> publish -> 取 endpoints。分步打印响应，便于核对链路。
 用法: python tools/_publish_osgb.py [mgr_base]
 默认 http://127.0.0.1:6180

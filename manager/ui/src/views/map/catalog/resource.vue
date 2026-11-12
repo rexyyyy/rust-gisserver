@@ -366,7 +366,7 @@ const wsLabel = (id: number) => {
 /** 侧栏宽度可拖拽，范围 120–240px；记忆到本地，避免每次进来都要拉一次 */
 const SIDE_MIN = 120;
 const SIDE_MAX = 240;
-const SIDE_KEY = 'r-manager:catalog:side-width';
+const SIDE_KEY = 'rust-gisserver:catalog:side-width';
 const sideWidth = ref(Math.min(SIDE_MAX, Math.max(SIDE_MIN, Number(localStorage.getItem(SIDE_KEY)) || 200)));
 
 interface SideGroup {

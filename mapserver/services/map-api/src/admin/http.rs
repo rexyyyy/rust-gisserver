@@ -9,7 +9,7 @@
 //! header (the manager backend is the intended — and only — caller on the
 //! intranet; the token is a seatbelt, not an auth system). The master token
 //! or any enabled `admin` key from the shared `sys_api_key` table is accepted
-//! (r-manager generates them; see `crate::apikeys`).
+//! (rust-gisserver generates them; see `crate::apikeys`).
 
 use std::sync::Arc;
 
@@ -28,7 +28,7 @@ pub(crate) fn json(status: StatusCode, v: serde_json::Value) -> Response {
 
 /// Token seatbelt for the admin surface.
 ///
-/// 配置 `admin.token` 后启用校验：主令牌 **或** r-manager `sys_api_key` 中
+/// 配置 `admin.token` 后启用校验：主令牌 **或** rust-gisserver `sys_api_key` 中
 /// 启用且未过期的 `admin` 用途 key 均被认可（后者由 `apikeys` 定时同步，
 /// 最多 15 秒生效）。未配置主令牌时保持零配置不设防，向后兼容。
 pub(crate) fn authorize(state: &AppState, headers: &HeaderMap) -> Result<(), Response> {

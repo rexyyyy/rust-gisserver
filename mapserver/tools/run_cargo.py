@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Run an arbitrary cargo command in the r-mapserver workspace.
+"""Run an arbitrary cargo command in the rust-gisserver workspace.
 
 Output goes to E:\\tmp\\cargo.log (full) with the tail printed to stdout.
 Injects the MSVC linker directory into PATH when missing (a bare Python
@@ -7,14 +7,14 @@ subprocess does not inherit the VS developer environment).
 
 Usage: python tools/run_cargo.py check --workspace
        python tools/run_cargo.py test --workspace
-       python tools/run_cargo.py build --release -p gisserver-server
+       python tools/run_cargo.py build --release -p mapserver
 """
 import os
 import subprocess
 import sys
 from pathlib import Path
 
-ROOT = Path(r"D:\mycomputer\documents\gis-wt\thirdparty\r-mapserver")
+ROOT = Path(r"D:\mycomputer\documents\gis-wt\thirdparty\rust-gisserver")
 LOG = Path(r"E:\tmp\cargo.log")
 VS = Path(r"C:\Program Files\Microsoft Visual Studio\2022\Community")
 KITS = Path(r"C:\Program Files (x86)\Windows Kits\10")

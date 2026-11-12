@@ -1,6 +1,6 @@
 #!/bin/sh
 # ============================================================================
-# r-mapserver / map-api 容器入口（P0-1 + P0-3）
+# rust-gisserver / map-api 容器入口（P0-1 + P0-3）
 #
 # 把挂载进来的配置模板 /app/config.template/*.xml 用 envsubst 渲染到
 # /app/config，DB 口令 / 服务主机名等敏感值经环境变量注入 —— 镜像与仓库

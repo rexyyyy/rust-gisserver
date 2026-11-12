@@ -1,12 +1,12 @@
 @echo off
 chcp 65001 >/dev/null
-REM Uninstall r-mapserver and r-manager
+REM Uninstall rust-gisserver and rust-gisserver
 REM Usage: uninstall.bat [install_dir]
 
 setlocal enabledelayedexpansion
 
 echo ============================================
-echo Uninstalling r-mapserver and r-manager
+echo Uninstalling rust-gisserver and rust-gisserver
 echo ============================================
 
 set INSTALL_DIR=%~dp0..\..\..\..\rmap_target
@@ -22,7 +22,7 @@ if not exist "%INSTALL_DIR%" (
 REM Stop running services
 echo [1/3] Stopping services...
 taskkill /F /IM map-api.exe 2>/dev/null
-taskkill /F /IM r-manager.exe 2>/dev/null
+taskkill /F /IM rust-gisserver.exe 2>/dev/null
 
 REM Ask for confirmation
 echo.

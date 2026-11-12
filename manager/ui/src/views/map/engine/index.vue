@@ -130,7 +130,7 @@
         </el-form-item>
         <el-form-item label="类型" prop="engineType">
           <el-select v-model="form.engineType" style="width: 100%">
-            <el-option label="r-mapserver (map-api)" value="r-mapserver" />
+            <el-option label="rust-gisserver (map-api)" value="rust-gisserver" />
           </el-select>
         </el-form-item>
         <el-form-item label="Base URL" prop="baseUrl">
@@ -447,7 +447,7 @@ const dlg = reactive({ visible: false, isEdit: false, saving: false });
 const emptyForm = () => ({
   engineId: '',
   engineName: '',
-  engineType: 'r-mapserver',
+  engineType: 'rust-gisserver',
   baseUrl: 'http://127.0.0.1:8095',
   adminToken: '',
   tokenConfigured: false,

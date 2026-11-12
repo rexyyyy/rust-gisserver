@@ -16,11 +16,11 @@ crates = ["pg-source", "wms-common", "wms-protocol", "wfs-protocol", "vector-que
 lines = []
 for crate in crates:
     cmd = [r"C:/Users/Administrator/.cargo/bin/cargo.exe", "test", "-p", crate,
-           "--manifest-path", r"D:\mycomputer\documents\gis-wt\thirdparty\r-mapserver\Cargo.toml"]
+           "--manifest-path", r"D:\mycomputer\documents\gis-wt\thirdparty\rust-gisserver\Cargo.toml"]
     t0 = time.time()
     try:
         p = subprocess.run(cmd, capture_output=True, text=False, timeout=600,
-                           cwd=r"D:\mycomputer\documents\gis-wt\thirdparty\r-mapserver", env=env)
+                           cwd=r"D:\mycomputer\documents\gis-wt\thirdparty\rust-gisserver", env=env)
         rc, out = p.returncode, as_text(p.stdout) + as_text(p.stderr)
     except subprocess.TimeoutExpired as e:
         rc = -99
@@ -28,5 +28,5 @@ for crate in crates:
     tails = [l for l in out.strip().splitlines() if l.strip()][-8:]
     lines.append(f"=== {crate} exit={rc} dur={time.time()-t0:.0f}s ===\n" + "\n".join(tails))
     # write incrementally so a later hang does not lose earlier results
-    with open(r"D:\mycomputer\documents\gis-wt\thirdparty\r-mapserver\serial_tests.txt", "w", encoding="utf-8", errors="replace") as f:
+    with open(r"D:\mycomputer\documents\gis-wt\thirdparty\rust-gisserver\serial_tests.txt", "w", encoding="utf-8", errors="replace") as f:
         f.write("\n\n".join(lines))

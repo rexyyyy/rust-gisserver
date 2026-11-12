@@ -21,12 +21,12 @@ pub struct Config {
     /// 本地文件存储配置（头像等）。
     #[serde(default)]
     pub storage: StorageCfg,
-    /// map-api（r-mapserver 服务面）管理代理配置。
+    /// map-api（rust-gisserver 服务面）管理代理配置。
     #[serde(default)]
     pub mapsvc: MapSvcCfg,
 }
 
-/// map-api 管理面连接配置：r-manager 后端是唯一调用方，
+/// map-api 管理面连接配置：rust-gisserver 后端是唯一调用方，
 /// 通过它代理前端对 map-api `/admin/*` 与 `/api/usage` 的访问。
 #[derive(Debug, Clone, serde::Deserialize)]
 pub struct MapSvcCfg {
@@ -87,7 +87,7 @@ pub struct SecurityCfg {
 #[derive(Debug, Clone, serde::Deserialize)]
 pub struct StorageCfg {
     /// 头像文件根目录。相对路径按「后端进程工作目录」解析；
-    /// 生产部署建议给绝对路径（如 `/var/lib/r-mapserver/avatar`）。
+    /// 生产部署建议给绝对路径（如 `/var/lib/rust-gisserver/avatar`）。
     #[serde(default = "default_avatar_dir")]
     pub avatar_dir: String,
 }

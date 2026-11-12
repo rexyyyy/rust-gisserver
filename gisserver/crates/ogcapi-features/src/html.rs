@@ -11,7 +11,7 @@ use crate::{CollectionInfo, ItemsPage};
 fn page(title: &str, base: &str, body: &str) -> String {
     format!(
         "<!DOCTYPE html>\n<html lang=\"zh-CN\"><head><meta charset=\"utf-8\">\n\
-         <title>{title} - r-mapserver OGC API - Features</title>\n\
+         <title>{title} - rust-gisserver OGC API - Features</title>\n\
          <style>\n\
          body{{font-family:sans-serif;margin:2rem;color:#222}}\n\
          table{{border-collapse:collapse;margin:1rem 0}}\n\
@@ -23,7 +23,7 @@ fn page(title: &str, base: &str, body: &str) -> String {
          <p><a href=\"{base}\">landing</a> | <a href=\"{base}/conformance\">conformance</a> | \
          <a href=\"{base}/collections\">collections</a> | \
          <a href=\"{base}/api\">api</a></p>\n{body}\n\
-         <hr><p>r-mapserver OGC API - Features 1.0.1</p>\n</body></html>"
+         <hr><p>rust-gisserver OGC API - Features 1.0.1</p>\n</body></html>"
     )
 }
 

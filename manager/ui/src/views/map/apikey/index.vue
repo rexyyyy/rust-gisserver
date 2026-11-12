@@ -2,7 +2,7 @@
   <div class="app-container">
     <el-card shadow="never">
       <template #header>
-        <span>API Key 管理（r-mapserver 访问凭证）</span>
+        <span>API Key 管理（rust-gisserver 访问凭证）</span>
       </template>
 
       <el-alert
@@ -11,7 +11,7 @@
         show-icon
         :closable="false"
         title="一处生成，两种用途"
-        description="管理面（admin）：manager 连接 server，点「应用到引擎」即写入默认引擎的 X-Admin-Token；客户端（data）：下发给客户端访问 /tiles /wms /wmts /mvt，支持 X-Data-Token、Authorization: Bearer 与 ?token=。server 侧启用强制校验需在 mapserver.xml 配置主令牌（admin token / data_token），本库启用中的 Key 由 r-mapserver 自动认可。"
+        description="管理面（admin）：manager 连接 server，点「应用到引擎」即写入默认引擎的 X-Admin-Token；客户端（data）：下发给客户端访问 /tiles /wms /wmts /mvt，支持 X-Data-Token、Authorization: Bearer 与 ?token=。server 侧启用强制校验需在 mapserver.xml 配置主令牌（admin token / data_token），本库启用中的 Key 由 rust-gisserver 自动认可。"
       />
 
       <el-row :gutter="12" class="mb-3" align="middle">

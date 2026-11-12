@@ -1,4 +1,4 @@
-"""续装 / 构建 r-mapserver manager 前端依赖。
+"""续装 / 构建 rust-gisserver manager 前端依赖。
 
 优先使用 PATH 里的 pnpm（本项目用 pnpm-lock.yaml，npm 安装会产出错误依赖树）；
 找不到时才把 FALLBACK_NODE_DIR 追加进 PATH —— 那是工作机上由工具链托管的 node

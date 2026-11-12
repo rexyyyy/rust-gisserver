@@ -74,7 +74,7 @@ pub fn capabilities_xml(base_url: &str, version: &str, feature_types: &[CapFeatu
     // ServiceIdentification
     if use_ows {
         x.push_str("<ows:ServiceIdentification>\n");
-        x.push_str("<ows:Title>r-mapserver WFS</ows:Title>\n");
+        x.push_str("<ows:Title>rust-gisserver WFS</ows:Title>\n");
         x.push_str("<ows:ServiceType>WFS</ows:ServiceType>\n");
         x.push_str("<ows:ServiceTypeVersion>2.0.0</ows:ServiceTypeVersion>\n");
         x.push_str("<ows:ServiceTypeVersion>1.1.0</ows:ServiceTypeVersion>\n");
@@ -83,15 +83,15 @@ pub fn capabilities_xml(base_url: &str, version: &str, feature_types: &[CapFeatu
     } else {
         x.push_str("<Service>\n");
         x.push_str("<Name>WFS</Name>\n");
-        x.push_str("<Title>r-mapserver WFS</Title>\n");
+        x.push_str("<Title>rust-gisserver WFS</Title>\n");
         x.push_str("</Service>\n");
     }
     // ServiceProvider
     x.push_str(&format!(
         "<{p}ServiceProvider>\n\
-         <{p}ProviderName>r-mapserver</{p}ProviderName>\n\
+         <{p}ProviderName>rust-gisserver</{p}ProviderName>\n\
          <{p}ServiceContact>\n\
-         <{p}IndividualName>r-mapserver</{p}IndividualName>\n\
+         <{p}IndividualName>rust-gisserver</{p}IndividualName>\n\
          </{p}ServiceContact>\n\
          </{p}ServiceProvider>\n",
         p = if use_ows { "ows:" } else { "" }

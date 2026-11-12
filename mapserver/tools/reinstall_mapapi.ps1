@@ -1,6 +1,6 @@
 # 用新编译的 release map-api.exe 替换安装目录产物并重启 8080 服务
-$install = "D:\mycomputor\documents\gis-wt\thirdparty\r-mapserver-install"
-$src     = "D:\mycomputor\documents\gis-wt\thirdparty\r-mapserver\target\release\map-api.exe"
+$install = "D:\mycomputor\documents\gis-wt\thirdparty\rust-gisserver-install"
+$src     = "D:\mycomputor\documents\gis-wt\thirdparty\rust-gisserver\target\release\map-api.exe"
 $dst     = "$install\map-api\map-api.exe"
 
 # 1) 停掉占用 8080 的旧进程

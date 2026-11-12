@@ -93,8 +93,8 @@ pub fn capabilities_xml(layers: &[WmtsCapLayer], grids: &[TileMatrixSet], rest_b
     let mut s = String::new();
     s.push_str("<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n");
     s.push_str("<Capabilities xmlns=\"http://www.opengis.net/wmts/1.0\" xmlns:ows=\"http://www.opengis.net/ows/1.1\" xmlns:xlink=\"http://www.w3.org/1999/xlink\" xmlns:xsi=\"http://www.w3.org/2001/XMLSchema-instance\" version=\"1.0.0\">\n");
-    s.push_str("  <ows:ServiceIdentification>\n    <ows:Title>r-mapserver</ows:Title>\n    <ows:ServiceType>OGC WMTS</ows:ServiceType>\n    <ows:ServiceTypeVersion>1.0.0</ows:ServiceTypeVersion>\n  </ows:ServiceIdentification>\n");
-    s.push_str("  <ows:ServiceProvider><ows:ProviderName>r-mapserver</ows:ProviderName></ows:ServiceProvider>\n");
+    s.push_str("  <ows:ServiceIdentification>\n    <ows:Title>rust-gisserver</ows:Title>\n    <ows:ServiceType>OGC WMTS</ows:ServiceType>\n    <ows:ServiceTypeVersion>1.0.0</ows:ServiceTypeVersion>\n  </ows:ServiceIdentification>\n");
+    s.push_str("  <ows:ServiceProvider><ows:ProviderName>rust-gisserver</ows:ProviderName></ows:ServiceProvider>\n");
     s.push_str("  <ows:OperationsMetadata>\n");
     s.push_str(&format!("    <ows:Operation name=\"GetCapabilities\"><ows:DCP><ows:HTTP><ows:Get xlink:href=\"{}/wmts\"><ows:Constraint name=\"GetEncoding\"><ows:AllowedValues><ows:Value>KVP</ows:Value></ows:AllowedValues></ows:Constraint></ows:Get></ows:HTTP></ows:DCP></ows:Operation>\n", xml_escape(rest_base)));
     s.push_str(&format!("    <ows:Operation name=\"GetTile\"><ows:DCP><ows:HTTP><ows:Get xlink:href=\"{}/wmts\"><ows:Constraint name=\"GetEncoding\"><ows:AllowedValues><ows:Value>KVP</ows:Value><ows:Value>RESTful</ows:Value></ows:AllowedValues></ows:Constraint></ows:Get></ows:HTTP></ows:DCP></ows:Operation>\n", xml_escape(rest_base)));
@@ -193,7 +193,7 @@ fn well_known_scale_set(g: &TileMatrixSet) -> String {
     match strip_size_suffix(&g.id).as_str() {
         "WebMercatorQuad" => "http://www.opengis.net/def/wkss/OGC/1.0/GoogleMapsCompatible".into(),
         "WorldCRS84Quad" => "http://www.opengis.net/def/wkss/OGC/1.0/GlobalCRS84Scale".into(),
-        _ => format!("urn:ogc:def:wkss:r-mapserver:{}", strip_size_suffix(&g.id)),
+        _ => format!("urn:ogc:def:wkss:rust-gisserver:{}", strip_size_suffix(&g.id)),
     }
 }
 
@@ -254,7 +254,7 @@ mod tests {
         assert!(!custom.contains("<TileMatrixSetURI>"), "{custom}");
         assert!(custom.contains("urn:ogc:def:crs:EPSG::4490"));
         // 服务端自有命名空间的 WellKnownScaleSet 仍照旧给出
-        assert!(custom.contains("urn:ogc:def:wkss:r-mapserver:CGCS2000Geo"));
+        assert!(custom.contains("urn:ogc:def:wkss:rust-gisserver:CGCS2000Geo"));
         let builtin = tile_matrix_set_xml(&TileMatrixSet::web_mercator_quad(256));
         assert!(builtin.contains(
             "<TileMatrixSetURI>http://www.opengis.net/def/tilematrixset/OGC/1.0/WebMercatorQuad</TileMatrixSetURI>"

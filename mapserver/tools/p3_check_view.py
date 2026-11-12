@@ -14,5 +14,5 @@ try:
     out.append("OK")
 except Exception:
     out.append(traceback.format_exc())
-with open(r"D:\mycomputer\documents\gis-wt\thirdparty\r-mapserver\setup_view_result.txt", "w", encoding="utf-8") as f:
+with open(r"D:\mycomputer\documents\gis-wt\thirdparty\rust-gisserver\setup_view_result.txt", "w", encoding="utf-8") as f:
     f.write("\n".join(out))

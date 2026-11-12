@@ -7,7 +7,7 @@ import sys
 import time
 from pathlib import Path
 
-ROOT = Path(r"D:\mycomputer\documents\gis-wt\thirdparty\r-mapserver")
+ROOT = Path(r"D:\mycomputer\documents\gis-wt\thirdparty\rust-gisserver")
 EXE = ROOT / "target" / "release" / "map-api.exe"
 GOOD = Path("E:/tmp/rms-verify")
 BAD = Path("E:/tmp/rms-badcfg")

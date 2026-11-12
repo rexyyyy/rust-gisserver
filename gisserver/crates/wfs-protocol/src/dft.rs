@@ -32,7 +32,7 @@ pub fn describe_feature_type_xml(
 ) -> String {
     let attrs = attribute_schema(fc);
     let geom_kind = primary_geometry_type(fc);
-    let ns = "http://r-mapserver.local";
+    let ns = "http://rust-gisserver.local";
     let mut x = String::with_capacity(2048);
     x.push_str("<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n");
     x.push_str(&format!(
@@ -91,7 +91,7 @@ mod tests {
             {"type":"Feature","properties":{"name":"a","pop":10,"ok":true},"geometry":{"type":"Point","coordinates":[0,0]}}
         ]});
         let x = describe_feature_type_xml("http://x", "places", &fc);
-        assert!(x.contains("targetNamespace=\"http://r-mapserver.local\""), "{x}");
+        assert!(x.contains("targetNamespace=\"http://rust-gisserver.local\""), "{x}");
         assert!(x.contains("<xsd:element name=\"places\" type=\"ws:placesType\""), "{x}");
         assert!(x.contains("name=\"geometry\" type=\"gml:PointPropertyType\""), "{x}");
         assert!(x.contains("name=\"name\" type=\"xs:string\""), "{x}");

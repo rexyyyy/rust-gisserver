@@ -1,8 +1,8 @@
-# manager —— r-mapserver 管理系统（独立项目）
+# manager —— rust-gisserver 管理系统（独立项目）
 
-r-mapserver 的「系统管理 + 地图服务管理」控制台：后端用 Rust（axum + tokio-postgres，仅 PostgreSQL）重写若依（RuoYi-Vue 5.X）的系统管理接口，前端沿用 plus-ui-5.X 的 Element Plus 实现并裁剪。
+rust-gisserver 的「系统管理 + 地图服务管理」控制台：后端用 Rust（axum + tokio-postgres，仅 PostgreSQL）重写若依（RuoYi-Vue 5.X）的系统管理接口，前端沿用 plus-ui-5.X 的 Element Plus 实现并裁剪。
 
-**独立项目**：2026-10-26 起从 `r-mapserver/manager` 拆出，位于 `thirdparty/manager`，git 独立管理（拆分前历史保留在 r-mapserver 仓库，最后共同提交 `ce576ae`）。与 r-mapserver（map-api，8080）的对接关系见 r-mapserver 仓库 `docs/manager-scope-analysis-2026-10-26.md`。
+**独立项目**：2026-10-26 起从 `rust-gisserver/manager` 拆出，位于 `thirdparty/manager`，git 独立管理（拆分前历史保留在 rust-gisserver 仓库，最后共同提交 `ce576ae`）。与 rust-gisserver（map-api，8080）的对接关系见 rust-gisserver 仓库 `docs/manager-scope-analysis-2026-10-26.md`。
 
 ## 目录结构
 
@@ -132,10 +132,10 @@ python tools/mgr_probe.py http://127.0.0.1:6180/manager-api out.txt
 
 辅助诊断脚本：`avatar_probe.py`（头像单测）、`route_diag.py`（路由方法探测）、`ct_diag.py`（区分「路由未注册」与「content-type 被拒」）。
 
-## 端到端功能测试（与 r-mapserver 联动）
+## 端到端功能测试（与 rust-gisserver 联动）
 
 `tools/func_test.py` 针对**已运行的两个实例**做接口级走查（68 项），数据源为真实
-图层目录（`r-mapserver/config/*` + `E:\data\1` + PostGIS `gis` 库），覆盖：
+图层目录（`rust-gisserver/config/*` + `E:\data\1` + PostGIS `gis` 库），覆盖：
 
 - **map-api 数据面**：COG（WMS 1.1.1/1.3.0、WMTS 两套 TileMatrixSet、XYZ、`/cog` 直读）、
   矢量（WFS、OGC API Features/Tiles、`/mvt`）、PostGIS 动态 MVT（3857 与原投影双接口）、
@@ -147,7 +147,7 @@ python tools/mgr_probe.py http://127.0.0.1:6180/manager-api out.txt
 - **同端口 SPA 托管**：`/index.html`、前端路由回退、静态资源可达。
 
 ```bash
-# 1) 起 map-api（r-mapserver 仓库根目录，监听 :8080）
+# 1) 起 map-api（rust-gisserver 仓库根目录，监听 :8080）
 #    瓦片链路务必用 release 构建，debug 下解码/编码慢一个数量级
 target\release\map-api.exe serve --config config/mapserver.xml
 # 2) 起 manager（backend 目录，监听 :6180，代理到 sys_engine 默认引擎）
@@ -262,12 +262,12 @@ python tools/check_perm_rules.py
 
 ## 与主项目的边界
 
-- 本子系统**只依赖 PostgreSQL**，不依赖 r-mapserver 的 PostGIS 数据源、瓦片缓存、SLD 渲染等能力，可独立部署。
-- 不复用 r-mapserver 的 crate；后端是独立 Cargo package（`backend/`），单独 `cargo build`，与 map-api 工作区互不影响。
+- 本子系统**只依赖 PostgreSQL**，不依赖 rust-gisserver 的 PostGIS 数据源、瓦片缓存、SLD 渲染等能力，可独立部署。
+- 不复用 rust-gisserver 的 crate；后端是独立 Cargo package（`backend/`），单独 `cargo build`，与 map-api 工作区互不影响。
 - 未来若要合并（系统管理作为主服务的一部分），需统一 `base_api`、鉴权中间件与配置结构。
 
 ## 许可证 / License
 
-本项目（r-manager）采用 **GNU Affero General Public License v3.0**（SPDX：`AGPL-3.0-only`）授权，全文见 [LICENSE](LICENSE)。
+本项目（rust-gisserver）采用 **GNU Affero General Public License v3.0**（SPDX：`AGPL-3.0-only`）授权，全文见 [LICENSE](LICENSE)。
 
 Copyright (c) 2026 rex yang <13556388@qq.com> and contributors.

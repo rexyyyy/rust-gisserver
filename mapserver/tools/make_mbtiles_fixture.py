@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Build a small MBTiles fixture for r-mapserver regression tests.
+"""Build a small MBTiles fixture for rust-gisserver regression tests.
 
 Creates fixtures/test.mbtiles: a PNG archive over z0..z3 in WebMercatorQuad
 scheme (tiles stored in TMS rows, bottom-up, per the MBTiles spec).
@@ -92,7 +92,7 @@ def main():
         ROOT / "fixtures" / "test.mbtiles",
         "png",
         lambda z, x, r: png_bytes(z * 60 % 256, x * 60 % 256, r * 60 % 256),
-        {"description": "r-mapserver MBTiles regression fixture (PNG)"},
+        {"description": "rust-gisserver MBTiles regression fixture (PNG)"},
     )
 
     # Vector archive: gzip-compressed fake pbf payload (gzip magic 1f 8b).
@@ -104,7 +104,7 @@ def main():
         ROOT / "fixtures" / "test-vector.mbtiles",
         "pbf",
         vec_tile,
-        {"description": "r-mapserver MBTiles regression fixture (gzip pbf)"},
+        {"description": "rust-gisserver MBTiles regression fixture (gzip pbf)"},
     )
 
 

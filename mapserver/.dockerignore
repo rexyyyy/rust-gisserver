@@ -1,4 +1,4 @@
-# r-mapserver 构建上下文忽略（P0-1）：只把编译 workspace 所需的 crates/ 与
+# mapserver 构建上下文忽略（P0-1）：只把编译 workspace 所需的 crates/ 与
 # services/ 送进 daemon，排除一切体积大 / 生成物 / 与镜像无关的东西。
 target/
 **/target/

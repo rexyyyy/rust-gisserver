@@ -1,6 +1,6 @@
 //! 服务引擎管理：多引擎注册表（sys_engine）+ 健康探测 + 默认引擎解析。
 //!
-//! 结构上支持多个地图服务引擎（当前仅 r-mapserver `map-api` 一种）：
+//! 结构上支持多个地图服务引擎（当前仅 rust-gisserver `map-api` 一种）：
 //! * 引擎登记在 `sys_engine` 表（engine_id 主键、base_url、可选 admin_token）；
 //! * 「默认引擎」（is_default='1' 且 status='0'）供管理代理转发使用；
 //!   无默认引擎时回落 `manager.xml` 的 `mapsvc.base_url`（兼容旧部署）；
@@ -226,7 +226,7 @@ pub async fn add(
     let mut b = body;
     b.engine_id = b.engine_id.trim().to_string();
     if b.engine_type.trim().is_empty() {
-        b.engine_type = "r-mapserver".into();
+        b.engine_type = "rust-gisserver".into();
     }
     if b.status.is_empty() {
         b.status = "0".into();

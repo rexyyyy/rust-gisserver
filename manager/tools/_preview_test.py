@@ -1,4 +1,4 @@
-"""数据面预览测试：验证 r-manager 发布的 3dtiles/osgb4326 能出 tileset + 真实 b3dm。"""
+"""数据面预览测试：验证 rust-gisserver 发布的 3dtiles/osgb4326 能出 tileset + 真实 b3dm。"""
 import json
 import struct
 import urllib.request

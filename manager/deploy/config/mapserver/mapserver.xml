@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!--
-  r-mapserver 容器运行配置模板（P0-1 一键部署 / P0-3 密钥占位）
+  rust-gisserver 容器运行配置模板（P0-1 一键部署 / P0-3 密钥占位）
   =============================================================================
   本文件是「模板」：容器 entrypoint 用 envsubst 把 ${VAR} 渲染后写到
   /app/config/mapserver.xml。DB 口令经环境变量（compose .env）注入，
@@ -18,7 +18,7 @@
        · files（默认）：扫描本目录下的图层 XML（<catalog.root>/<type>/*.xml），零配置即可演示。
        · db（PG 配置发布）：改 backend="db" 并从共享库 sys_published_layer.service_doc 读图层，
          与 manager 发布链路对接；需先建库表（挂 backend/sql 初始化）。两后端的
-         ${DATA_ROOT} 占位都会在加载时展开（r-mapserver db_catalog 已接 expand_env）。 -->
+         ${DATA_ROOT} 占位都会在加载时展开（rust-gisserver db_catalog 已接 expand_env）。 -->
   <catalog root="/app/config" backend="files"/>
   <admin dsn="postgresql://postgres:${MAPSERVER_DB_PASSWORD}@postgis:5432/mapserver_manager"/>
 </config>

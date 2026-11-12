@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-"""P2 stress probe: 100k-row PostGIS table through r-mapserver.
+"""P2 stress probe: 100k-row PostGIS table through rust-gisserver.
 
 Steps:
   1. create/drop table `stress_100k` (100k points, EPSG:4543) in the gis DB

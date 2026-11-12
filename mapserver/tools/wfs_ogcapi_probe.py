@@ -310,7 +310,7 @@ def probe_oaf():
     print("--- OGC API - Features ---")
     s, h, b = req("/ogc/features/v1")
     d = json.loads(b)
-    check("landing page", s == 200 and d["title"].startswith("r-mapserver"))
+    check("landing page", s == 200 and d["title"].startswith("rust-gisserver"))
     rels = [l["rel"] for l in d["links"]]
     check("landing links", {"self", "conformance", "data", "service-desc"} <= set(rels), str(rels))
 

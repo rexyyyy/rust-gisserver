@@ -121,8 +121,8 @@ fn links(base: &str, extra: Vec<(&str, String)>) -> Vec<Value> {
 /// `GET {base}` — the landing page.
 pub fn landing(base: &str) -> String {
     let doc = json!({
-        "title": "r-mapserver OGC API - Tiles",
-        "description": "Map and vector tile access over the r-mapserver catalog.",
+        "title": "rust-gisserver OGC API - Tiles",
+        "description": "Map and vector tile access over the rust-gisserver catalog.",
         "links": links(base, vec![
             ("service-desc", format!("{base}/api")),
             ("conformance", format!("{base}/conformance")),
@@ -341,7 +341,7 @@ pub fn collection(base: &str, c: &TiledCollection) -> String {
     let doc = json!({
         "id": c.id,
         "title": c.title,
-        "description": format!("Tiled collection '{}' ({}) served by r-mapserver.", c.id, c.data_type),
+        "description": format!("Tiled collection '{}' ({}) served by rust-gisserver.", c.id, c.data_type),
         "dataType": c.data_type,
         "tileMatrixSets": c.tile_matrix_sets,
         "extent": extent,

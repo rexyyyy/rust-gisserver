@@ -1,4 +1,4 @@
-//! r-mapserver 系统管理后端（axum + PostgreSQL 单库）。
+//! rust-gisserver 系统管理后端（axum + PostgreSQL 单库）。
 mod auth;
 mod captcha;
 mod config;

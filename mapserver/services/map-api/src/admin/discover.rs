@@ -1,4 +1,4 @@
-//! 只读数据发现与元数据探查：`r-manager` 的 Workspace → Store → Resource
+//! 只读数据发现与元数据探查：`rust-gisserver` 的 Workspace → Store → Resource
 //! 组织层在服务平面对应的唯一接口。
 //!
 //! * `GET /admin/capabilities`               — 数据类型 × 服务类型权威矩阵。
@@ -8,7 +8,7 @@
 //!
 //! 全部只读：不写盘、不建常驻池、不生成瓦片、不导入要素、不重投影落库。
 //! 读的是文件头 / 归档元数据 / `tileset.json` / `geometry_columns`，属于计划 §7.1
-//! 允许的「读元数据探测 bbox 与源 CRS」，不是数据处理。r-mapserver 的服务模型
+//! 允许的「读元数据探测 bbox 与源 CRS」，不是数据处理。rust-gisserver 的服务模型
 //! （Layer/SourceKind）不因本模块改变。
 
 use std::path::{Path, PathBuf};
@@ -46,7 +46,7 @@ const STORE_TYPES: &[(&str, &[&str])] = &[
 /// 3D Tiles 数据集的入口文件名（目录内存在该文件即认为是一个 3D Tiles 实体）。
 const TILESET_ENTRY: &str = "tileset.json";
 
-/// 数据类型 → (r-mapserver kind, 可发布服务类型, 默认勾选)。
+/// 数据类型 → (rust-gisserver kind, 可发布服务类型, 默认勾选)。
 ///
 /// 口径来自代码实测（`tiles.rs::raster_tile` / `wms.rs::render_get_map` /
 /// `wfs.rs` / `ogcapi_features.rs` / `mvt.rs`），而非文档宣传：
@@ -74,7 +74,7 @@ fn data_type_caps(data_type: &str) -> (&'static str, &'static [&'static str], &'
         "postgis_table" => ("postgis", &["wms", "mvt", "wfs", "oaf"], &["mvt", "wms"]),
         // PostGIS 普通表（无 geometry 列）：不可发布为图层服务，仅提供数据查询服务。
         "pg_table" => ("", &[], &[]),
-        // 静态 shapefile：r-mapserver 无 shp 读取器，计划 §6 标「将来支持」。
+        // 静态 shapefile：rust-gisserver 无 shp 读取器，计划 §6 标「将来支持」。
         "shapefile" => ("", &[], &[]),
         // 静态 MVT 瓦片目录：无对应 SourceKind，仅发现。
         "mvt" => ("", &[], &[]),
@@ -83,7 +83,7 @@ fn data_type_caps(data_type: &str) -> (&'static str, &'static [&'static str], &'
 }
 
 /// `GET /admin/capabilities` — 组织层要用的权威矩阵：Store 类型、数据类型到
-/// r-mapserver kind 的映射、每类可发布的服务类型与默认勾选。
+/// rust-gisserver kind 的映射、每类可发布的服务类型与默认勾选。
 pub async fn capabilities(
     State(state): State<Arc<AppState>>,
     headers: axum::http::HeaderMap,
@@ -115,7 +115,7 @@ pub async fn capabilities(
             "service_types": supported,
             "default_service_types": defaults,
             "note": match *dt {
-                "shapefile" => "r-mapserver 无静态 shapefile 读取器：可发现、不可发布（计划标『将来支持』）",
+                "shapefile" => "rust-gisserver 无静态 shapefile 读取器：可发现、不可发布（计划标『将来支持』）",
                 "pmtiles" | "mbtiles" => "栅格归档：WMTS/XYZ 直读 + 整档下载；WMS GetMap 不支持归档类",
                 "pmtiles_mvt" | "mbtiles_mvt" => "矢量归档：仅 /mvt 直读，WMTS/XYZ/WMS 均不支持",
                 "postgis_table" => "PostGIS 层不支持 WMTS/XYZ（无栅格源）",
@@ -633,7 +633,7 @@ fn probe_arcgis(path: &Path) -> Value {
     v
 }
 
-/// 静态 MVT 瓦片目录：可发现，但 r-mapserver 暂无对应的服务源。
+/// 静态 MVT 瓦片目录：可发现，但 rust-gisserver 暂无对应的服务源。
 fn probe_mvt(path: &Path) -> Value {
     finish(
         path,
@@ -668,7 +668,7 @@ fn probe_one(state: &AppState, path: &Path) -> Value {
             path,
             "shapefile",
             json!({}),
-            Some("r-mapserver 无静态 shapefile 读取器：仅发现，发布属『将来支持』（计划 §6 边界）".into()),
+            Some("rust-gisserver 无静态 shapefile 读取器：仅发现，发布属『将来支持』（计划 §6 边界）".into()),
         ),
         "pmtiles" => probe_pmtiles(path),
         "mbtiles" => probe_mbtiles(path),

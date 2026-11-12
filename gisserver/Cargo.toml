@@ -10,8 +10,9 @@ members = ["crates/*"]
 [workspace.package]
 version = "0.1.0"
 edition = "2021"
-license = "MIT"
-repository = "https://github.com/example/r-mapserver"
+# 双许可（D1b 定稿）：任选其一。发布到 crates.io 不提供代码仓库路径，
+# 故不设 repository 字段。
+license = "MIT OR Apache-2.0"
 
 [workspace.dependencies]
 # --- Internal crates (gisserver-* published names) --------------------------

@@ -184,7 +184,7 @@ pub fn data_router(state: Arc<AppState>) -> Router {
 /// * `Authorization: Bearer <token>`
 /// * 查询参数 `?token=<token>`（浏览器 / viewer 可直接拼在瓦片 URL 上）
 ///
-/// 配置主令牌后，主令牌**或** r-manager 共享库 `sys_api_key` 中启用且未过期的
+/// 配置主令牌后，主令牌**或** rust-gisserver 共享库 `sys_api_key` 中启用且未过期的
 /// `data` key 均被认可（见 [`crate::apikeys`]，15 秒同步、用途隔离）。
 /// 未配置 `data_token` 时不设防（零配置向后兼容）—— 与 `admin.token` 的
 /// 「安全带」定位一致：它是令牌护栏，不是完整鉴权体系（角色 / ACL 交给网关或
@@ -279,7 +279,7 @@ pub fn admin_router(state: Arc<AppState>) -> Router {
         )
         .route("/access-logs", get(crate::admin::http::access_logs))
         .route("/browse", get(crate::admin::catalog_admin::browse))
-        // 只读数据发现（r-manager Workspace/Store/Resource 组织层的数据面接口）
+        // 只读数据发现（rust-gisserver Workspace/Store/Resource 组织层的数据面接口）
         .route("/probe", get(crate::admin::discover::probe))
         .route("/discover", get(crate::admin::discover::discover))
         .route("/capabilities", get(crate::admin::discover::capabilities))
@@ -471,7 +471,7 @@ pub fn xml_response(xml: String) -> Response {
 /// front ends classify them through here (OGC API - Tiles already answers 400
 /// for every tile failure). Reporting 500 tells the client the server is broken
 /// and makes it retry a request that can never succeed -- and it also makes a
-/// capability probe (r-manager walks these endpoints to decide what a layer can
+/// capability probe (rust-gisserver walks these endpoints to decide what a layer can
 /// publish) read "unsupported" as "broken", so every *request* problem answers
 /// 4xx:
 /// * a CRS the server cannot honour (CGCS2000 Gauss-Krüger tile on a build

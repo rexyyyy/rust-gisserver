@@ -122,7 +122,7 @@ pub struct AppState {
     /// path (dynamic vector tiles, WMS/WFS/OAF queries). Built by
     /// [`build_pg_registry`] before `AppState::new`; hot-swapped on reload.
     pub pg: RwLock<Option<Arc<PgRegistry>>>,
-    /// 共享库 API Key 缓存（r-manager `sys_api_key`）：主令牌之外的附加认可凭证。
+    /// 共享库 API Key 缓存（rust-gisserver `sys_api_key`）：主令牌之外的附加认可凭证。
     /// 后台任务定时刷新，校验只读内存，见 [`crate::apikeys`]。
     pub api_keys: crate::apikeys::ApiKeyCache,
     // ── 管理面（admin plane）：经 `state.admin` 访问，数据面不应直接触碰 ──

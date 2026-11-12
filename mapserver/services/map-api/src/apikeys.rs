@@ -1,4 +1,4 @@
-//! 共享库 API Key 缓存：r-manager 生成的访问凭证在这里被 r-mapserver 认可。
+//! 共享库 API Key 缓存：rust-gisserver 生成的访问凭证在这里被 rust-gisserver 认可。
 //!
 //! 设计（与 manager 端 `sys_api_key` 表对应）：
 //! * manager 与 map-api 连同一个 PostgreSQL 库（`admin.dsn`）；

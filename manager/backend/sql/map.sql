@@ -1,7 +1,7 @@
 -- =====================================================================
--- r-manager · map.sql —— 地图服务与数据服务板块（建表 + 菜单）
+-- rust-gisserver · map.sql —— 地图服务与数据服务板块（建表 + 菜单）
 -- ---------------------------------------------------------------------
--- 用途：r-manager 管理端的地图业务底座，包含两个顶级目录：
+-- 用途：rust-gisserver 管理端的地图业务底座，包含两个顶级目录：
 --       ① 数据服务（顶级目录 6）：工作空间 / 数据源 / 数据图层 / 已发布服务
 --          —— GeoServer Data 组语义：只管数据源组织与发布账本；
 --       ② 地图服务（顶级目录 7）：服务清单 / 访问日志 / 样式库 / 服务垃圾箱 /
@@ -187,7 +187,7 @@ insert into sys_role_menu values ('3', '1058') on conflict do nothing;
 create table if not exists sys_engine (
   engine_id   varchar(64)  primary key,
   engine_name varchar(64)  not null,
-  engine_type varchar(32)  not null default 'r-mapserver',
+  engine_type varchar(32)  not null default 'rust-gisserver',
   base_url    varchar(255) not null,
   admin_token varchar(128) default '',
   status      char(1)      not null default '0',
@@ -199,13 +199,13 @@ create table if not exists sys_engine (
 );
 
 comment on table sys_engine is '地图服务引擎注册表：管理代理转发默认引擎，健康探测按 base_url';
-comment on column sys_engine.engine_type is '引擎类型（当前 r-mapserver；预留扩展）';
+comment on column sys_engine.engine_type is '引擎类型（当前 rust-gisserver；预留扩展）';
 comment on column sys_engine.is_default is '默认引擎：管理代理 /map/* 转发目标；无默认时回落 manager.xml mapsvc';
 
 -- 种子：本地 map-api（幂等；base_url 不覆盖已有环境配置）
 insert into sys_engine (engine_id, engine_name, engine_type, base_url, status, is_default, sort, remark)
-values ('map-api', 'r-mapserver map-api', 'r-mapserver', 'http://127.0.0.1:8080', '0', '1', 0,
-        '本地 r-mapserver 服务面（种子值，生产按环境改 base_url）')
+values ('map-api', 'rust-gisserver map-api', 'rust-gisserver', 'http://127.0.0.1:8080', '0', '1', 0,
+        '本地 rust-gisserver 服务面（种子值，生产按环境改 base_url）')
 on conflict (engine_id) do nothing;
 
 -- ---------- B. 菜单 ----------
@@ -402,7 +402,7 @@ comment on column sys_resource.reason      is '不可发布 / 探测降级的人
 comment on column sys_resource.meta        is '发现结果原样快照：PostGIS 的 geometry_column/srid、归档缩放区间、3D Tiles 入口等，发布时据此重建 source';
 comment on column sys_resource.crs_suspicious is '坐标系可疑：声明 CRS 与探测到的 bbox 范围不符，发布前需人工确认';
 
--- 已发布服务：发布动作的产物账本；实体配置仍落在 r-mapserver 的 XML 里。
+-- 已发布服务：发布动作的产物账本；实体配置仍落在 rust-gisserver 的 XML 里。
 create table if not exists sys_published_layer (
   id             bigserial    primary key,
   workspace_id   bigint       not null,
@@ -428,12 +428,12 @@ create index if not exists idx_published_workspace on sys_published_layer (works
 alter table sys_published_layer add column if not exists service_doc jsonb;
 alter table sys_published_layer add column if not exists grid jsonb;
 
-comment on table  sys_published_layer               is '已发布服务账本：与 r-mapserver sys_service 登记簿同源，state 四态一致';
-comment on column sys_published_layer.layer_name    is 'r-mapserver 扁平唯一服务名（= Layer name / TilesetService Name）';
+comment on table  sys_published_layer               is '已发布服务账本：与 rust-gisserver sys_service 登记簿同源，state 四态一致';
+comment on column sys_published_layer.layer_name    is 'rust-gisserver 扁平唯一服务名（= Layer name / TilesetService Name）';
 comment on column sys_published_layer.service_types is '发布勾选的协议，逗号分隔：wms,wmts,xyz,wfs,mvt,oaf,3dtiles';
 comment on column sys_published_layer.mapserver_kind is 'cog|vector|pmtiles|mbtiles|postgis|3dtiles（决定写哪类 XML 文档）';
-comment on column sys_published_layer.state         is 'active|stopped|paused|deleted（复用 r-mapserver 登记簿四态）';
-comment on column sys_published_layer.service_doc  is '完整服务定义（Layer JSON，含 custom_grids）：r-mapserver backend=db 模式下的唯一真理源，manager 为唯一写入方';
+comment on column sys_published_layer.state         is 'active|stopped|paused|deleted（复用 rust-gisserver 登记簿四态）';
+comment on column sys_published_layer.service_doc  is '完整服务定义（Layer JSON，含 custom_grids）：rust-gisserver backend=db 模式下的唯一真理源，manager 为唯一写入方';
 comment on column sys_published_layer.grid         is '发布时固化的原生网格快照（ArcGIS：CRS/瓦片尺寸/原点/LOD 阶梯），运行时仍以缓存 Conf.xml 为准';
 
 -- ---------- B. 菜单 ----------
@@ -524,13 +524,13 @@ insert into sys_role_menu values ('3', '1065') on conflict do nothing;
 insert into sys_role_menu values ('3', '1066') on conflict do nothing;
 
 -- =====================================================================
--- §6.5 API Key 管理（r-mapserver 访问凭证）
+-- §6.5 API Key 管理（rust-gisserver 访问凭证）
 -- ---------------------------------------------------------------------
--- 一张表同时服务两种用途（purpose），与 r-mapserver 现有两套令牌护栏对齐：
+-- 一张表同时服务两种用途（purpose），与 rust-gisserver 现有两套令牌护栏对齐：
 --   admin  manager → server 管理面（请求头 X-Admin-Token）
 --   data   server → 客户端数据面（X-Data-Token / Authorization: Bearer / ?token=）
 -- 明文存储便于管理端复制分发；库部署在内网，访问受登录态 + map:apikey:* 约束。
--- r-mapserver 从同一共享库定时读取启用中的 key 作为「附加认可凭证」，
+-- rust-gisserver 从同一共享库定时读取启用中的 key 作为「附加认可凭证」，
 -- 主令牌（mapserver.xml 的 admin.token / server.data_token）仍是启用校验的开关。
 -- =====================================================================
 
@@ -547,7 +547,7 @@ create table if not exists sys_api_key (
     update_time timestamp
 );
 
-comment on table  sys_api_key            is 'r-mapserver 访问密钥：管理面(admin) / 客户端数据面(data)';
+comment on table  sys_api_key            is 'rust-gisserver 访问密钥：管理面(admin) / 客户端数据面(data)';
 comment on column sys_api_key.purpose    is '用途：admin=manager 连接 server（X-Admin-Token）；data=客户端访问数据面';
 comment on column sys_api_key.status     is '状态：0 启用 / 1 停用';
 comment on column sys_api_key.expires_at is '过期时间（空 = 永不过期）；停用或过期的 key 不参与 server 校验';
@@ -557,7 +557,7 @@ create index if not exists idx_sys_api_key_purpose_status on sys_api_key (purpos
 -- ---------- A. 菜单（地图服务目录 7 下）----------
 insert into sys_menu values('128', 'API Key 管理', '7', '10', 'apikeys', 'map/apikey/index', '', '1', '0', 'C', '0', '0',
   'map:apikey:list', 'key', 103, 1, now(), null, null,
-  '为 r-mapserver 生成访问密钥（名称 + Key），供 manager 连接 server 或下发给客户端')
+  '为 rust-gisserver 生成访问密钥（名称 + Key），供 manager 连接 server 或下发给客户端')
   on conflict (menu_id) do nothing;
 
 -- ---------- B. 按钮权限 ----------

@@ -1,11 +1,11 @@
 //! 数据目录：Workspace → Store → Resource → 已发布服务（对齐 GeoServer 组织层）。
 //!
 //! 边界（计划 §1 红线，本模块逐条遵守）：
-//! * 只做**服务发布与管理**的组织元数据；组织元数据全部落 r-manager PostgreSQL。
+//! * 只做**服务发布与管理**的组织元数据；组织元数据全部落 rust-gisserver PostgreSQL。
 //! * 不读数据文件、不连业务库：数据侧一律走 map-api 的只读发现面
 //!   （`/admin/capabilities`、`/admin/discover`、`/admin/pg-tables`、`/admin/pg-test`）。
-//! * 发布产物是 r-mapserver 的 `Layer` / `TilesetService` 文档，经
-//!   `POST /admin/services` 落盘并热重载；r-manager 不写 XML、不生成瓦片、不导入要素。
+//! * 发布产物是 rust-gisserver 的 `Layer` / `TilesetService` 文档，经
+//!   `POST /admin/services` 落盘并热重载；rust-gisserver 不写 XML、不生成瓦片、不导入要素。
 //! * 软删除仅标记：Resource `del_flag=1`，已发布层 `state='deleted'`（进垃圾箱，可恢复）。
 //!
 //! 引擎口径：目录面（发现/连接测试/发布）当前一律走**默认引擎**
@@ -13,7 +13,7 @@
 //! 归属调整）仍由既有 `/map/services/*` 按服务归属路由，两者互不影响。
 //!
 //! 能力矩阵（`data_type` → `kind` + 可发布服务类型）从 map-api `/admin/capabilities`
-//! 取，r-manager 不重复维护第二份矩阵，避免两处口径漂移。
+//! 取，rust-gisserver 不重复维护第二份矩阵，避免两处口径漂移。
 use std::collections::HashMap;
 use std::sync::Arc;
 
@@ -1655,7 +1655,7 @@ pub async fn resource_list(
 }
 
 /// `DELETE /map/catalog/resources/:id` — 软删除（假删除仅标记）：
-/// `del_flag=1` + 其已发布服务转 `state='deleted'`（r-mapserver 停止服务、保留
+/// `del_flag=1` + 其已发布服务转 `state='deleted'`（rust-gisserver 停止服务、保留
 /// XML，进垃圾箱），不物理删文件、不调物理 DELETE。
 pub async fn resource_remove(
     State(state): State<Arc<AppState>>,
@@ -1914,7 +1914,7 @@ fn bbox_of(e: &Value) -> Option<Vec<f64>> {
     }
 }
 
-/// 由资源 + Store 指针重建 r-mapserver 的服务文档（`POST /admin/services` 负载）。
+/// 由资源 + Store 指针重建 rust-gisserver 的服务文档（`POST /admin/services` 负载）。
 ///
 /// 三种形状：3D Tiles → `<TilesetService>`（root/entry）；PostGIS →
 /// `source.type=postgis` 的连接与表定位；其余 → `source.type=<kind>` + 文件路径。
@@ -2855,7 +2855,7 @@ pub async fn published_state(
 /// `GET /map/catalog/published/:id/endpoints` — 单个已发布服务的协议端点（预览、一键复制）。
 ///
 /// 端点 URL 全部由引擎给出（[`engine::aggregate_services`] 聚合各引擎
-/// `/admin/services`），r-manager 只按服务名挑出对应条目，不自行拼接，
+/// `/admin/services`），rust-gisserver 只按服务名挑出对应条目，不自行拼接，
 /// 避免与「服务管理」页两处口径漂移。引擎目录里没有该服务（配置被外部删除、
 /// 或引擎换了目录）时返回 `found=false` + 原因，而不是报错。
 pub async fn published_endpoints(

@@ -1,8 +1,8 @@
-"""r-manager + r-mapserver 联合功能测试（针对已运行的 live 实例）。
+"""rust-gisserver + rust-gisserver 联合功能测试（针对已运行的 live 实例）。
 
-与 r-mapserver/tools/capability_probe.py（自建最小 catalog、验路由语义）不同，
-本脚本直接打 r-mapserver 仓库 config/ 下的真实图层目录（数据源 E:\\data\\1 +
-PostGIS :5434 的 gis 库），并按 r-manager 的实际管理链路做接口级走查：
+与 rust-gisserver/tools/capability_probe.py（自建最小 catalog、验路由语义）不同，
+本脚本直接打 rust-gisserver 仓库 config/ 下的真实图层目录（数据源 E:\\data\\1 +
+PostGIS :5434 的 gis 库），并按 rust-gisserver 的实际管理链路做接口级走查：
 
   map-api :8080   数据面：WMS / WMTS / XYZ / OGC API Features / OGC API Tiles /
                   MVT（vector + PostGIS 双坐标接口）/ PMTiles / MBTiles /
@@ -89,7 +89,7 @@ def js(url, pred, hdr=None, method="GET", body=None):
 
 # ---------------------------------------------------------------- map-api 数据面
 def section_mapapi():
-    print("\n== r-mapserver map-api 数据面（真实 config/，E:\\data\\1 + PostGIS gis 库）==")
+    print("\n== rust-gisserver map-api 数据面（真实 config/，E:\\data\\1 + PostGIS gis 库）==")
 
     # 管理面 / 探活
     check("GET /admin/services 图层清单",
@@ -183,7 +183,7 @@ def section_mapapi():
     check("terrain quantized-mesh 瓦片 8/401/163",
           lambda: st(MAPAPI + "/terrain/wuhua12/8/401/163.terrain"))
 
-    # 错误分流（r-mapserver c131a9b：请求问题/真故障 分 400/404/500）
+    # 错误分流（rust-gisserver c131a9b：请求问题/真故障 分 400/404/500）
     check("未知图层 XYZ 返回 404", lambda: _want(MAPAPI + "/tiles/no_such_layer/6/52/25.png", (404,)))
     check("已删除服务不再出瓦片 404",
           lambda: _want(MAPAPI + "/tiles/cog_crs4326_test/6/52/25.png", (404,)))
@@ -234,7 +234,7 @@ def _auth(user, path, method="GET", body=None):
 
 
 def section_manager():
-    print("\n== r-manager 管理面（登录 / 代理 / 引擎 / 配置回写 / 权限）==")
+    print("\n== rust-gisserver 管理面（登录 / 代理 / 引擎 / 配置回写 / 权限）==")
 
     check("POST /auth/login admin", lambda: _login("admin", "admin123"))
     check("POST /auth/login test(role3)", lambda: _login("test", "666666"))

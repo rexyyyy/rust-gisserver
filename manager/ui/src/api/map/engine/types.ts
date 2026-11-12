@@ -2,7 +2,7 @@ export interface EngineVO {
   /** 引擎 ID（URL 段，字母/数字/-/_） */
   engineId: string;
   engineName: string;
-  /** 引擎类型（当前 r-mapserver；预留扩展） */
+  /** 引擎类型（当前 rust-gisserver；预留扩展） */
   engineType: string;
   /** 管理面 base_url */
   baseUrl: string;

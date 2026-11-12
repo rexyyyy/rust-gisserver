@@ -232,7 +232,7 @@ pub fn capabilities_xml(layers: &[CapLayer], version: &str, base_url: &str) -> S
     } else {
         s.push_str("<WMS_Capabilities version=\"1.1.1\" xmlns=\"http://www.opengis.net/wms\" xmlns:xlink=\"http://www.w3.org/1999/xlink\">\n");
     }
-    s.push_str("  <Service>\n    <Name>WMS</Name>\n    <Title>r-mapserver</Title>\n");
+    s.push_str("  <Service>\n    <Name>WMS</Name>\n    <Title>rust-gisserver</Title>\n");
     s.push_str(&format!("    <Abstract>Rust map server: WMS / WMTS / TMS / MVT / PMTiles / COG tile services</Abstract>\n"));
     s.push_str(&format!("    <OnlineResource xlink:href=\"{}\"/>\n", xml_escape(&format!("{base_url}/wms"))));
     s.push_str("    <Fees/>\n    <AccessConstraints/>\n    <MaxWidth>8192</MaxWidth>\n    <MaxHeight>8192</MaxHeight>\n  </Service>\n");
@@ -255,7 +255,7 @@ pub fn capabilities_xml(layers: &[CapLayer], version: &str, base_url: &str) -> S
     s.push_str("    <UserDefinedSymbolization SupportSLD=\"1\" UserLayer=\"0\" UserStyle=\"1\" RemoteWFS=\"0\"/>\n");
 
     // Root layer: common CRSs + bounding boxes.
-    s.push_str("    <Layer>\n      <Title>r-mapserver layers</Title>\n");
+    s.push_str("    <Layer>\n      <Title>rust-gisserver layers</Title>\n");
     for crs in wms_common::crs::advertised() {
         s.push_str(&format!("      <{crs_tag}>{crs}</{crs_tag}>\n"));
     }

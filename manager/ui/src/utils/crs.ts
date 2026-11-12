@@ -1,7 +1,7 @@
 /**
  * 坐标系（CRS）能力口径与写法工具。
  *
- * 口径必须与 r-mapserver README《坐标系支持》一致，分三层：
+ * 口径必须与 rust-gisserver README《坐标系支持》一致，分三层：
  * ① 内置数学 EPSG:4326 / CRS:84 / EPSG:3857（服务端自写 Web Mercator，零依赖）；
  * ② 恒等路径——请求 CRS 与源 CRS 相同时不做任何投影数学，因此 CGCS2000
  *    （EPSG:4490）或高斯-克吕格分带图层在没有 PROJ 的机器上也能直出；

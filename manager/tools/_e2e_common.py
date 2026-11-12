@@ -1,4 +1,4 @@
-"""E2E 公共库：gis-srv 作业(提交+轮询) + r-manager catalog 发布链 + r-mapserver 浏览探测。
+"""E2E 公共库：gis-srv 作业(提交+轮询) + rust-gisserver catalog 发布链 + rust-gisserver 浏览探测。
 供 _e2e_*.py 各格式脚本复用。纯标准库。"""
 import json
 import time
@@ -59,7 +59,7 @@ def job_run(tool_id, params, tag="", poll=2400):
     return None
 
 
-# ---------- r-manager catalog 发布链 ----------
+# ---------- rust-gisserver catalog 发布链 ----------
 def login():
     code, j = jget(MGR + "/auth/login", "POST", {"username": "admin", "password": "admin123"})
     _TOK["t"] = (j.get("data") or {}).get("access_token")

@@ -1,11 +1,11 @@
 @echo off
-REM Install r-mapserver and r-manager
+REM Install rust-gisserver and rust-gisserver
 REM Usage: install.bat [install_dir]
 
 setlocal enabledelayedexpansion
 
 echo ============================================
-echo Installing r-mapserver and r-manager
+echo Installing rust-gisserver and rust-gisserver
 echo ============================================
 
 REM Default install directory
@@ -16,16 +16,16 @@ echo Install directory: %INSTALL_DIR%
 
 REM Check if executables exist
 set MAPSERVER_EXE=%~dp0..\..\target\release\map-api.exe
-set MANAGER_EXE=%~dp0..\..\..\r-manager\backend\target\release\manager.exe
+set MANAGER_EXE=%~dp0..\..\..\rust-gisserver\backend\target\release\manager.exe
 
 if not exist "%MAPSERVER_EXE%" (
-    echo [ERROR] r-mapserver not found: %MAPSERVER_EXE%
+    echo [ERROR] rust-gisserver not found: %MAPSERVER_EXE%
     echo Please run build_all.bat first
     exit /b 1
 )
 
 if not exist "%MANAGER_EXE%" (
-    echo [ERROR] r-manager not found: %MANAGER_EXE%
+    echo [ERROR] rust-gisserver not found: %MANAGER_EXE%
     echo Please run build_all.bat first
     exit /b 1
 )
@@ -93,14 +93,14 @@ if exist "%MAPSERVER_CONFIG%" (
     xcopy /E /I /Y "%MAPSERVER_CONFIG%" "%INSTALL_DIR%\config"
 )
 
-set MANAGER_CONFIG=%~dp0..\..\..\r-manager\backend\config
+set MANAGER_CONFIG=%~dp0..\..\..\rust-gisserver\backend\config
 if exist "%MANAGER_CONFIG%" (
     xcopy /E /I /Y "%MANAGER_CONFIG%" "%INSTALL_DIR%\config\manager"
     REM Copy manager.xml to config root for default path
     copy /Y "%INSTALL_DIR%\config\manager\manager.xml" "%INSTALL_DIR%\config\manager.xml"
     REM Fix static_dir path for installed layout.
     REM Source config may carry either "../ui/dist" or "manager/ui/dist"
-    REM (the latter is what r-manager/backend/config/manager.xml actually ships),
+    REM (the latter is what rust-gisserver/backend/config/manager.xml actually ships),
     REM so both patterns must be rewritten to the installed "web" directory.
     powershell -Command "(Get-Content '%INSTALL_DIR%\config\manager.xml') -replace 'static_dir=\"(\.\./ui/dist|manager/ui/dist)\"', 'static_dir=\"web\"' | Set-Content '%INSTALL_DIR%\config\manager.xml'"
     powershell -Command "(Get-Content '%INSTALL_DIR%\config\manager\manager.xml') -replace 'static_dir=\"(\.\./ui/dist|manager/ui/dist)\"', 'static_dir=\"web\"' | Set-Content '%INSTALL_DIR%\config\manager\manager.xml'"
@@ -108,7 +108,7 @@ if exist "%MANAGER_CONFIG%" (
 
 REM Copy frontend if built
 echo [5/6] Copying frontend...
-set FRONTEND_DIR=%~dp0..\..\..\r-manager\ui\dist
+set FRONTEND_DIR=%~dp0..\..\..\rust-gisserver\ui\dist
 if exist "%FRONTEND_DIR%" (
     xcopy /E /I /Y "%FRONTEND_DIR%" "%INSTALL_DIR%\web"
     echo [OK] Frontend copied
@@ -118,7 +118,7 @@ if exist "%FRONTEND_DIR%" (
 
 REM Generate .env.example
 echo [6/6] Generating .env.example...
-echo # r-mapserver and r-manager environment configuration > "%INSTALL_DIR%\.env.example"
+echo # rust-gisserver and rust-gisserver environment configuration > "%INSTALL_DIR%\.env.example"
 echo # Copy this file to .env and modify as needed >> "%INSTALL_DIR%\.env.example"
 echo. >> "%INSTALL_DIR%\.env.example"
 echo # Legacy filename encoding region for path normalisation >> "%INSTALL_DIR%\.env.example"
@@ -126,17 +126,17 @@ echo # Valid values: zh-CN / zh-TW / en / ko / ja >> "%INSTALL_DIR%\.env.example
 echo # Linux and macOS have no system ANSI code page, set this explicitly >> "%INSTALL_DIR%\.env.example"
 echo GIS_ENCODING_REGION=zh-CN >> "%INSTALL_DIR%\.env.example"
 echo. >> "%INSTALL_DIR%\.env.example"
-echo # PostgreSQL database for r-manager >> "%INSTALL_DIR%\.env.example"
+echo # PostgreSQL database for rust-gisserver >> "%INSTALL_DIR%\.env.example"
 echo MANAGER_DB_HOST=localhost >> "%INSTALL_DIR%\.env.example"
 echo MANAGER_DB_PORT=5434 >> "%INSTALL_DIR%\.env.example"
 echo MANAGER_DB_PASSWORD=your_password_here >> "%INSTALL_DIR%\.env.example"
 echo MANAGER_JWT_SECRET=your_jwt_secret_here >> "%INSTALL_DIR%\.env.example"
 echo. >> "%INSTALL_DIR%\.env.example"
-echo # r-mapserver connection (for r-manager proxy) >> "%INSTALL_DIR%\.env.example"
+echo # rust-gisserver connection (for rust-gisserver proxy) >> "%INSTALL_DIR%\.env.example"
 echo MAPSRV_HOST=127.0.0.1 >> "%INSTALL_DIR%\.env.example"
 echo MAPSRV_PORT=8080 >> "%INSTALL_DIR%\.env.example"
 echo. >> "%INSTALL_DIR%\.env.example"
-echo # r-mapserver >> "%INSTALL_DIR%\.env.example"
+echo # rust-gisserver >> "%INSTALL_DIR%\.env.example"
 echo MAPSERVER_PORT=8080 >> "%INSTALL_DIR%\.env.example"
 echo MAPSERVER_DATA_DIR=data >> "%INSTALL_DIR%\.env.example"
 echo MAPSERVER_CACHE_DIR=cache >> "%INSTALL_DIR%\.env.example"
@@ -161,7 +161,7 @@ echo if exist .env ( for /f "usebackq tokens=1,* delims== eol=#" %%%%a in (".env
 echo set "PROJ_LIB=" >> "%INSTALL_DIR%\start-mapserver.bat"
 echo set "PROJ_DLL=%%~dp0bin\proj_9.dll" >> "%INSTALL_DIR%\start-mapserver.bat"
 echo set "PROJ_DATA=%%~dp0share\proj" >> "%INSTALL_DIR%\start-mapserver.bat"
-echo echo Starting r-mapserver on port 8080... >> "%INSTALL_DIR%\start-mapserver.bat"
+echo echo Starting rust-gisserver on port 8080... >> "%INSTALL_DIR%\start-mapserver.bat"
 echo bin\map-api.exe serve >> "%INSTALL_DIR%\start-mapserver.bat"
 
 echo @echo off > "%INSTALL_DIR%\start-manager.bat"
@@ -178,7 +178,7 @@ REM map-api uses.
 echo set "PROJ_LIB=" >> "%INSTALL_DIR%\start-manager.bat"
 echo set "PROJ_DLL=%%~dp0bin\proj_9.dll" >> "%INSTALL_DIR%\start-manager.bat"
 echo set "PROJ_DATA=%%~dp0share\proj" >> "%INSTALL_DIR%\start-manager.bat"
-echo echo Starting r-manager on port 6180... >> "%INSTALL_DIR%\start-manager.bat"
+echo echo Starting rust-gisserver on port 6180... >> "%INSTALL_DIR%\start-manager.bat"
 echo bin\manager.exe >> "%INSTALL_DIR%\start-manager.bat"
 
 echo.

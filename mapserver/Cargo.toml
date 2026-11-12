@@ -10,8 +10,8 @@ members = ["services/*"]
 [workspace.package]
 version = "0.1.0"
 edition = "2021"
-license = "MIT"
-repository = "https://github.com/example/r-mapserver"
+# 服务层引擎（D1a 定稿）：AGPL-3.0-only。本 workspace 不发布到 crates.io。
+license = "AGPL-3.0-only"
 
 [workspace.dependencies]
 # --- Internal crates (gisserver-* published names) --------------------------

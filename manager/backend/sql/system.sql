@@ -1,7 +1,7 @@
 -- =====================================================================
--- r-manager · system.sql —— 系统管理与监控板块（建表 + 初始化数据）
+-- rust-gisserver · system.sql —— 系统管理与监控板块（建表 + 初始化数据）
 -- ---------------------------------------------------------------------
--- 用途：r-manager 管理端（Axum + PostgreSQL）的系统底座，一次性建表并写入
+-- 用途：rust-gisserver 管理端（Axum + PostgreSQL）的系统底座，一次性建表并写入
 --       系统管理 / 系统监控两个板块的菜单、角色、用户、字典与参数。
 -- 依赖：无（可独立执行）
 -- 用法：psql -h localhost -p 5434 -U postgres -d mapserver_manager -f system.sql

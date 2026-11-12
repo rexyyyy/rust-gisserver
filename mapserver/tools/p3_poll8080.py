@@ -8,5 +8,5 @@ for _ in range(60):
         break
     except OSError:
         time.sleep(1)
-with open(r"D:\mycomputer\documents\gis-wt\thirdparty\r-mapserver\port8080.txt", "w") as f:
+with open(r"D:\mycomputer\documents\gis-wt\thirdparty\rust-gisserver\port8080.txt", "w") as f:
     f.write(f"up={ok}")

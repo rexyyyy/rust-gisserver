@@ -1,5 +1,5 @@
 """矢量 MVT/WFS/WMS 全链路 E2E：geojson -> 发布 geojson_dir -> 浏览实测。
-r-mapserver 对 geojson 走动态重编码（mvt/wfs/oaf/wms/wmts），无需先切片。"""
+rust-gisserver 对 geojson 走动态重编码（mvt/wfs/oaf/wms/wmts），无需先切片。"""
 import os
 import shutil
 

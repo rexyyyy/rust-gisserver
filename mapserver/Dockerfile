@@ -1,6 +1,6 @@
 # syntax=docker/dockerfile:1
 # ============================================================================
-# r-mapserver / map-api — 发布服务平面镜像（开发计划 P0-1 一键部署）
+# mapserver / map-api — 发布服务平面镜像（开发计划 P0-1 一键部署）
 #
 # 多阶段：
 #   1) builder  rust:1-slim-book，装 build-essential + pkg-config
@@ -9,7 +9,7 @@
 #   2) runtime  debian:bookworm-slim，带 ca-certificates + gettext-base
 #      （envsubst），配合 docker-entrypoint.sh 把挂载的配置模板渲染成
 #      运行期 mapserver.xml —— DB 口令等经环境变量注入，配置本体不入库、
-#      也不烘焙进镜像（守 r-mapserver「纯发布服务平面」红线）。
+#      也不烘焙进镜像（守 mapserver「纯发布服务平面」红线）。
 #
 # 镜像内不含任何 config/data：启动时以卷挂载
 #   /app/config.template  配置模板（*.xml，含 ${VAR} 占位，只读）

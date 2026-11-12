@@ -21,7 +21,7 @@ import time
 import zlib
 from pathlib import Path
 
-ROOT = Path(r"D:\mycomputer\documents\gis-wt\thirdparty\r-mapserver")
+ROOT = Path(r"D:\mycomputer\documents\gis-wt\thirdparty\rust-gisserver")
 EXE = ROOT / "target" / "release" / "map-api.exe"
 GOOD = Path("E:/tmp/rms-probe")
 TDS = GOOD / "tds" / "probe"          # 3dtiles dataset root

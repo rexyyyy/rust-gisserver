@@ -8,15 +8,15 @@ gis-srv（能力底座 / MCP）以 profile 占位、默认不启动。
 | 服务      | 镜像 / 构建               | 宿主端口 | 说明                        |
 |-----------|---------------------------|----------|-----------------------------|
 | postgis   | `postgis/postgis:16-3.4`  | 5434→5432| 单库 `mapserver_manager`    |
-| map-api   | `../../r-mapserver`       | 8080     | WMS/WMTS/WFS/MVT/COG/PMTiles… |
-| manager   | `..`（r-manager）         | 6180     | 管理平面 + 前端静态资源     |
+| map-api   | `../../rust-gisserver`       | 8080     | WMS/WMTS/WFS/MVT/COG/PMTiles… |
+| manager   | `..`（rust-gisserver）         | 6180     | 管理平面 + 前端静态资源     |
 
 容器网络内互访用服务名：manager→`http://map-api:8080`，两服务→`postgis:5432`。
 
 ## 快速开始
 
 ```powershell
-cd r-manager/deploy
+cd rust-gisserver/deploy
 copy .env.example .env       # 必填 MAPSERVER_DB_PASSWORD / MANAGER_JWT_SECRET
 docker compose up -d --build
 ```

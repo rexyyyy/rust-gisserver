@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!--
-  r-mapserver 服务端通用配置
+  rust-gisserver 服务端通用配置
   =============================================================================
   本文件只放 **server 级** 配置（监听、缓存、图层目录根）。
   图层相关的配置一律放在图层配置文件里：
@@ -62,14 +62,14 @@
          Authorization: Bearer / 查询参数 ?token=（便于浏览器/viewer 拼在 URL）。
          未配置则数据面不设防（零配置向后兼容）。与 admin.token 定位相同：
          令牌护栏而非完整鉴权体系，角色/ACL 交给网关或 manager。 -->
-    <!-- API Key（r-manager「地图服务 → API Key 管理」生成）：
+    <!-- API Key（rust-gisserver「地图服务 → API Key 管理」生成）：
          配置主令牌开启校验后，主令牌**或**共享库 sys_api_key 中启用且未过期的
          data key 均被认可（每 15 秒同步、无需重启）；未配置主令牌则不设防。 -->
     <!-- <data_token>changeme</data_token> -->
   </server>
   <catalog root="config" backend="files"/>
   <!-- admin 的 token 属性是管理面主令牌（X-Admin-Token）；配置后，主令牌或
-       共享库 sys_api_key 中启用且未过期的 admin key 均被认可。r-manager 的
+       共享库 sys_api_key 中启用且未过期的 admin key 均被认可。rust-gisserver 的
        「API Key 管理 → 应用到引擎」会把生成的 admin key 写入默认引擎。 -->
   <admin dsn="postgresql://postgres:${MAPSERVER_DB_PASSWORD}@${MAPSERVER_DB_HOST:-localhost}:${MAPSERVER_DB_PORT:-5434}/mapserver_manager"/>
   <!-- PMTiles 独立归档：name -> 绝对路径，暴露为 /pmtiles/{name}（Range 读取）。

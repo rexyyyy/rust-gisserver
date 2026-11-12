@@ -83,7 +83,7 @@ pub fn pack_tiles(
     let root_dir = serialize_directory(&entries);
     let metadata = serde_json::json!({
         "name": name,
-        "generator": "r-mapserver pmtiles-pack",
+        "generator": "rust-gisserver pmtiles-pack",
         "format": if tile_type == super::tile_type::MVT { "pbf" } else { "png" }
     });
     let metadata_json = serde_json::to_vec(&metadata).map_err(|e| format!("metadata: {e}"))?;

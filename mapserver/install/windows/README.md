@@ -54,8 +54,8 @@ start-manager.bat     # 端口 6180
 ```
 rmap_target/
 ├── bin/
-│   ├── map-api.exe      # r-mapserver 主程序
-│   ├── r-manager.exe    # r-manager 管理后台
+│   ├── map-api.exe      # rust-gisserver 主程序
+│   ├── rust-gisserver.exe    # rust-gisserver 管理后台
 │   └── proj_9.dll       # PROJ 坐标转换库
 ├── config/              # 配置文件
 ├── data/                # 数据目录 (TPK, MBTiles 等)
@@ -83,18 +83,18 @@ CREATE DATABASE rmap;
 
 ### 文件模式 (无需数据库)
 
-r-mapserver 支持 file-sidecar 模式，无需数据库即可运行。
+rust-gisserver 支持 file-sidecar 模式，无需数据库即可运行。
 
 ## 注册为 Windows 服务
 
 使用 NSSM (Non-Sucking Service Manager):
 
 ```cmd
-nssm install r-mapserver "[安装目录]\bin\map-api.exe"
-nssm install r-manager "[安装目录]\bin\r-manager.exe"
+nssm install rust-gisserver "[安装目录]\bin\map-api.exe"
+nssm install rust-gisserver "[安装目录]\bin\rust-gisserver.exe"
 
-nssm start r-mapserver
-nssm start r-manager
+nssm start rust-gisserver
+nssm start rust-gisserver
 ```
 
 ## 卸载

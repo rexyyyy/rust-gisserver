@@ -6,7 +6,7 @@ marker = "export const THREED_TILES_SERVICES = [\n"
 entry = (
     "  {\n"
     "    id: 'mcy-reconv',\n"
-    "    name: '沐春园 重转 (EPSG:4522 投影/米 / r-manager 发布)',\n"
+    "    name: '沐春园 重转 (EPSG:4522 投影/米 / rust-gisserver 发布)',\n"
     "    url: 'http://127.0.0.1:8080/3dtiles/mcy-reconv/tileset.json',\n"
     "  },\n"
 )

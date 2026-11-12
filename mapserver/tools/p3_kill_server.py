@@ -5,5 +5,5 @@ for l in out.splitlines():
         pid = l.split('","')[1]
         subprocess.run(['taskkill', '/F', '/PID', pid], capture_output=True)
         print(f"killed map-api pid={pid}")
-with open(r"D:\mycomputer\documents\gis-wt\thirdparty\r-mapserver\kill_out.txt", "w") as f:
+with open(r"D:\mycomputer\documents\gis-wt\thirdparty\rust-gisserver\kill_out.txt", "w") as f:
     f.write("done")

@@ -167,7 +167,7 @@ pub async fn handle(
     }
 }
 
-/// `ws:places` -> `places` (r-mapserver layers are flat, no namespaces).
+/// `ws:places` -> `places` (rust-gisserver layers are flat, no namespaces).
 fn bare_type_name(name: &str) -> String {
     name.rsplit(':').next().unwrap_or(name).trim().to_string()
 }

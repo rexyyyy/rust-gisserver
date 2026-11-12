@@ -1,4 +1,4 @@
-# r-manager 构建上下文忽略（P0-1）：Dockerfile 需要 backend/ 与 ui/ 源码，
+# manager 构建上下文忽略（P0-1）：Dockerfile 需要 backend/ 与 ui/ 源码，
 # 其余生成物 / 备份 dist / 依赖目录一律排除，缩小上下文、避免污染镜像层。
 .git/
 .gitignore

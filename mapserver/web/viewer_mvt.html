@@ -2,7 +2,7 @@
 <html lang="zh-CN">
 <head>
 <meta charset="utf-8"/>
-<title>r-mapserver · PostGIS 矢量瓦片浏览（发布网格 · 源 LOD 原生寻址）</title>
+<title>rust-gisserver · PostGIS 矢量瓦片浏览（发布网格 · 源 LOD 原生寻址）</title>
 <meta name="viewport" content="width=device-width, initial-scale=1"/>
 <!--
   PostGIS 矢量瓦片（MVT）浏览页。与 /viewer（纯 Web Mercator XYZ）不同：图层的
@@ -112,7 +112,7 @@
     var res = state.resolutions;
     var bbox = state.bbox || state.extent;
     var L = [];
-    L.push('// ===== 图层加载常量（随图层 / 发布网格变化；由 r-mapserver 预览页生成）=====');
+    L.push('// ===== 图层加载常量（随图层 / 发布网格变化；由 rust-gisserver 预览页生成）=====');
     L.push('const TILE_SERVER = ' + JSON.stringify(BASE) + ';   // 瓦片服务地址（http/https）');
     L.push('const LAYER = ' + JSON.stringify(LAYER) + ';');
     L.push('const CRS = ' + JSON.stringify(state.code) + ';                  // 源坐标系，不做 WebMercator 重投影');

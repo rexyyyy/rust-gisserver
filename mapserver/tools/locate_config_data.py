@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Locate the real data paths referenced (mis-spelled) by r-mapserver configs."""
+"""Locate the real data paths referenced (mis-spelled) by rust-gisserver configs."""
 import os
 from pathlib import Path
 

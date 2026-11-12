@@ -101,7 +101,7 @@ fn parse_bbox(raw: &str, srs_raw: &str, srs: &str) -> Result<Bbox, WfsError> {
 /// Parse and validate `GetFeature` KVP parameters.
 ///
 /// `vector_layers` are the published feature-type names; only one typeName is
-/// served per request (r-mapserver layers are flat, no joins).
+/// served per request (rust-gisserver layers are flat, no joins).
 pub fn parse_get_feature(
     version: &str,
     kv: &[(String, String)],
@@ -112,7 +112,7 @@ pub fn parse_get_feature(
 
     // TYPENAMES is the WFS 2.0 spelling; TYPENAME the 1.x one. Accept both
     // (lenient, like GeoServer's KVP dispatcher). A namespace prefix
-    // (`ws:places`) is stripped: r-mapserver layers are flat.
+    // (`ws:places`) is stripped: rust-gisserver layers are flat.
     let type_names: Vec<String> = get("typeNames")
         .or_else(|| get("typeName"))
         .unwrap_or("")
@@ -305,7 +305,7 @@ pub fn feature_collection_xml(
     x.push_str(&format!(
         "<wfs:FeatureCollection {count_attr} \
          xmlns:wfs=\"{wfs_ns}\" xmlns:gml=\"{gml_ns}\" \
-         xmlns:ws=\"http://r-mapserver.local\">\n"
+         xmlns:ws=\"http://rust-gisserver.local\">\n"
     ));
     for (i, f) in features.iter().enumerate() {
         let id = vector_query::feature_id(f, offset + i);

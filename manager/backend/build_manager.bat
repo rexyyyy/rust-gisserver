@@ -1,5 +1,5 @@
 @echo off
-REM r-mapserver manager backend build script
+REM rust-gisserver manager backend build script
 REM Usage: build_manager.bat [debug|release]
 REM
 REM 环境策略：PATH 里已有 cl.exe（说明已在 VS Developer Prompt / 已配置好的环境里）

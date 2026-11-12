@@ -1,4 +1,4 @@
-"""r-mapserver 性能基准：起服 -> 多场景压测 -> 输出 JSON 报告。
+"""rust-gisserver 性能基准：起服 -> 多场景压测 -> 输出 JSON 报告。
 
 用法（在项目根目录）：
     python tools/bench_server.py --label before

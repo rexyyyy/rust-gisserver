@@ -6,7 +6,7 @@ marker = "export const THREED_TILES_SERVICES = [\n"
 entry = (
     "  {\n"
     "    id: 'osgb4326',\n"
-    "    name: 'OSGB4326 倾斜摄影 (EPSG:4326 昆明 / r-manager 发布)',\n"
+    "    name: 'OSGB4326 倾斜摄影 (EPSG:4326 昆明 / rust-gisserver 发布)',\n"
     "    url: 'http://127.0.0.1:8080/3dtiles/osgb4326/tileset.json',\n"
     "  },\n"
 )

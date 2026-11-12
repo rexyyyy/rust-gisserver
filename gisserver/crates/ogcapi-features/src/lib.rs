@@ -49,7 +49,7 @@ impl CollectionInfo {
         CollectionInfo {
             id: id.to_string(),
             title: if title.is_empty() { id.to_string() } else { title.to_string() },
-            description: format!("Feature collection '{id}' (r-mapserver vector layer)."),
+            description: format!("Feature collection '{id}' (rust-gisserver vector layer)."),
             extent,
             geometry_kind,
             count,
@@ -63,7 +63,7 @@ impl CollectionInfo {
         CollectionInfo {
             id: id.to_string(),
             title: if title.is_empty() { id.to_string() } else { title.to_string() },
-            description: format!("Feature collection '{id}' (r-mapserver PostGIS layer)."),
+            description: format!("Feature collection '{id}' (rust-gisserver PostGIS layer)."),
             extent,
             geometry_kind: None,
             count,
@@ -85,8 +85,8 @@ fn links(base: &str, extra: Vec<(&str, String)>) -> Vec<Value> {
 /// `GET {base}` — the landing page.
 pub fn landing(base: &str) -> String {
     let doc = json!({
-        "title": "r-mapserver OGC API - Features",
-        "description": "Vector feature access over the r-mapserver catalog (GeoJSON layers).",
+        "title": "rust-gisserver OGC API - Features",
+        "description": "Vector feature access over the rust-gisserver catalog (GeoJSON layers).",
         "links": links(base, vec![
             ("service-desc", format!("{base}/api")),
             ("conformance", format!("{base}/conformance")),
@@ -123,9 +123,9 @@ pub fn api_doc(base: &str) -> String {
     let doc = json!({
         "openapi": "3.0.3",
         "info": {
-            "title": "r-mapserver OGC API - Features",
+            "title": "rust-gisserver OGC API - Features",
             "version": "1.0.1",
-            "description": "Feature access over the r-mapserver catalog.",
+            "description": "Feature access over the rust-gisserver catalog.",
         },
         "servers": [{ "url": base }],
         "paths": paths,

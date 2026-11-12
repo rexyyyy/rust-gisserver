@@ -1,8 +1,8 @@
-# r-manager 后端（manager）
+# rust-gisserver 后端（manager）
 
-r-mapserver 的系统管理后端：axum 0.8 + tokio-postgres（PostgreSQL 单库）。负责
+rust-gisserver 的系统管理后端：axum 0.8 + tokio-postgres（PostgreSQL 单库）。负责
 登录鉴权（JWT + 验证码）、RBAC（用户/角色/菜单/部门/岗位）、字典/参数/通知、
-监控审计（在线用户/登录日志/操作日志），以及对 r-mapserver `map-api` 管理面
+监控审计（在线用户/登录日志/操作日志），以及对 rust-gisserver `map-api` 管理面
 （`/admin/*`、`/api/usage`）的统一代理。前端见 `../ui`（Vue3 + Vite）。
 
 ## 模块职责
@@ -74,7 +74,7 @@ cargo test             # 单测：perm.rs、xmlcfg.rs（bin crate 内联 #[cfg(t
 cargo run              # 默认读 config/manager.xml
 ```
 
-运行依赖：PostgreSQL（`database.url`）；可选 r-mapserver map-api（`mapsvc.base_url`，
+运行依赖：PostgreSQL（`database.url`）；可选 rust-gisserver map-api（`mapsvc.base_url`，
 默认 `http://127.0.0.1:8095`，多引擎部署时以 `sys_engine` 注册表为准）。
 
 ## 前端部署：同端口一体化（static_dir）
@@ -132,7 +132,7 @@ fallback 被 SPA 回落成 `index.html`，前端拿到 HTML 却期望 JSON，极
 ```nginx
 server {
     listen 80;
-    root /opt/r-mapserver/ui/dist;
+    root /opt/rust-gisserver/ui/dist;
     location / { try_files $uri $uri/ /index.html; }   # SPA fallback
     location /manager-api/ {
         proxy_pass http://127.0.0.1:6180/manager-api/;

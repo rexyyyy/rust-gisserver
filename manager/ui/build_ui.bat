@@ -1,5 +1,5 @@
 @echo off
-REM r-mapserver manager UI build script
+REM rust-gisserver manager UI build script
 REM Usage: build_ui.bat [dev|prod]
 REM
 REM 目录按脚本自身位置解析；node/pnpm 优先用 PATH 里的，找不到才回退到

@@ -4,7 +4,7 @@
   与 config/vector/places.xml 同名（places.sld），map-api 启动时自动发现，
   驱动 WMS GetMap / WMTS / TMS / XYZ 的矢量栅格化出图。
 
-  本样例演示 r-mapserver SLD 支持的完整符号特性（对照 GeoServer / OGC SE）：
+  本样例演示 mapserver SLD 支持的完整符号特性（对照 GeoServer / OGC SE）：
     · 多规则 + Filter 分类：pop &gt; 800 万 → 金色五角星 + 名称标注；
       pop &lt;= 800 万 → 蓝色圆点（互斥过滤，叠加时互不干扰）
     · ElseFilter 兜底规则：缺 pop 属性的要素 → 灰色方块

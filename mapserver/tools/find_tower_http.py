@@ -1,7 +1,7 @@
 """Show http-body versions in Cargo.lock and tower-http's constraint."""
 from pathlib import Path
 
-lock = Path(r"D:\mycomputer\documents\gis-wt\thirdparty\r-mapserver\Cargo.lock")
+lock = Path(r"D:\mycomputer\documents\gis-wt\thirdparty\rust-gisserver\Cargo.lock")
 lines = lock.read_text(encoding="utf-8", errors="replace").splitlines()
 cur = None
 for i, line in enumerate(lines):

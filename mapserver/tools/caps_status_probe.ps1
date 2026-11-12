@@ -1,6 +1,6 @@
 # 瓦片端点错误口径探活：验证「请求问题 -> 4xx / 服务端故障 -> 500」的分流，
 # 以及能力矩阵（引擎 /admin/capabilities）与实际行为是否一致。
-# 管理端（r-manager）就是按状态码判断某层能否发布某服务，所以这些码是契约的一部分。
+# 管理端（rust-gisserver）就是按状态码判断某层能否发布某服务，所以这些码是契约的一部分。
 #
 # 用法：pwsh -File tools/caps_status_probe.ps1 [-Base http://127.0.0.1:8099]
 # 前置：map-api 已用仓库 config/mapserver.xml 启动，且加载了

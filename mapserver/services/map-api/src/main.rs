@@ -14,7 +14,7 @@ use tracing_subscriber::FmtSubscriber;
 
 #[derive(Parser, Debug)]
 #[command(name = "map-api")]
-#[command(about = "r-mapserver: WMS / WMTS / TMS / WFS / OGC API-Features / OGC API-Tiles / MVT / PMTiles / MBTiles / COG tile services")]
+#[command(about = "rust-gisserver: WMS / WMTS / TMS / WFS / OGC API-Features / OGC API-Tiles / MVT / PMTiles / MBTiles / COG tile services")]
 struct Cli {
     #[command(subcommand)]
     cmd: Cmd,
@@ -248,7 +248,7 @@ fn run_serve(args: &ServeArgs) -> anyhow::Result<()> {
         // Usage metering flush task (PG hour buckets; no-op in files mode).
         // Must be spawned inside the runtime (tokio timers need a reactor).
         map_api::admin::usage::spawn_flush(state.clone());
-        // r-manager 生成的 API Key 从共享库同步（15s），供管理面/数据面校验。
+        // rust-gisserver 生成的 API Key 从共享库同步（15s），供管理面/数据面校验。
         map_api::apikeys::spawn_refresh(state.config.admin.dsn.clone(), state.api_keys.clone());
         // Periodic catalog re-scan (`server.catalog_scan_secs`, 0 = off).
         // Cluster convergence: re-read the (shared) XML catalog files so a

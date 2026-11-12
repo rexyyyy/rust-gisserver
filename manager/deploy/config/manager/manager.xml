@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!--
-  r-manager 容器运行配置模板（P0-1 一键部署 / P0-3 密钥占位）
+  rust-gisserver 容器运行配置模板（P0-1 一键部署 / P0-3 密钥占位）
   =============================================================================
   容器 entrypoint 用 envsubst 把 ${VAR} 渲染后写到 /app/config/manager.xml。
   DB 口令与 JWT 密钥经环境变量（compose .env）注入，明文不进镜像/仓库。

@@ -2,7 +2,7 @@
 name = "manager"
 version = "0.1.0"
 edition = "2021"
-description = "r-mapserver 系统管理后端（axum + tokio-postgres，仅 PostgreSQL）"
+description = "rust-gisserver 系统管理后端（axum + tokio-postgres，仅 PostgreSQL）"
 license = "AGPL-3.0-only"
 
 [dependencies]
