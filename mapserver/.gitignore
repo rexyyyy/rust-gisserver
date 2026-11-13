@@ -15,7 +15,12 @@ manager/
 /.tmp-stress/
 /_tmp*
 
-# 运行期下载的 PROJ 运行时（proj_9.dll + share/proj 数据目录），不入库
+# ===== PROJ 运行期二进制（下载/安装生成，绝不入库） =====
+# 安装脚本 build/script/install.bat 从 gis-wt\build | gis-wt\dist | gis-wt\thirdparty\GDAL3.13\dll
+# 收集 proj_9.dll + 12 个传递依赖到 INSTALL_DIR\bin\，proj.db 到 INSTALL_DIR\share\proj\。
+# 这些二进制不进版本库；闭包清单见 build/script/PROJ_RUNTIME_MANIFEST.csv。
+*.dll
+/bin/
 /proj_9.dll
 /share/
 

@@ -1,36 +1,10 @@
-# ===== Rust =====
-/target
-**/target
-Cargo.lock.bak
-*.rlib
+# ===== Build output =====
+# cargo target dir is redirected here by build/script/build_all.bat (CARGO_TARGET_DIR).
+# Scripts in build/script/ are source and stay tracked; only build/target/ is ignored.
+/build/target/
+/mapserver/target/
+/manager/target/
 
-# ===== Node (manager/ui) =====
-node_modules/
-manager/ui/node_modules/
-manager/ui/dist/
-manager/ui/dist_*/
-manager/ui/_node_modules_broken/
-
-# ===== OS / editor =====
-.DS_Store
-Thumbs.db
-*.swp
-*.swo
-*.tmp
-
-# ===== IDE =====
-.idea/
-.vscode/
-*.user
-
-# ===== local assistant data (not for distribution) =====
+# ===== Agent / runtime artifacts (never commit) =====
+# WorkBuddy agent memory, skills cache, and session logs stay local.
 .workbuddy/
-
-# ===== local build artifacts =====
-*.log
-
-# ===== full-test run artifacts (13 GB, never commit) =====
-# 2026-11-12/gisserver-full-test/ holds foyer cache blobs, logs, probe scripts
-# and sample data. Only the 4 Chinese reports under outputs/ are tracked
-# (added with `git add -f`; ignore rules do not apply to tracked files).
-2026-11-12/
