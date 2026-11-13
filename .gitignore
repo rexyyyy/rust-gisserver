@@ -28,3 +28,9 @@ Thumbs.db
 
 # ===== local build artifacts =====
 *.log
+
+# ===== full-test run artifacts (13 GB, never commit) =====
+# 2026-11-12/gisserver-full-test/ holds foyer cache blobs, logs, probe scripts
+# and sample data. Only the 4 Chinese reports under outputs/ are tracked
+# (added with `git add -f`; ignore rules do not apply to tracked files).
+2026-11-12/
