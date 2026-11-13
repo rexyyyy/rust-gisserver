@@ -94,31 +94,58 @@ pub fn pack_tiles(
     let metadata_off = root_off + root_dir.len() as u64;
     let tile_off = metadata_off + metadata_gz.len() as u64;
 
+    // Geographic extent of the packed tiles. The spec's header bounds are
+    // always lon/lat degrees (e7) regardless of the tile type, and clients use
+    // them for the initial view — leaving them zero makes a valid archive look
+    // like it covers null island.
+    let mut box4 = [180.0_f64, 90.0_f64, -180.0_f64, -90.0_f64];
+    for ((z, x, y), _) in &sorted {
+        let (minx, miny, maxx, maxy) = tile_lonlat(*z, *x, *y);
+        box4[0] = box4[0].min(minx);
+        box4[1] = box4[1].min(miny);
+        box4[2] = box4[2].max(maxx);
+        box4[3] = box4[3].max(maxy);
+    }
+    let e7 = |v: f64| (v * 1e7).round() as i32;
+
+    let min_zoom = sorted.iter().map(|((z, _, _), _)| *z).min().unwrap_or(0);
+    let max_zoom = sorted.iter().map(|((z, _, _), _)| *z).max().unwrap_or(0);
+
     let header = Header {
         root_dir_offset: root_off,
         root_dir_length: root_dir.len() as u64,
         metadata_offset: metadata_off,
         metadata_length: metadata_gz.len() as u64,
-        leaf_dirs_offset: 0,
+        // An empty leaf section still starts where the metadata ends: the
+        // spec orders the sections header/root/metadata/leaf/data, and strict
+        // third-party readers verify that adjacency.
+        leaf_dirs_offset: tile_off,
         leaf_dirs_length: 0,
         tile_data_offset: tile_off,
         tile_data_length: tile_data.len() as u64,
-        num_addressed_tiles: entries.len() as u64,
+        num_addressed_tiles: entries.iter().map(|e| e.run_length).sum::<u64>(),
         num_tile_entries: entries.len() as u64,
-        num_tile_contents: entries.iter().map(|e| e.run_length).sum::<u64>(),
+        // Distinct stored payloads, not entry count: deduplicated tiles share
+        // one blob, and the spec uses this field to report that reuse.
+        num_tile_contents: {
+            let mut offs: Vec<u64> = entries.iter().map(|e| e.offset).collect();
+            offs.sort_unstable();
+            offs.dedup();
+            offs.len() as u64
+        },
         clustered: 1,
         internal_compression: super::compression::GZIP,
         tile_compression,
         tile_type,
-        min_zoom: sorted.iter().map(|((z, _, _), _)| *z).min().unwrap_or(0) as u8,
-        max_zoom: sorted.iter().map(|((z, _, _), _)| *z).max().unwrap_or(0) as u8,
-        min_lon_e7: 0,
-        min_lat_e7: 0,
-        max_lon_e7: 0,
-        max_lat_e7: 0,
-        center_zoom: 0,
-        center_lon_e7: 0,
-        center_lat_e7: 0,
+        min_zoom: min_zoom as u8,
+        max_zoom: max_zoom as u8,
+        min_lon_e7: e7(box4[0]),
+        min_lat_e7: e7(box4[1]),
+        max_lon_e7: e7(box4[2]),
+        max_lat_e7: e7(box4[3]),
+        center_zoom: ((min_zoom + max_zoom) / 2) as u8,
+        center_lon_e7: e7((box4[0] + box4[2]) / 2.0),
+        center_lat_e7: e7((box4[1] + box4[3]) / 2.0),
     };
 
     let mut out = Vec::with_capacity(127 + root_dir.len() + metadata_gz.len() + tile_data.len());
@@ -128,4 +155,23 @@ pub fn pack_tiles(
     out.extend_from_slice(&tile_data);
     std::fs::write(path, &out).map_err(|e| format!("write {path:?}: {e}"))?;
     Ok(())
+}
+
+/// `(z, x, y)` -> `(min_lon, min_lat, max_lon, max_lat)` in degrees.
+///
+/// PMTiles header bounds are always WGS84 degrees, and the TileID Hilbert
+/// scheme it uses is the Web Mercator quad, so this is the inverse Mercator
+/// tile formula rather than a CRS-parameterised transform.
+fn tile_lonlat(z: u32, x: u32, y: u32) -> (f64, f64, f64, f64) {
+    let n = 2f64.powi(z as i32);
+    let lon = |k: f64| k / n * 360.0 - 180.0;
+    let lat = |k: f64| {
+        (std::f64::consts::PI * (1.0 - 2.0 * k / n)).sinh().atan().to_degrees()
+    };
+    (
+        lon(x as f64),
+        lat(y as f64 + 1.0),
+        lon(x as f64 + 1.0),
+        lat(y as f64),
+    )
 }

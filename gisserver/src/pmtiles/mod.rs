@@ -59,6 +59,8 @@ pub mod tile_type {
 
 /// PMTiles compression schemes.
 pub mod compression {
+    /// Writer did not declare it; resolve by sniffing the gzip magic.
+    pub const UNKNOWN: u8 = 0;
     pub const NONE: u8 = 1;
     pub const GZIP: u8 = 2;
     pub const BROTLI: u8 = 3;

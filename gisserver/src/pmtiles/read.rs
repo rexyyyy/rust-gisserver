@@ -11,7 +11,7 @@
 //! shared file descriptor. Concurrent lookups therefore never fight over a
 //! seek cursor and each caller only ever observes the bytes it asked for.
 
-use super::codec::{deserialize_directory, gunzip, read_header};
+use super::codec::{deserialize_directory_in, gunzip, read_header};
 use super::{zxy_to_tileid, Entry, Header, PmResult};
 use std::fs::File;
 use std::path::Path;
@@ -76,9 +76,10 @@ impl PmtilesReader {
         let head = Range::checked(0, HEADER_BYTES, file_len)?.read_within(&file)?;
         let header = read_header(&head)?;
 
-        let root = deserialize_directory(
+        let root = deserialize_directory_in(
             &Range::checked(header.root_dir_offset, header.root_dir_length, file_len)?
                 .read_within(&file)?,
+            header.internal_compression,
         )?;
 
         let metadata = if header.metadata_length == 0 {
@@ -152,8 +153,9 @@ impl PmtilesReader {
         let leaf_base = self.header.leaf_dirs_offset.checked_add(entry.offset).ok_or_else(
             || "pmtiles: leaf directory offset overflows the archive".to_string(),
         )?;
-        let leaf = deserialize_directory(
+        let leaf = deserialize_directory_in(
             &Range::checked(leaf_base, entry.length, self.file_len)?.read_within(&self.file)?,
+            self.header.internal_compression,
         )?;
         match locate(&leaf, id) {
             Some(leaf_entry) => self.entry_blob(&leaf_entry).map(Some),

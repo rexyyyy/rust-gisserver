@@ -82,11 +82,35 @@ pub fn serialize_directory(entries: &[Entry]) -> Vec<u8> {
     gzip(&raw)
 }
 
-/// Inverse of [`serialize_directory`] (input is gzip'd).
-pub fn deserialize_directory(bytes: &[u8]) -> PmResult<Vec<Entry>> {
-    let raw = gunzip(bytes)?;
+/// Decode a directory that is stored with the archive's declared
+/// `internal_compression`.
+///
+/// Directories are *not* always gzipped: the spec allows `none`, and a
+/// gzip-only reader rejects archives written by other tools. `UNKNOWN` is
+/// resolved by sniffing the gzip magic.
+pub fn deserialize_directory_in(bytes: &[u8], internal: u8) -> PmResult<Vec<Entry>> {
+    let raw = match internal {
+        super::compression::NONE => bytes.to_vec(),
+        super::compression::GZIP => gunzip(bytes)?,
+        super::compression::UNKNOWN => {
+            if bytes.starts_with(&[0x1f, 0x8b]) {
+                gunzip(bytes)?
+            } else {
+                bytes.to_vec()
+            }
+        }
+        other => {
+            return Err(format!(
+                "directory: unsupported internal compression {other} (spec: 0=unknown, 1=none, 2=gzip)"
+            ))
+        }
+    };
+    decode_entries(&raw)
+}
+
+fn decode_entries(raw: &[u8]) -> PmResult<Vec<Entry>> {
     let mut pos = 0usize;
-    let n = read_uvarint(&raw, &mut pos)? as usize;
+    let n = read_uvarint(raw, &mut pos)? as usize;
     if n.saturating_mul(4) > raw.len().saturating_sub(pos) {
         return Err(format!("directory: entry count {n} exceeds available bytes"));
     }
@@ -101,17 +125,17 @@ pub fn deserialize_directory(bytes: &[u8]) -> PmResult<Vec<Entry>> {
     ];
     let mut last = 0u64;
     for e in es.iter_mut() {
-        last += read_uvarint(&raw, &mut pos)?;
+        last += read_uvarint(raw, &mut pos)?;
         e.tile_id = last;
     }
     for e in es.iter_mut() {
-        e.run_length = read_uvarint(&raw, &mut pos)?;
+        e.run_length = read_uvarint(raw, &mut pos)?;
     }
     for e in es.iter_mut() {
-        e.length = read_uvarint(&raw, &mut pos)?;
+        e.length = read_uvarint(raw, &mut pos)?;
     }
     for i in 0..n {
-        let v = read_uvarint(&raw, &mut pos)?;
+        let v = read_uvarint(raw, &mut pos)?;
         es[i].offset = if v == 0 {
             if i == 0 {
                 return Err("directory: offset sentinel 0 at first entry".into());
@@ -197,4 +221,69 @@ pub fn read_header(bytes: &[u8]) -> PmResult<Header> {
         center_lon_e7: i(119),
         center_lat_e7: i(123),
     })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::pmtiles::compression;
+
+    fn entries() -> Vec<Entry> {
+        vec![
+            Entry {
+                tile_id: 1,
+                offset: 0,
+                length: 10,
+                run_length: 1,
+            },
+            Entry {
+                tile_id: 2,
+                offset: 10,
+                length: 20,
+                run_length: 3,
+            },
+        ]
+    }
+
+    /// `internal_compression` is honoured, not assumed: an archive that stores
+    /// its directories raw (allowed by the spec, and what several writers do)
+    /// must decode instead of failing the whole file.
+    #[test]
+    fn directory_decoding_follows_internal_compression() {
+        let want = entries();
+        let gz = serialize_directory(&want);
+        assert_eq!(deserialize_directory_in(&gz, compression::GZIP).unwrap(), want);
+        // UNKNOWN(0) resolves by the gzip magic.
+        assert_eq!(
+            deserialize_directory_in(&gz, compression::UNKNOWN).unwrap(),
+            want
+        );
+
+        // A raw (uncompressed) directory: build it the way a `none` writer
+        // would -- the same varint columns `serialize_directory` emits, minus
+        // the gzip step.
+        let mut raw = Vec::new();
+        write_uvarint(&mut raw, 2);
+        write_uvarint(&mut raw, 1);
+        write_uvarint(&mut raw, 1);
+        write_uvarint(&mut raw, 1);
+        write_uvarint(&mut raw, 3);
+        write_uvarint(&mut raw, 10);
+        write_uvarint(&mut raw, 20);
+        write_uvarint(&mut raw, 1); // offset 0 stored as +1
+        write_uvarint(&mut raw, 0); // continues from previous entry
+        assert_eq!(
+            deserialize_directory_in(&raw, compression::NONE).unwrap(),
+            want
+        );
+        assert_eq!(
+            deserialize_directory_in(&raw, compression::UNKNOWN).unwrap(),
+            want
+        );
+        // Gzip on a raw directory must fail loudly, not return garbage.
+        assert!(deserialize_directory_in(&raw, compression::GZIP).is_err());
+        // Unsupported scheme gets a specific message.
+        let err = deserialize_directory_in(&gz, compression::ZSTD).unwrap_err();
+        assert!(err.contains("internal compression"), "{err}");
+    }
 }
