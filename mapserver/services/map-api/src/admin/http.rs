@@ -58,7 +58,22 @@ pub fn endpoints_for(
     name: &str,
     layers: &[gisserver::wms_common::layer::Layer],
 ) -> Vec<serde_json::Value> {
+    // 把引擎基址作为 `?base=` 查询值；保留 `/` 与 `:` 便于阅读，
+    // 其余会破坏 query 结构的字符按 percent-encoding 转义。
+    fn query_escape(s: &str) -> String {
+        let mut out = String::with_capacity(s.len());
+        for b in s.bytes() {
+            match b {
+                b'A'..=b'Z' | b'a'..=b'z' | b'0'..=b'9'
+                | b'-' | b'_' | b'.' | b'~' | b'/' | b':' => out.push(b as char),
+                _ => out.push_str(&format!("%{b:02X}")),
+            }
+        }
+        out
+    }
+
     let b = base.trim_end_matches('/');
+    let enc_base = query_escape(b);
     let mut v: Vec<(String, String)> = Vec::new();
     let layer_defs = kind != "3dtiles"
         && kind != "pmtiles"
@@ -134,11 +149,11 @@ pub fn endpoints_for(
         v.push((
             "内置预览（OpenLayers）".into(),
             if matches!(src, Some(gisserver::wms_common::layer::SourceKind::Postgis(_))) {
-                format!("{b}/viewer-mvt?layer={name}&grid={grid_id}")
+                format!("/preview/viewer-mvt.html?layer={name}&grid={grid_id}&base={enc_base}")
             } else if native_grid {
-                format!("{b}/viewer-arcgis?layer={name}&grid={grid_id}")
+                format!("/preview/viewer-arcgis.html?layer={name}&grid={grid_id}&base={enc_base}")
             } else {
-                format!("{b}/viewer?layer={name}")
+                format!("/preview/viewer.html?layer={name}&base={enc_base}")
             },
         ));
     } else if kind == "pmtiles" || kind == "mbtiles" {
@@ -176,7 +191,7 @@ pub fn endpoints_for(
         }
         v.push((
             "内置预览（OpenLayers）".into(),
-            format!("{b}/viewer?tiles={tpl}"),
+            format!("/preview/viewer.html?tiles={}&base={enc_base}", query_escape(&tpl)),
         ));
     } else if kind == "arcgis" {
         // ArcGIS 预切片缓存走 raster_tile 的 read-through 分支：只宣 WMTS / TMS /
@@ -199,13 +214,13 @@ pub fn endpoints_for(
             // ArcGIS 缓存是源坐标系下的自定义网格，必须用专用的 viewer-arcgis
             // （读 tileMatrixSets/{grid} 的原生 LOD 与原点）；通用 /viewer 按
             // WebMercator XYZ 寻址，打开只会是空白底图。
-            format!("{b}/viewer-arcgis?layer={name}&grid=arcgis_{name}"),
+            format!("/preview/viewer-arcgis.html?layer={name}&grid=arcgis_{name}&base={enc_base}"),
         ));
     } else if kind == "3dtiles" {
         v.push(("tileset.json".into(), format!("{b}/3dtiles/{name}/tileset.json")));
         v.push((
             "内置预览（Cesium）".into(),
-            format!("{b}/cesium?name={name}"),
+            format!("/preview/cesium.html?name={name}&base={enc_base}"),
         ));
     } else if kind == "terrain" {
         // Quantized-Mesh 1.1 地形服务（.terrainpack 归档）
@@ -216,8 +231,12 @@ pub fn endpoints_for(
         ));
         v.push((
             "内置预览（Cesium 三维地形）".into(),
-            format!("{b}/cesium?terrain={name}"),
+            format!("/preview/cesium.html?terrain={name}&base={enc_base}"),
         ));
+    }
+    // 独立引擎模式没有 manager 托管预览页：能力列表只给数据端点，不给死链。
+    if !state.manager.is_managed() {
+        v.retain(|(name, _)| !name.starts_with("内置预览"));
     }
     v.into_iter()
         .map(|(name, url)| serde_json::json!({"name": name, "url": url}))
@@ -545,4 +564,53 @@ pub async fn access_logs(
             "rows": rows,
         }),
     )
+}
+
+#[cfg(test)]
+mod endpoint_tests {
+    use super::*;
+    use crate::config::{ServerConfig, ServerOpts};
+    use crate::manager::{ManagerLink, RunMode};
+
+    fn test_config() -> ServerConfig {
+        ServerConfig {
+            server: ServerOpts::default(),
+            admin: Default::default(),
+            manager: Default::default(),
+            layers: vec![],
+            archives: Default::default(),
+            catalog: Default::default(),
+            grids: Default::default(),
+        }
+    }
+
+    /// 独立引擎没有 manager 托管预览页：能力列表只给数据端点，不给死链。
+    /// 受管模式则给出 `/preview/*.html?...&base=<引擎地址>` 入口。
+    #[tokio::test]
+    async fn preview_endpoint_follows_run_mode() {
+        let mut state = crate::AppState::new(test_config(), None).await.unwrap();
+
+        state.manager = ManagerLink::standalone();
+        let eps = endpoints_for(&state, "http://engine:8080/", "3dtiles", "demo", &[]);
+        assert!(eps.iter().any(|v| v["name"].as_str() == Some("tileset.json")));
+        assert!(!eps
+            .iter()
+            .any(|v| v["name"].as_str().unwrap_or("").starts_with("内置预览")));
+
+        state.manager = ManagerLink {
+            mode: RunMode::Managed,
+            url: Some("http://127.0.0.1:6180".into()),
+        };
+        let eps = endpoints_for(&state, "http://engine:8080/", "3dtiles", "demo", &[]);
+        let url = eps
+            .iter()
+            .find(|v| v["name"].as_str().unwrap_or("").starts_with("内置预览"))
+            .expect("受管模式应给出预览入口")["url"]
+            .as_str()
+            .unwrap()
+            .to_string();
+        assert!(url.starts_with("/preview/cesium.html?"), "{url}");
+        assert!(url.contains("name=demo"), "{url}");
+        assert!(url.contains("base=http://engine:8080"), "{url}");
+    }
 }

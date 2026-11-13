@@ -15,7 +15,7 @@ mapserver/
 ├── config/                  # mapserver.xml（server 级）+ 图层类型目录（一图层一文件）+ 样式
 ├── fixtures/                # 示例数据（sample.tif、sample.geojson、test.mbtiles、test-vector.mbtiles）
 ├── tools/                   # 辅助脚本（make_mbtiles_fixture.py 生成 MBTiles 测试包）
-├── web/                     # 内嵌 Leaflet 查看器（/viewer）
+├── (UI 在 ../manager/ui/public/preview/)  # 预览页由 manager 托管，引擎不内嵌页面
 ├── docs/                    # 架构说明
 └── scripts/                 # （预留）```
 
@@ -32,13 +32,33 @@ mapserver/
 | **PMTiles** 归档 | `/pmtiles/{name}` | HTTP Range 直出，支持 `pmtiles://` 客户端（JS 库等） |
 | **MBTiles** 归档 | `/mbtiles/{name}`、`/mbtiles/{name}/{z}/{x}/{y}[.ext]` | SQLite 瓦片包直读（PNG/JPEG/WebP 栅格或 gzip pbf 矢量）；归档信息 + XYZ 瓦片；同样可经 XYZ / TMS / WMTS / MVT 前端访问 |
 | **COG** 直读 | `/cog/{layer}` | HTTP Range 直出，QGIS/rasterio 可远程打开；无 Range 时全量流式 |
-| **3D Tiles** 服务 | `/3dtiles`、`/3dtiles/{name}/tileset.json`、`/3dtiles/{name}/{path...}` | `<catalog.root>/3dtiles` 下**每个 XML 一个服务**；Cesium 直连，内置三维浏览页 `/cesium` |
+| **3D Tiles** 服务 | `/3dtiles`、`/3dtiles/{name}/tileset.json`、`/3dtiles/{name}/{path...}` | `<catalog.root>/3dtiles` 下**每个 XML 一个服务**；Cesium 直连，预览页由 manager 提供 |
 | **WFS** 2.0.0 / 1.1.0 / 1.0.0 | `/wfs` | GetCapabilities / DescribeFeatureType / GetFeature；GML 3.2(3.1) / GeoJSON / CSV 输出；bbox（CRS 轴序）/ featureID / count / startIndex / propertyName / resultType=hits；覆盖全部 `vector` 图层 |
 | **OGC API - Features** 1.0.1 | `/ogc/features/v1` | landing / conformance / api(OpenAPI 3.0) / collections / items；GeoJSON + HTML；limit/offset/bbox 分页；声明 core/oas30/html/geojson 四个 conformance class |
 | **OGC API - Tiles** 1.0.0 | `/ogc/tiles/v1` | landing / conformance / tileMatrixSets（预设 + 自定义网格）/ collections / tiles / tileset 元数据；瓦片字节复用 WMS 渲染路径（`{tileMatrix}/{tileRow}/{tileCol}` 顶行起算） |
-| 运维 | `/health`、`/ready`、`/viewer`、`/cesium`、`/api/config`、`/api/cache`、`/api/cache/purge` | 探活、内嵌查看器、3D Tiles 三维浏览、当前配置、缓存统计、缓存刷新（purge） |
+| 运维 | `/health`、`/ready`、`/api/config`、`/api/cache`、`/api/cache/purge` | 探活（含运行模式）、当前配置、缓存统计、缓存刷新；预览 / UI 由 manager 托管 |
 
 所有瓦片响应均带 `ETag`（FNV-1a）+ `304 Not Modified` + `Cache-Control`；PMTiles MVT 直读透传 `Content-Encoding: gzip` 与 `Vary`。
+
+## 运行模式与归属管理端
+
+map-api 是纯地图引擎，**不托管 UI**。`<manager/>` 配置声明「受哪个 manager 管理」：
+
+```xml
+<manager url="${MAPSERVER_MANAGER_URL:-http://127.0.0.1:6180}" probe_timeout_ms="1500"/>
+```
+
+启动时对 `<url>/health` 做一次短超时探活，结果写入启动日志与 `GET /health`
+的 `mode` / `manager` 字段：
+
+| 结果 | 模式 | 行为 |
+|---|---|---|
+| 探活成功 | `managed` | 界面与预览由该 manager 托管；能力列表给出 `/preview/*.html?...&base=<引擎地址>` 预览入口 |
+| 失败 / 未配置 | `standalone` | 独立引擎，仅提供数据面、运维面、管理面；不挂任何页面路由，能力列表不含预览项 |
+
+`url` 只用于服务端探活，不会下发到浏览器；预览页里的引擎地址由 manager 通过
+`?base=` 注入（取自 manager 侧的引擎配置），跨机部署时该地址须对浏览器可达。
+删除该配置段或把 `url` 留空即回到零配置的独立运行方式。
 
 ## 快速开始
 
@@ -54,8 +74,8 @@ cargo run -p mapserver -- cog-create
 # 3) 启动（默认读取 config/mapserver.xml，监听 0.0.0.0:8080）
 cargo run -p mapserver -- serve
 
-# 4) 打开查看器
-#    浏览器访问 http://localhost:8080/viewer
+# 4) 数据面就绪探活（预览入口在 manager 控制台，引擎不托管页面）
+#    curl http://localhost:8080/health
 ```
 
 ### 常用请求示例
@@ -106,8 +126,8 @@ curl "http://localhost:8080/ogc/features/v1/collections/places/items?limit=10&of
 curl "http://localhost:8080/ogc/tiles/v1/collections/places/tiles/WebMercatorQuad"
 curl -o tile.pbf "http://localhost:8080/ogc/tiles/v1/collections/places/tiles/WebMercatorQuad/6/27/50"
 
-# 内置三维浏览页（自动加载 /3dtiles 下全部服务）
-/cesium
+# 三维浏览页由 manager 托管（自动加载 /3dtiles 下全部服务）
+#    manager 控制台 → 服务目录 → 内置预览
 ```
 
 ### 3D Tiles 服务（一个 XML = 一个服务）
@@ -343,7 +363,7 @@ CRS 链路落在正确地面范围。
 
 ### 5. 客户端侧怎么配合
 
-- **自动选源**：`web/viewer.html` 按图层探测最快源（MVT/XYZ/WMS 兜底），并把 `VectorTile` 的 `tileGrid` 显式设为 `createXYZ({tileSize:256})`（OpenLayers 默认 512 会与服务器 256 网格错位导致要素偏移/空白）。
+- **自动选源**：`manager/ui/public/preview/viewer.html` 按图层探测最快源（MVT/XYZ/WMS 兜底），并把 `VectorTile` 的 `tileGrid` 显式设为 `createXYZ({tileSize:256})`（OpenLayers 默认 512 会与服务器 256 网格错位导致要素偏移/空白）。
 - **ETag + 304**：所有瓦片响应带 FNV-1a `ETag` + `Cache-Control`，未变即 304，浏览器/CDN 二次命中零传输。
 - **Range 206**：COG/PMTiles/3D Tiles 走 `Accept-Ranges: bytes`，客户端（QGIS/rasterio/Cesium）按需取字节，不全量下载。按 RFC 9110 §14.2 支持 `a-b`、`a-`、`-N`（suffix）三种形态，`end` 越界收敛到文件尾，起点≥长度回 **416 + `Content-Range: bytes */total`**；多区间或无法解析的 Range 一律忽略并回 200 全量（不报错、不重试死循环）。
 - **压缩策略**：`CompressionLayer` 只压文本类响应；`image/*`、`application/x-protobuf`、MVT、二进制 3D Tiles **跳过二次 gzip**（瓦片是流量主体，二次压缩纯耗 CPU）。

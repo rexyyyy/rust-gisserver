@@ -265,6 +265,34 @@ fn default_usage_flush_secs() -> u64 {
     30
 }
 
+/// 归属管理端配置（`<manager .../>`，server 级可选段）。
+///
+/// map-api 是纯地图引擎：它只声明「自己受哪个 manager 管理」，不托管 UI。
+/// 启动时按 `url` 探测该 manager；探测通过为受管模式，否则退化为独立引擎，
+/// 仅提供数据服务（不挂任何预览 / 页面路由）。未配置 `url` 时不做探测，
+/// 直接独立运行——零配置部署行为与旧版一致。
+#[derive(Clone, Debug, Deserialize, Serialize)]
+pub struct ManagerOpts {
+    /// 管理端基址，含地址与端口，如 `http://127.0.0.1:6180`。
+    /// 支持 `${ENV}` / `${ENV:-默认}` 占位（由 xmlcfg 展开）。
+    /// 为空或未配置 = 不声明归属，独立引擎模式。
+    #[serde(default)]
+    pub url: Option<String>,
+    /// 启动探测超时（毫秒）；超时或连接失败按「未找到 manager」处理。
+    #[serde(default = "default_manager_probe_ms")]
+    pub probe_timeout_ms: u64,
+}
+
+impl Default for ManagerOpts {
+    fn default() -> Self {
+        ManagerOpts { url: None, probe_timeout_ms: default_manager_probe_ms() }
+    }
+}
+
+fn default_manager_probe_ms() -> u64 {
+    1500
+}
+
 /// Layer-catalog source: where layer configurations come from.
 #[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Eq)]
 #[serde(rename_all = "lowercase")]
@@ -371,6 +399,9 @@ pub struct ServerConfig {
     /// Admin / manager integration (service registry + usage metering).
     #[serde(default)]
     pub admin: AdminOpts,
+    /// 归属管理端（启动自检，决定受管 / 独立模式）。缺省不探测。
+    #[serde(default)]
+    pub manager: ManagerOpts,
     /// Legacy inline layers (still honored; merged with catalog files).
     #[serde(default)]
     pub layers: Vec<Layer>,

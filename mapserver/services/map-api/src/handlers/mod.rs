@@ -188,7 +188,7 @@ pub fn data_router(state: Arc<AppState>) -> Router {
 /// `data` key 均被认可（见 [`crate::apikeys`]，15 秒同步、用途隔离）。
 /// 未配置 `data_token` 时不设防（零配置向后兼容）—— 与 `admin.token` 的
 /// 「安全带」定位一致：它是令牌护栏，不是完整鉴权体系（角色 / ACL 交给网关或
-/// manager）。数据面不包括 `/health` `/ready` `/viewer` `/cesium` `/api/*`
+/// manager）。数据面不包括 `/health` `/ready` `/api/*`
 /// 等运维 / 管理路径（它们不在 [`data_router`] 内，分别由 ops / admin 面处理）。
 async fn data_auth(
     State(state): State<Arc<AppState>>,
@@ -235,7 +235,7 @@ async fn data_auth(
     }
 }
 
-/// 运维面路由（健康 / 缓存 / 用量 / 预览 / 配置）：路径分散，由 [`router`] 通过 `merge` 接入。
+/// 运维面路由（健康 / 缓存 / 用量 / 配置）：路径分散，由 [`router`] 通过 `merge` 接入。
 pub fn ops_router(state: Arc<AppState>) -> Router {
     Router::new()
         // Ops
@@ -246,16 +246,7 @@ pub fn ops_router(state: Arc<AppState>) -> Router {
         .route("/api/cache/purge", axum::routing::post(cache::purge))
         // Manager integration: usage metering (`admin::http`).
         .route("/api/usage", get(crate::admin::http::usage_handler))
-        // 内置预览页 + 当前配置便捷接口
-        .route("/viewer", get(viewer))
-        .route("/viewer-projected", get(viewer_projected))
-        .route("/viewer-arcgis", get(viewer_arcgis))
-        .route("/viewer-mvt", get(viewer_mvt))
-        // 投影预览页依赖库（proj4 + OpenLayers）同源内嵌伺服，无需联网 CDN
-        .route("/vendor/proj4.js", get(vendor_proj4_js))
-        .route("/vendor/ol.js", get(vendor_ol_js))
-        .route("/vendor/ol.css", get(vendor_ol_css))
-        .route("/cesium", get(cesium_viewer))
+        // 当前配置便捷接口（预览 / UI 一律由 manager 托管，引擎不内嵌页面）
         .route("/api/config", get(api_config))
 
         .with_state(state)}
@@ -378,7 +369,7 @@ pub fn router(state: Arc<AppState>) -> Router {
     Router::new()
         // 数据面：瓦片 + 要素服务（直接挂在根路径）
         .merge(data_router(state.clone()))
-        // 运维面：健康 / 缓存 / 用量 / 预览 / 配置（分散路径）
+        // 运维面：健康 / 缓存 / 用量 / 配置（分散路径）
         .merge(ops_router(state.clone()))
         // 管理面：统一 /admin 前缀
         .nest("/admin", admin_router(state.clone()))
@@ -790,91 +781,6 @@ pub fn base_url(state: &AppState, headers: &HeaderMap) -> String {
     state.base_url.clone()
 }
 
-/// The tiny built-in Leaflet viewer, served inline.
-async fn viewer() -> Response {
-    (
-        StatusCode::OK,
-        [(header::CONTENT_TYPE, "text/html; charset=utf-8")],
-        include_str!("../../../../web/viewer.html").to_string(),
-    )
-        .into_response()
-}
-
-/// 投影坐标系（EPSG:4522 / wh_custom_grid_4522）MVT 浏览验证页：
-/// 用 proj4 注册投影 CRS + 自定义 TileGrid，请求留在源投影的矢量瓦片，
-/// 验证 `mvt::encode_projected` 的产出可被前端正确定位渲染。
-async fn viewer_projected() -> Response {
-    (
-        StatusCode::OK,
-        [(header::CONTENT_TYPE, "text/html; charset=utf-8")],
-        include_str!("../../../../web/viewer_projected.html").to_string(),
-    )
-        .into_response()
-}
-
-/// 投影预览页依赖库：`proj4` UMD bundle（编译期内嵌，与运行时工作目录无关）。
-async fn vendor_proj4_js() -> Response {
-    (
-        StatusCode::OK,
-        [(header::CONTENT_TYPE, "text/javascript; charset=utf-8")],
-        include_str!("../../../../web/vendor/proj4.js").to_string(),
-    )
-        .into_response()
-}
-
-/// 投影预览页依赖库：OpenLayers 单文件构建（编译期内嵌）。
-async fn vendor_ol_js() -> Response {
-    (
-        StatusCode::OK,
-        [(header::CONTENT_TYPE, "text/javascript; charset=utf-8")],
-        include_str!("../../../../web/vendor/ol.js").to_string(),
-    )
-        .into_response()
-}
-
-/// 投影预览页样式：OpenLayers ol.css（编译期内嵌）。
-async fn vendor_ol_css() -> Response {
-    (
-        StatusCode::OK,
-        [(header::CONTENT_TYPE, "text/css; charset=utf-8")],
-        include_str!("../../../../web/vendor/ol.css").to_string(),
-    )
-        .into_response()
-}
-
-/// 内置 Cesium 三维浏览页：动态加载 `/3dtiles` 目录下的全部 3D Tiles 服务。
-async fn cesium_viewer() -> Response {
-    (
-        StatusCode::OK,
-        [(header::CONTENT_TYPE, "text/html; charset=utf-8")],
-        include_str!("../../../../web/cesium.html").to_string(),
-    )
-        .into_response()
-}
-
-/// 内置 ArcGIS 预切片缓存浏览页：地理系（EPSG:4490）自定义网格栅格查看器。
-/// 依赖 `/ogc/tiles/v1/tileMatrixSets/{grid}` 暴露的原生 resolution 建网格，
-/// 避免用 scaleDenominator 反算导致的 ~5.8% 寻址偏差。
-async fn viewer_arcgis() -> Response {
-    (
-        StatusCode::OK,
-        [(header::CONTENT_TYPE, "text/html; charset=utf-8")],
-        include_str!("../../../../web/viewer_arcgis.html").to_string(),
-    )
-        .into_response()
-}
-
-/// 内置 PostGIS 矢量瓦片预览页：按发布网格（含 Conf.xml 自定义 LOD）加载 MVT。
-/// 与 `viewer_arcgis` 共用同一套网格读取口径（`/ogc/tiles/v1/tileMatrixSets`）。
-async fn viewer_mvt() -> Response {
-    (
-        StatusCode::OK,
-        [(header::CONTENT_TYPE, "text/html; charset=utf-8")],
-        include_str!("../../../../web/viewer_mvt.html").to_string(),
-    )
-        .into_response()
-}
-
 /// Parse a tile coordinate segment that may carry an extension (e.g. `36.png`),
 /// which matchit 0.7 captures together with the number.
 pub fn parse_coord(s: &str) -> Option<u32> {
@@ -926,6 +832,7 @@ mod tests {
                 crate::config::ServerConfig {
                     server: crate::config::ServerOpts::default(),
                     admin: Default::default(),
+                    manager: Default::default(),
                     layers: vec![],
                     archives: Default::default(),
                     catalog: Default::default(),
@@ -1011,6 +918,7 @@ mod tests {
                 crate::config::ServerConfig {
                     server: crate::config::ServerOpts::default(),
                     admin: Default::default(),
+                    manager: Default::default(),
                     layers: vec![],
                     archives: Default::default(),
                     catalog: Default::default(),
@@ -1137,6 +1045,7 @@ mod tests {
                 crate::config::ServerConfig {
                     server: crate::config::ServerOpts::default(),
                     admin: Default::default(),
+                    manager: Default::default(),
                     layers: vec![],
                     archives: Default::default(),
                     catalog: Default::default(),
@@ -1269,6 +1178,7 @@ mod tests {
                 ..ServerOpts::default()
             },
             admin: AdminOpts::default(),
+            manager: Default::default(),
             layers: vec![],
             archives: Default::default(),
             catalog: CatalogOpts::default(),
@@ -1354,6 +1264,7 @@ mod tests {
                 crate::config::ServerConfig {
                     server: crate::config::ServerOpts::default(),
                     admin: Default::default(),
+                    manager: Default::default(),
                     layers: vec![],
                     archives: Default::default(),
                     catalog: Default::default(),

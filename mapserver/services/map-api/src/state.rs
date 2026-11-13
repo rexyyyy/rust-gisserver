@@ -127,6 +127,8 @@ pub struct AppState {
     pub api_keys: crate::apikeys::ApiKeyCache,
     // ── 管理面（admin plane）：经 `state.admin` 访问，数据面不应直接触碰 ──
     pub admin: AdminState,
+    /// 启动自检得出的归属关系（受管 / 独立）。一次性判定，热重载不改。
+    pub manager: crate::manager::ManagerLink,
 }
 
 /// Build the PostGIS pool registry from the configured layers.
@@ -360,6 +362,9 @@ impl AppState {
         catalog_pool: Option<Arc<PgPool>>,
         config_path: PathBuf,
     ) -> anyhow::Result<AppState> {
+        // 归属自检：按配置探测 manager，决定受管 / 独立模式。必须在 config
+        // 被移入 AppState 之前完成；热重载不重新判定（运行期模式固定）。
+        let manager = crate::manager::resolve(&config.manager).await;
         let cache_mib = config.server.cache_mib;
         // Decoded-tile cache capacity must assume the LARGEST configured tile
         // pixel size: a 512px layer stores 512*512*4 = 1 MiB per entry, not the
@@ -541,6 +546,7 @@ impl AppState {
                 access_log: AccessLog::new(4000),
                 styles_dir,
             },
+            manager,
         })
     }
 

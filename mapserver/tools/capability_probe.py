@@ -155,8 +155,10 @@ def main():
     # ---- ops ----
     probe("ready", "/ready", 200)
     probe("api/config", "/api/config", 200, contains="cache_mib")
-    probe("viewer HTML", "/viewer", 200, contains="leaflet")
-    probe("cesium HTML", "/cesium", 200, contains="cesium")
+    # 预览页已迁到 manager：引擎侧这些路径应为 404，且 /health 报告运行模式。
+    probe("viewer removed", "/viewer", 404)
+    probe("cesium removed", "/cesium", 404)
+    probe("health run mode", "/health", 200, contains="\"mode\"")
     probe("HEAD health", "/health", 200, method="HEAD")
     probe("HEAD tile", "/tms/1.0.0/world/2/1/1.png", 200, method="HEAD")
 

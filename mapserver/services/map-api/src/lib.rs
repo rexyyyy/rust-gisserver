@@ -13,6 +13,7 @@ pub mod db_catalog;
 pub mod handlers;
 pub mod legend;
 pub mod layer;
+pub mod manager;
 pub mod mbtiles;
 pub mod state;
 pub mod terrain;

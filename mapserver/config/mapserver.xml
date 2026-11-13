@@ -68,6 +68,13 @@
     <!-- <data_token>changeme</data_token> -->
   </server>
   <catalog root="config" backend="files"/>
+  <!-- 归属管理端（可选）：map-api 是纯地图引擎，界面与预览由 manager 托管。
+       启动时对 url 发一次 GET /health：
+         连通   = 受管模式，/health 返回 mode=managed 与该 manager 地址；
+         未连通 = 独立引擎模式，不挂任何预览 / 页面路由，只提供数据服务。
+       未配置或 url 留空 = 不探测，直接独立运行（零配置向后兼容）。
+       跨机部署把 MAPSERVER_MANAGER_URL 注入为可达的 manager 地址即可。 -->
+  <manager url="${MAPSERVER_MANAGER_URL:-http://127.0.0.1:6180}" probe_timeout_ms="1500"/>
   <!-- admin 的 token 属性是管理面主令牌（X-Admin-Token）；配置后，主令牌或
        共享库 sys_api_key 中启用且未过期的 admin key 均被认可。rust-gisserver 的
        「API Key 管理 → 应用到引擎」会把生成的 admin key 写入默认引擎。 -->
