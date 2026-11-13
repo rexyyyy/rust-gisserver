@@ -3100,9 +3100,15 @@ mod tests {
 
     #[test]
     fn tileset_body_uses_root_and_drops_crs() {
+        // 平台无关：用 Path::join 生成本机分隔符的路径，再按“服务体统一为正斜杠”的
+        // 契约比较，不把 Windows 盘符 / 反斜杠写死进断言（D5）。
+        let store_root = std::path::Path::new("data_root").join("region");
+        let res_dir = store_root.join("city");
+        let store_root = store_root.to_string_lossy().to_string();
+        let res_source = res_dir.to_string_lossy().to_string();
         let body = build_service_body(
-            &res("3dtiles", r"D:\data\city", json!({})),
-            &store("3dtiles_dir", r"D:\data", ""),
+            &res("3dtiles", &res_source, json!({})),
+            &store("3dtiles_dir", &store_root, ""),
             &cap("3dtiles", &["3dtiles"], &["3dtiles"]),
             "city",
             "城市模型",
@@ -3112,8 +3118,15 @@ mod tests {
         )
         .unwrap();
         assert_eq!(body["kind"], json!("3dtiles"));
-        assert_eq!(body["root"], json!(r"D:\data\city"));
-        // TilesetService 文档没有 src_crs / source 字段（引擎只读 Name/Title/Root/Entry）。
+        // 校验点 1：root 是资源目录本身并保留 Store root 前缀（相对名 "city" 会被渲染侧
+        // 解析到错误位置），且不指向 tileset.json 文件。
+        let root = body["root"].as_str().unwrap();
+        assert_eq!(root, res_dir.to_string_lossy().replace('\\', "/"));
+        assert!(root.ends_with("/city"), "root 应保留资源目录名: {root}");
+        // 校验点 2：跨平台契约——服务体里的路径分隔符统一为 '/'。
+        assert!(!root.contains('\\'), "root 不应含 Windows 分隔符: {root}");
+        // 校验点 3：TilesetService 文档没有 src_crs / source 字段（引擎只读 Name/Title/Root/Entry），
+        // 发布 3dtiles 时必须丢掉 CRS 信息。
         assert!(body.get("src_crs").is_none());
         assert!(body.get("source").is_none());
     }

@@ -126,12 +126,25 @@ def section_mapapi():
                                   "&typeNames=wuhua_building&count=3"))
     check("OGC features collections 清单",
           lambda: js(MAPAPI + "/ogc/features/v1/collections", lambda j: ("collections" in j, "")))
+    def _page_size_ok(limit):
+        # 首页条数 = min(numberMatched, limit)，且 numberReturned 必须与实际条数一致；
+        # 不依赖集合里恰好有多少要素（数据量少于 limit 时整页返回同样合法）。
+        def _pred(j):
+            f = j.get("features") or []
+            n = len(f)
+            matched = j.get("numberMatched")
+            returned = j.get("numberReturned")
+            ok = (isinstance(matched, int) and matched >= n
+                  and returned == n and n == min(matched, limit))
+            return (ok, f"returned={returned} actual={n} matched={matched} limit={limit}")
+        return _pred
+
     check("OGC features items places?limit=3",
           lambda: js(MAPAPI + "/ogc/features/v1/collections/places/items?limit=3",
-                     lambda j: (len(j.get("features", [])) == 3, f"{len(j.get('features', []))} features")))
+                     _page_size_ok(3)))
     check("OGC features items wuhua_building?limit=2",
           lambda: js(MAPAPI + "/ogc/features/v1/collections/wuhua_building/items?limit=2",
-                     lambda j: (len(j.get("features", [])) == 2, f"{len(j.get('features', []))} features")))
+                     _page_size_ok(2)))
     check("OGC tiles collections 清单",
           lambda: js(MAPAPI + "/ogc/tiles/v1/collections", lambda j: ("collections" in j, "")))
     check("OGC tiles places/WebMercatorQuad/6/27/51（矢量层出 pbf）",
@@ -247,10 +260,16 @@ def section_manager():
           lambda: _aj("test", "/system/menu/getRouters", _routers_pred))
     check("GET /map/services 跨引擎聚合",
           lambda: _aj("admin", "/map/services", _services_pred))
+    def _services_page_ok(j):
+        # 行数取决于实际注册的服务数，不能写死；合法值 = min(total, pageSize)
+        d = j.get("data") or {}
+        rows = len(d.get("services") or [])
+        total = d.get("total") or 0
+        want = min(total, 5)
+        return (rows == want, f"total={total} rows={rows} expect={want}")
+
     check("GET /map/services?page=1&pageSize=5 分页",
-          lambda: _aj("admin", "/map/services?page=1&pageSize=5",
-                      lambda j: (len(j.get("data", {}).get("services", [])) == 5,
-                                 f"total={j.get('data', {}).get('total')} rows={len(j.get('data', {}).get('services', []))}")))
+          lambda: _aj("admin", "/map/services?page=1&pageSize=5", _services_page_ok))
     check("GET /map/services?kind=postgis 类型过滤",
           lambda: _aj("admin", "/map/services?kind=postgis",
                       lambda j: (all(s.get("kind") == "postgis"
