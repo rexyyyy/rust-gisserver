@@ -583,19 +583,28 @@ pub fn tile_sql_env(def: &PgSourceDef, layer_id: &str, out_srid: i32) -> String 
     // Grid CRS differs from the data SRID: reproject the geometry once. The
     // WHERE filter still tests the *source* geometry against the envelope
     // transformed back into the source SRID, so the GiST index is used.
+    //
+    // The envelope is widened by the same tile buffer fraction the
+    // Web-Mercator path uses (see `tile_index_filter`): `ST_AsMVTGeom` keeps
+    // everything inside tile+buffer, but a feature that only reaches into that
+    // ring cannot pass an un-widened `&&` test, so it is dropped before
+    // encoding. Measured against the 51 192-row Wuhua buildings table on tile
+    // 10/1608/368: exact envelope -> 8 950 encoded features, widened -> 9 415,
+    // i.e. 465 features (4.9 %) live only in the buffer ring.
+    let envelope = format!("ST_MakeEnvelope($1, $2, $3, $4, {srid})");
+    let search_box = if buffer == 0 {
+        envelope
+    } else {
+        let margin = f64::from(buffer) / f64::from(extent);
+        format!("ST_Expand({envelope}, ($3 - $1) * {margin}, ($4 - $2) * {margin})")
+    };
     let (geom_expr, spatial_filter) = if reproject {
         (
             format!("ST_Transform({geom_expr}, {srid})"),
-            format!(
-                "ST_Transform(ST_MakeEnvelope($1, $2, $3, $4, {srid}), {src})",
-                src = def.srid
-            ),
+            format!("ST_Transform({search_box}, {src})", src = def.srid),
         )
     } else {
-        (
-            geom_expr,
-            format!("ST_MakeEnvelope($1, $2, $3, $4, {srid})"),
-        )
+        (geom_expr, search_box)
     };
 
     format!(
@@ -798,6 +807,38 @@ mod projected_tests {
         assert!(sql.contains("\"geom\" &&"), "{sql}");
         assert!(sql.contains("FROM \"public\".\"wuhua_buildings\""), "{sql}");
         assert!(sql.contains("FROM clipped AS tile"), "{sql}");
+    }
+
+    /// The envelope path must widen its index predicate by the tile buffer,
+    /// otherwise features that only reach into the buffer ring never pass the
+    /// `&&` test and the `buffer` handed to `ST_AsMVTGeom` is wasted.
+    #[test]
+    fn envelope_tile_sql_widens_the_index_predicate() {
+        let def = test_def();
+
+        // Same CRS as the grid: widen in grid units, no reprojection.
+        let same = tile_sql_env(&def, "wuhua", 4543);
+        assert!(
+            same.contains("ST_Expand(ST_MakeEnvelope($1, $2, $3, $4, 4543), ($3 - $1) * 0.015625, ($4 - $2) * 0.015625)"),
+            "{same}"
+        );
+        // The clip envelope handed to ST_AsMVTGeom stays the exact tile.
+        assert!(
+            same.contains("ST_AsMVTGeom(\n        ST_CurveToLine(\"geom\"::geometry),\n        ST_MakeEnvelope($1, $2, $3, $4, 4543),\n        4096, 64, true"),
+            "{same}"
+        );
+
+        // Different grid CRS: widen in grid units *before* transforming back.
+        let reproj = tile_sql_env(&def, "wuhua", 4326);
+        assert!(reproj.contains("ST_Transform(ST_Expand(ST_MakeEnvelope($1, $2, $3, $4, 4326)"), "{reproj}");
+        assert!(reproj.contains(", 4543)"), "{reproj}");
+
+        // buffer = 0 -> exact envelope, no widening anywhere.
+        let mut nobuf = test_def();
+        nobuf.buffer = Some(0);
+        let sql = tile_sql_env(&nobuf, "wuhua", 4543);
+        assert!(!sql.contains("ST_Expand"), "{sql}");
+        assert!(sql.contains("\"geom\" && ST_MakeEnvelope($1, $2, $3, $4, 4543)"), "{sql}");
     }
 
     fn test_def() -> PgSourceDef {

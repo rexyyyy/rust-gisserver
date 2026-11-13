@@ -462,7 +462,8 @@ impl AppState {
         }
         // PROJ backend (optional, environment concern): resolution order is
         // explicit env vars PROJ_DLL / PROJ_DATA, then run-directory defaults
-        // (`proj_9.dll` in the working directory, `<workdir>/share/proj`).
+        // (`proj_9.dll` in the working directory, `<workdir>/share/proj`), then
+        // the executable's directory (`bin/proj_9.dll`, `<exe>/../share/proj`).
         // Missing/failed load only disables arbitrary-CRS reprojection.
         gisserver::projection::init_proj(None, None);
         tracing::info!(

@@ -64,7 +64,8 @@
 //! PROJ runtime assets (`proj_9.dll`, `share/proj/proj.db`) are an
 //! **environment** concern, not server config: resolution order is explicit
 //! env vars `PROJ_DLL` / `PROJ_DATA`, then run-directory defaults
-//! (`proj_9.dll` in the working directory, `<workdir>/share/proj`).
+//! (`proj_9.dll` in the working directory, `<workdir>/share/proj`), then the
+//! executable's directory (install layout `bin/proj_9.dll` + `share/proj`).
 //!
 //! `catalog.backend` prepares for a future database-backed layer registry:
 //! `files` (default, implemented) reads the directories above; `db` is a

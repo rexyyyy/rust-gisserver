@@ -71,6 +71,15 @@ async fn serve(
                 format!("postgis layer '{layer_name}' has no pool (registry disabled?)"),
             );
         };
+        // 显式接口段（`/mvt/{layer}/{srid}/...`）必须是本图层能兑现的接口。
+        // 旧实现遇到未知 srid 会静默回退 WebMercatorQuad —— 返回一片坐标系错误
+        // 但“看起来正常”的瓦片；与 README「无法兑现的 CRS 一律 4xx，瓦片端点回
+        // 400」的契约不符，这里改为显式 400。
+        if let Some(seg) = tms.as_deref() {
+            if let Some(msg) = validate_interface(&state, &layer, &layer_name, seg, Some(def.srid)) {
+                return plain(StatusCode::BAD_REQUEST, msg);
+            }
+        }
         // 发布时选定的网格（OGC 标准 / 天地图 / Conf.xml 自定义）优先：切片包络
         // 必须与该网格的 origin 与分辨率一致，否则前端按自定义 LOD 寻址会错位。
         // `3857` 显式接口除外——那条路径走 ST_TileEnvelope 的原生 Web Mercator。
@@ -86,6 +95,14 @@ async fn serve(
         };
         return serve_pg(state, layer_name, pool, &def, tms.as_deref(), grid, z, x, y, &headers)
             .await;
+    }
+    // 非 PostGIS 图层（GeoJSON / PMTiles-MVT / MBTiles-MVT）没有“源 SRID 接口”，
+    // 显式段只能是 `3857` 别名或本图层可解析的网格 id；其余一律 400，不再静默
+    // 回退 WebMercatorQuad。
+    if let Some(seg) = tms.as_deref() {
+        if let Some(msg) = validate_interface(&state, &layer, &layer_name, seg, None) {
+            return plain(StatusCode::BAD_REQUEST, msg);
+        }
     }
     // Resolve the effective grid: the requested `tms` interface when given, else
     // the layer's default. The file-vector MVT path is grid-aware (a projected
@@ -305,7 +322,9 @@ async fn serve_pg(
             )
         }
         Iface::Projected => {
-            let Some([minx, miny, maxx, maxy]) = gisserver::pg_source::grid::tile_bounds(z, x, y) else {
+            let Some([minx, miny, maxx, maxy]) =
+                gisserver::pg_source::grid::tile_bounds(def.srid, z, x, y)
+            else {
                 return plain(StatusCode::NOT_FOUND, format!("tile {z}/{x}/{y} out of grid range"));
             };
             Query::Env(
@@ -416,6 +435,14 @@ async fn pg_tilejson(
     else {
         return plain(StatusCode::INTERNAL_SERVER_ERROR, "postgis registry disabled".to_string());
     };
+    // `/mvt/{layer}/{srid}/tilejson.json` 走同一套接口解析：未知 srid 若继续回退
+    // WebMercatorQuad，TileJSON 会宣告一份与请求坐标接口不符的 bounds/crs/grid，
+    // 因此与瓦片端点同样返回 400。
+    if let Some(seg) = tms.as_deref() {
+        if let Some(msg) = validate_interface(&state, &layer, &layer_name, seg, Some(def.srid)) {
+            return plain(StatusCode::BAD_REQUEST, msg);
+        }
+    }
     // 发布网格优先：TileJSON 必须宣告与切片一致的 crs/grid/原点/分辨率，
     // 前端（OpenLayers）据此建自定义 TileGrid；显式 `3857` 接口除外。
     let grid = if matches!(
@@ -468,7 +495,7 @@ async fn render_pg_tilejson(
     layer_name: String,
 ) -> String {
     let mut extra = serde_json::Map::new();
-    let (crs_tag, template, bounds, crs_member, zrange) = match &grid {
+    let (grid_tag, template, bounds, crs_member, zrange) = match &grid {
         Some(g) if g.crs != gisserver::wms_common::crs::EPSG_3857 => {
             // 网格 CRS 与数据 SRID 一致时直接取源包络；否则退回网格满幅范围。
             let same_crs = epsg_of(&g.crs) == Some(def.srid);
@@ -478,12 +505,7 @@ async fn render_pg_tilejson(
                     .ok()
                     .flatten()
                     .or_else(|| g.full_extent())
-                    .unwrap_or([
-                        -gisserver::pg_source::grid::PROJECTED_WORLD_HALF,
-                        -gisserver::pg_source::grid::PROJECTED_WORLD_HALF,
-                        gisserver::pg_source::grid::PROJECTED_WORLD_HALF,
-                        gisserver::pg_source::grid::PROJECTED_WORLD_HALF,
-                    ])
+                    .unwrap_or_else(|| gisserver::pg_source::grid::world_extent(def.srid))
             } else {
                 g.full_extent().unwrap_or([-180.0, -90.0, 180.0, 90.0])
             };
@@ -515,14 +537,21 @@ async fn render_pg_tilejson(
                     .await
                     .ok()
                     .flatten()
-                    .unwrap_or([
-                        -gisserver::pg_source::grid::PROJECTED_WORLD_HALF,
-                        -gisserver::pg_source::grid::PROJECTED_WORLD_HALF,
-                        gisserver::pg_source::grid::PROJECTED_WORLD_HALF,
-                        gisserver::pg_source::grid::PROJECTED_WORLD_HALF,
-                    ]);
+                    .unwrap_or_else(|| gisserver::pg_source::grid::world_extent(def.srid));
+                // The source-SRID interface addresses geographic sources with
+                // the `2^(z+1) x 2^z` degree matrix (`grid::tile_bounds`),
+                // which is what the `WorldCRS84Quad` / `CGCS2000Quad` presets
+                // define, so those are the grids to announce — a bare SRID has
+                // no resolvable `tileMatrixSets/{id}` entry.
+                let announced = if !gisserver::pg_source::grid::is_geographic_srid(def.srid) {
+                    def.srid.to_string()
+                } else if def.srid == 4490 {
+                    "CGCS2000Quad".to_string()
+                } else {
+                    "WorldCRS84Quad".to_string()
+                };
                 (
-                    def.srid.to_string(),
+                    announced,
                     format!("{base}/mvt/{layer_name}/{srid}/{{z}}/{{x}}/{{y}}.pbf", srid = def.srid),
                     b,
                     Some(format!("EPSG:{}", def.srid)),
@@ -583,7 +612,7 @@ async fn render_pg_tilejson(
     }
     // TileJSON 的 grid 必须是可直接查 `tileMatrixSets/{id}` 的网格 id；默认 WebMercator
     // 接口内部用 `3857` 作 crs 标签，不能原样写进 grid（客户端会拿它查网格 404）。
-    let grid_id = match crs_tag.as_str() {
+    let grid_id = match grid_tag.as_str() {
         "3857" | "EPSG:3857" => "WebMercatorQuad".to_string(),
         other => other.to_string(),
     };
@@ -636,4 +665,95 @@ fn envelope_params(
         params.push(SqlParam::I32(z as i32));
     }
     params
+}
+
+/// `{tms}` 段是否为 Web Mercator 别名（含 `WebMercatorQuad_512` / `@512` 变体）。
+fn is_web_mercator_alias(seg: &str) -> bool {
+    matches!(seg, "3857" | "EPSG:3857" | "WebMercatorQuad")
+        || gisserver::wms_common::tile::strip_size_suffix(seg) == "WebMercatorQuad"
+}
+
+/// 校验 `/mvt/{layer}/{tms}/...` 的显式接口段；合法返回 `None`，否则返回 400 文案。
+///
+/// 可接受取值（与 [`serve_pg`] 的接口表、README「矢量侧」一致）：
+/// * `3857` / `EPSG:3857` / `WebMercatorQuad[\_|@<size>]` —— 原生 Web Mercator；
+/// * 图层源 SRID 的 `<srid>` / `EPSG:<srid>` 写法（PostGIS 图层，`source_srid` 为 `Some`）；
+/// * 本图层可解析的网格 id（`WorldCRS84Quad`、`CGCS2000Quad`、配置的自定义网格）。
+///
+/// 其余取值（非数字、数字但未注册、声明了却解析不到的网格）一律拒绝：旧实现
+/// 对它们静默回退 WebMercatorQuad，等于用错误的坐标系伪造成功响应。
+fn validate_interface(
+    state: &AppState,
+    layer: &crate::layer::LayerRuntime,
+    layer_name: &str,
+    seg: &str,
+    source_srid: Option<i32>,
+) -> Option<String> {
+    interface_rejection(
+        seg,
+        layer_name,
+        source_srid,
+        state.grid_for_layer(layer, seg).is_some(),
+    )
+}
+
+/// [`validate_interface`] 的纯判定部分（不依赖 `AppState`，便于单测）。
+fn interface_rejection(
+    seg: &str,
+    layer_name: &str,
+    source_srid: Option<i32>,
+    grid_resolvable: bool,
+) -> Option<String> {
+    if is_web_mercator_alias(seg) || grid_resolvable {
+        return None;
+    }
+    if let Some(srid) = source_srid {
+        if seg == srid.to_string() || seg.eq_ignore_ascii_case(&format!("EPSG:{srid}")) {
+            return None;
+        }
+        return Some(format!(
+            "unsupported srid/grid '{seg}' for layer '{layer_name}': expected '3857', the \
+             layer's source srid '{srid}' (as '{srid}' or 'EPSG:{srid}') or a published grid id"
+        ));
+    }
+    Some(format!(
+        "unsupported srid/grid '{seg}' for layer '{layer_name}': expected '3857' or a published grid id"
+    ))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// 合法接口一律放行：3857 别名、源 SRID 两种写法、可解析的发布网格。
+    #[test]
+    fn known_interfaces_are_accepted() {
+        for seg in ["3857", "EPSG:3857", "WebMercatorQuad", "WebMercatorQuad_512"] {
+            assert!(
+                interface_rejection(seg, "l", Some(4326), false).is_none(),
+                "{seg} should be accepted"
+            );
+        }
+        assert!(interface_rejection("4326", "l", Some(4326), false).is_none());
+        assert!(interface_rejection("EPSG:4326", "l", Some(4326), false).is_none());
+        assert!(interface_rejection("WorldCRS84Quad", "l", Some(4326), true).is_none());
+        assert!(interface_rejection("wh_custom_grid_4522", "l", Some(4522), true).is_none());
+    }
+
+    /// 未知 / 未注册 srid 必须 400，不能再回退默认网格。
+    #[test]
+    fn unknown_srid_is_rejected() {
+        let msg = interface_rejection("4543", "wuhua_building", Some(4326), false)
+            .expect("numeric but unregistered srid must be rejected");
+        assert!(msg.contains("4543") && msg.contains("wuhua_building") && msg.contains("4326"));
+        // 注册号超出范围同样拒绝。
+        assert!(interface_rejection("999999", "wuhua_building", Some(4326), false).is_some());
+        // 非数字段拒绝。
+        assert!(interface_rejection("abc", "wuhua_building", Some(4326), false).is_some());
+        // 别的图层的源 SRID 换个图层就不成立。
+        assert!(interface_rejection("4326", "l", Some(4543), false).is_some());
+        // 非 PostGIS 图层没有源 SRID 接口：`4326` 拒绝、`3857` 仍放行。
+        assert!(interface_rejection("4326", "places", None, false).is_some());
+        assert!(interface_rejection("3857", "places", None, false).is_none());
+    }
 }

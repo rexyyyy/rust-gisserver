@@ -12,6 +12,7 @@
 //! CGCS2000 Gauss-Krüger zones (EPSG:45xx) against lon/lat.
 
 use std::ffi::{c_char, c_int, c_void, CStr, CString};
+use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex, OnceLock};
 
 // ---- Platform-specific library loading ----------------------------------------
@@ -286,34 +287,96 @@ pub fn crs_proj4(crs: &str) -> Option<String> {
     proj()?.crs_proj4(crs)
 }
 
+/// PROJ 动态库候选路径，按优先级排列：
+/// 显式参数 > `PROJ_DLL` > 裸库名（工作目录 / 系统搜索路径，保留旧行为）> 可执行文件目录。
+/// 最后一项对应安装包布局 `bin/map-api.exe` + `bin/proj_9.dll`，使服务从任意 CWD
+/// 启动都能找到 PROJ。
+fn lib_candidates(
+    explicit: Option<&str>,
+    env_dll: Option<&str>,
+    exe_dir: Option<&Path>,
+    default_name: &str,
+) -> Vec<PathBuf> {
+    if let Some(p) = explicit {
+        return vec![PathBuf::from(p)];
+    }
+    let mut out = Vec::new();
+    if let Some(p) = env_dll.filter(|s| !s.is_empty()) {
+        out.push(PathBuf::from(p));
+    }
+    out.push(PathBuf::from(default_name));
+    if let Some(dir) = exe_dir {
+        out.push(dir.join(default_name));
+    }
+    out
+}
+
+/// PROJ 数据目录（含 `proj.db`）候选路径，按优先级排列：
+/// 显式参数 > `PROJ_DATA` > `<cwd>/share/proj`（旧行为）> `<exe>/share/proj` >
+/// `<exe>/../share/proj`（安装包布局：`bin/` 与 `share/proj/` 同级）。
+/// 注意不读 `PROJ_LIB`：该变量常被系统 PostGIS 的旧版 proj.db 占用，见
+/// `mapserver/THIRD-PARTY-NOTICES.md` 的部署约束。
+fn data_candidates(
+    explicit: Option<&str>,
+    env_data: Option<&str>,
+    cwd: Option<&Path>,
+    exe_dir: Option<&Path>,
+) -> Vec<PathBuf> {
+    if let Some(p) = explicit {
+        return vec![PathBuf::from(p)];
+    }
+    let mut out = Vec::new();
+    if let Some(p) = env_data.filter(|s| !s.is_empty()) {
+        out.push(PathBuf::from(p));
+    }
+    if let Some(dir) = cwd {
+        out.push(dir.join("share").join("proj"));
+    }
+    if let Some(dir) = exe_dir {
+        out.push(dir.join("share").join("proj"));
+        out.push(dir.join("..").join("share").join("proj"));
+    }
+    out
+}
+
 fn try_load(lib_path: Option<&str>, data_dir: Option<&str>) -> Option<Arc<Proj>> {
-    // 显式参数 > 环境变量（PROJ_DLL / PROJ_DATA）> 运行目录默认值。
+    // 显式参数 > 环境变量（PROJ_DLL / PROJ_DATA）> 运行目录默认值 > 可执行文件旁。
     #[cfg(windows)]
     let default_name = "proj_9.dll";
     #[cfg(unix)]
     let default_name = "libproj.so";
 
-    let candidate = lib_path
-        .map(std::path::PathBuf::from)
-        .or_else(|| std::env::var_os("PROJ_DLL").filter(|s| !s.is_empty()).map(std::path::PathBuf::from))
-        .unwrap_or_else(|| std::path::PathBuf::from(default_name));
-    let data_dir = data_dir
-        .map(std::path::PathBuf::from)
-        .or_else(|| {
-            std::env::var_os("PROJ_DATA")
-                .filter(|s| !s.is_empty())
-                .map(std::path::PathBuf::from)
-        })
-        .or_else(|| {
-            // 运行目录约定布局：<cwd>/share/proj（含 proj.db）。
-            let d = std::env::current_dir().ok()?.join("share").join("proj");
-            d.is_dir().then_some(d)
-        });
-    let lib = platform::load_library(&candidate)?;
+    let exe_dir = std::env::current_exe()
+        .ok()
+        .and_then(|p| p.parent().map(Path::to_path_buf));
+    let env_dll = std::env::var("PROJ_DLL").ok();
+    let env_data = std::env::var("PROJ_DATA").ok();
+    let cwd = std::env::current_dir().ok();
+
+    // 逐个候选尝试加载：裸名字保留“工作目录 / 系统搜索路径”的既有行为，失败后
+    // 再试可执行文件所在目录（安装包布局 bin/proj_9.dll，服务从任意 CWD 启动都能命中）。
+    let lib = lib_candidates(lib_path, env_dll.as_deref(), exe_dir.as_deref(), default_name)
+        .into_iter()
+        .find_map(|c| {
+            let h = platform::load_library(&c);
+            if h.is_none() {
+                eprintln!("[projection] PROJ load failed: cannot load '{}'", c.display());
+            }
+            h
+        })?;
     if lib.is_null() {
-        eprintln!("[projection] PROJ load failed: load_library returned NULL for {}", candidate.display());
+        eprintln!("[projection] PROJ load failed: load_library returned NULL");
         return None;
     }
+    // 显式参数 / 环境变量按原样使用（与旧行为一致）；未指定时按运行目录与安装
+    // 布局查找首个**存在**的 proj.db 目录。
+    let data_explicit = data_dir.or(env_data.as_deref()).is_some();
+    let data_candidates = data_candidates(data_dir, env_data.as_deref(), cwd.as_deref(), exe_dir.as_deref());
+    let data_dir = if data_explicit {
+        data_candidates.into_iter().next()
+    } else {
+        data_candidates.into_iter().find(|d| d.is_dir())
+    };
     // Safety: resolve the entry points we need; cast raw pointers to fn ptrs.
     macro_rules! sym {
         ($name:literal, $ty:ty) => {{
@@ -384,5 +447,40 @@ mod tests {
         init_proj(Some("definitely_not_proj_lib"), None);
         // second init is ignored (OnceLock already set).
         init_proj(Some("definitely_not_proj_lib"), None);
+    }
+
+    /// 候选顺序：显式 > 环境变量 > 运行目录（旧行为）> 可执行文件旁（安装布局）。
+    #[test]
+    fn proj_candidates_are_ordered() {
+        let exe = Path::new("bin");
+        assert_eq!(
+            lib_candidates(None, Some("C:/proj/proj_9.dll"), Some(exe), "proj_9.dll"),
+            vec![
+                PathBuf::from("C:/proj/proj_9.dll"),
+                PathBuf::from("proj_9.dll"),
+                exe.join("proj_9.dll"),
+            ]
+        );
+        // 显式参数独占，不再尝试其它候选。
+        assert_eq!(
+            lib_candidates(Some("x.dll"), Some("y.dll"), Some(exe), "proj_9.dll"),
+            vec![PathBuf::from("x.dll")]
+        );
+
+        let cwd = Path::new("work");
+        assert_eq!(
+            data_candidates(None, None, Some(cwd), Some(exe)),
+            vec![
+                cwd.join("share").join("proj"),
+                exe.join("share").join("proj"),
+                exe.join("..").join("share").join("proj"),
+            ]
+        );
+        assert_eq!(
+            data_candidates(None, Some("D:/projdata"), Some(cwd), None)[0],
+            PathBuf::from("D:/projdata")
+        );
+        // PROJ_LIB 不参与解析（避免系统 PostGIS 旧 proj.db 被误用）。
+        assert!(data_candidates(None, None, None, None).is_empty());
     }
 }
