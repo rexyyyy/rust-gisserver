@@ -32,23 +32,39 @@ pub async fn archive(
             .into_response();
     };
 
-    match crate::handlers::parse_range(&headers) {
-        Some((start, end)) => {
-            let len = source.len();
-            let Some(total) = len else {
-                return (
-                    StatusCode::INTERNAL_SERVER_ERROR,
-                    [(axum::http::header::CONTENT_TYPE, "text/plain")],
-                    "range requests need a known length".to_string(),
-                )
-                    .into_response();
-            };
+    // A suffix range (`bytes=-N`) needs the representation length to resolve,
+    // so the header is parsed against that length rather than up front.
+    let range = match (
+        headers.contains_key(axum::http::header::RANGE),
+        source.len(),
+    ) {
+        (true, Some(total)) => crate::handlers::parse_range(&headers, total)
+            .map(|(start, end)| (start, end, total)),
+        (true, None) => {
+            return (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                [(axum::http::header::CONTENT_TYPE, "text/plain")],
+                "range requests need a known length".to_string(),
+            )
+                .into_response()
+        }
+        (false, _) => None,
+    };
+
+    match range {
+        Some((start, end, total)) => {
             let end = end.min(total - 1);
             if start > end {
+                // RFC 9110 §14.4.1: a 416 must carry the unsatisfied-range
+                // form, which is also what `file_range_response` emits.
+                let content_range = format!("bytes */{total}");
                 return (
                     StatusCode::RANGE_NOT_SATISFIABLE,
-                    [(axum::http::header::CONTENT_TYPE, "text/plain")],
-                    format!("invalid range {start}-{end}"),
+                    [
+                        (axum::http::header::CONTENT_TYPE, "text/plain"),
+                        (axum::http::header::CONTENT_RANGE, content_range.as_str()),
+                    ],
+                    format!("range start {start} is past the end of {total} bytes"),
                 )
                     .into_response();
             }

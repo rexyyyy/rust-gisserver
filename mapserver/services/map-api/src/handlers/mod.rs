@@ -624,18 +624,40 @@ pub fn fnv1a(bytes: &[u8]) -> u64 {    let mut h: u64 = 0xcbf29ce484222325;
     h
 }
 
-/// Parse a `Range: bytes=a-b` header into `(start, end_inclusive)`.
-pub fn parse_range(headers: &HeaderMap) -> Option<(u64, u64)> {
+/// Parse a `Range` header into `(start, end_inclusive)` for a representation
+/// that is `total` bytes long.
+///
+/// All three single-range forms of RFC 9110 §14.2 are honoured: `a-b`,
+/// `a-` (open-ended) and `-N` (the **last** N bytes, which only resolves
+/// against the total length). Everything else — a multi-range header, a
+/// non-numeric bound, `a` greater than `b`, or a zero suffix — returns
+/// `None`, meaning "ignore the header and serve the whole representation",
+/// which is what the spec prescribes for a Range it cannot satisfy
+/// syntactically. An open-ended `a-` yields `u64::MAX`, so callers clamp it.
+pub fn parse_range(headers: &HeaderMap, total: u64) -> Option<(u64, u64)> {
     let r = headers.get(header::RANGE)?.to_str().ok()?;
-    let rest = r.strip_prefix("bytes=")?;
-    let (a, b) = rest.split_once('-')?;
-    let start = a.parse::<u64>().ok()?;
-    let end = if b.is_empty() {
-        None
-    } else {
-        Some(b.parse::<u64>().ok()?)
-    };
-    Some((start, end.unwrap_or(u64::MAX)))
+    let spec = r.strip_prefix("bytes=")?;
+    if spec.contains(',') {
+        return None;
+    }
+    let (a, b) = spec.split_once('-')?;
+    match (a.is_empty(), b.is_empty()) {
+        (false, false) => {
+            let start = a.parse::<u64>().ok()?;
+            let end = b.parse::<u64>().ok()?;
+            (start <= end).then_some((start, end))
+        }
+        (false, true) => Some((a.parse::<u64>().ok()?, u64::MAX)),
+        (true, false) => {
+            let n = b.parse::<u64>().ok()?;
+            if n == 0 || total == 0 {
+                return None;
+            }
+            let n = n.min(total);
+            Some((total - n, total - 1))
+        }
+        (true, true) => None,
+    }
 }
 
 /// Serve a **local file** honoring an optional `Range` header, reading only the
@@ -651,11 +673,15 @@ pub async fn file_range_response(
     headers: &HeaderMap,
     content_type: &'static str,
 ) -> Response {
-    let range = parse_range(headers);
+    // The Range is resolved inside the blocking task: a suffix range
+    // (`bytes=-N`) can only be turned into a byte window once the file length
+    // is known.
     let path_display = path.display().to_string();
+    let headers = headers.clone();
     let res = tokio::task::spawn_blocking(move || -> std::io::Result<FileRange> {
         let file = File::open(&path)?;
         let total = file.metadata()?.len();
+        let range = parse_range(&headers, total);
         Ok(match range {
             Some((start, end)) if start < total => {
                 let end = end.min(total - 1);
