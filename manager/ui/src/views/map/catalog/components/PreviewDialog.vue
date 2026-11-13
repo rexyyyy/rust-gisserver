@@ -144,8 +144,8 @@ const openUrl = (url: string) => window.open(url, '_blank');
 // 因此换图层/换网格时随之变化。矢量瓦片（MVT）与 ArcGIS 缓存（XYZ 栅格）都支持。
 const previewKind = computed<'mvt' | 'raster' | ''>(() => {
   const u = previewUrl.value;
-  if (u.includes('/viewer-mvt')) return 'mvt';
-  if (u.includes('/viewer-arcgis')) return 'raster';
+  if (u.includes('viewer-mvt')) return 'mvt';
+  if (u.includes('viewer-arcgis')) return 'raster';
   return '';
 });
 const isCodeable = computed(() => !!previewKind.value);
@@ -268,9 +268,9 @@ const openCode = async () => {
   codeText.value = '正在读取该图层的网格定义…';
   try {
     const kind = previewKind.value || 'mvt';
-    const u = new URL(previewUrl.value);
+    const u = new URL(previewUrl.value, window.location.origin);
     const gridId = u.searchParams.get('grid') || '';
-    const base = u.origin;
+    const base = u.searchParams.get('base') || u.origin;
     const layer = layerName.value;
     if (!gridId) {
       codeText.value = '// 预览地址没有携带网格参数，无法确定该图层的 LOD 体系';

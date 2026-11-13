@@ -2,6 +2,19 @@
 <html lang="zh-CN">
 <head>
   <meta charset="UTF-8" />
+<script>
+  // 预览页由 manager 托管、数据面在 map-api：引擎地址经 ?base= 注入，页面不写死端口。
+  // 同源相对请求（fetch('/wms') 等）统一改写为引擎地址；瓦片 URL 模板见下方 MAP_BASE。
+  (function () {
+    var b = (new URLSearchParams(location.search).get('base') || '').replace(/\/+$/, '');
+    window.MAP_BASE = b || location.origin;
+    var raw = window.fetch;
+    window.fetch = function (u, o) {
+      if (typeof u === 'string' && u.charAt(0) === '/' && u.charAt(1) !== '/') u = window.MAP_BASE + u;
+      return raw.call(this, u, o);
+    };
+  })();
+</script>
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>rust-gisserver · 3D Tiles 三维浏览</title>
   <!--

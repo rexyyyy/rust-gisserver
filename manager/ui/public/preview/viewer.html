@@ -2,6 +2,19 @@
 <html lang="zh-CN">
 <head>
 <meta charset="utf-8"/>
+<script>
+  // 预览页由 manager 托管、数据面在 map-api：引擎地址经 ?base= 注入，页面不写死端口。
+  // 同源相对请求（fetch('/wms') 等）统一改写为引擎地址；瓦片 URL 模板见下方 MAP_BASE。
+  (function () {
+    var b = (new URLSearchParams(location.search).get('base') || '').replace(/\/+$/, '');
+    window.MAP_BASE = b || location.origin;
+    var raw = window.fetch;
+    window.fetch = function (u, o) {
+      if (typeof u === 'string' && u.charAt(0) === '/' && u.charAt(1) !== '/') u = window.MAP_BASE + u;
+      return raw.call(this, u, o);
+    };
+  })();
+</script>
 <title>rust-gisserver viewer</title>
 <meta name="viewport" content="width=device-width, initial-scale=1"/>
 <!--
@@ -184,7 +197,7 @@ async function probeKind(name, bbox, srcType) {
     // 归档类常只到 z0~z3，z=12 会 404，必须降级再试，否则误判成 wms。
     for (const z of [12, 0]) {
       const [zz, x, y] = lonLatToTile(lon, lat, z);
-      const url = kind === 'mvt' ? `/mvt/${name}/${zz}/${x}/${y}.pbf` : `/tiles/${name}/${zz}/${x}/${y}.png`;
+      const url = kind === 'mvt' ? `${MAP_BASE}/mvt/${name}/${zz}/${x}/${y}.pbf` : `${MAP_BASE}/tiles/${name}/${zz}/${x}/${y}.png`;
       const st = await tileProbe(url, kind === 'mvt');
       if (st === 'ok') return kind;
       if (st !== 'miss') break;   // 400 类型不合 / 其它异常：这个协议到此为止
@@ -246,7 +259,7 @@ function buildLayer(name, kind) {
     // COG 等栅格：服务端瓦片（XYZ）直出，缩放天然按瓦片矩阵刷新
     return new ol.layer.Tile({
       source: new ol.source.XYZ({
-        url: `/tiles/${name}/{z}/{x}/{y}.png`,
+        url: `${MAP_BASE}/tiles/${name}/{z}/{x}/{y}.png`,
         // 服务端网格只到 z=25，OL 默认到 z=42；声明 maxZoom 让 OL 在 z>25
         // overzoom 复用 z25 瓦片，避免深缩放整屏 404。
         tileGrid: ol.tilegrid.createXYZ({ tileSize: 256, maxZoom: 25 }),
@@ -263,7 +276,7 @@ function buildLayer(name, kind) {
     return new ol.layer.VectorTile({
       source: new ol.source.VectorTile({
         format: new ol.format.MVT(),
-        url: `/mvt/${name}/{z}/{x}/{y}.pbf`,
+        url: `${MAP_BASE}/mvt/${name}/{z}/{x}/{y}.pbf`,
         // 服务端 MVT 是标准 256px WebMercatorQuad 方案；OL 默认 512 网格
         // 会让瓦片定位错一倍（特征飞出视野→空白），必须显式对齐。
         tileGrid: ol.tilegrid.createXYZ({ tileSize: 256, maxZoom: 22 }),
@@ -275,7 +288,7 @@ function buildLayer(name, kind) {
   // 兜底：WMS GetMap（1.1.1 + EPSG:3857，避开 1.3.0 轴序坑）
   return new ol.layer.Tile({
     source: new ol.source.TileWMS({
-      url: '/wms',
+      url: `${MAP_BASE}/wms`,
       params: { LAYERS: name, FORMAT: 'image/png', TRANSPARENT: true, VERSION: '1.1.1' },
       serverType: 'mapserver',
       crossOrigin: 'anonymous'
@@ -406,7 +419,7 @@ async function loadGrid(id) {
 
 // 生成当前图层的调用代码（常量内联，随图层变化）
 async function buildSnippet(name) {
-  const org = location.origin;
+  const org = window.MAP_BASE;
 
   if (tilesTpl) {
     const quad = await loadGrid('WebMercatorQuad');
