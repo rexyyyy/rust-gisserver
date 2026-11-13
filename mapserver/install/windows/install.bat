@@ -16,7 +16,7 @@ echo Install directory: %INSTALL_DIR%
 
 REM Check if executables exist
 set MAPSERVER_EXE=%~dp0..\..\target\release\map-api.exe
-set MANAGER_EXE=%~dp0..\..\..\rust-gisserver\backend\target\release\manager.exe
+set MANAGER_EXE=%~dp0..\..\..\manager\target\release\manager.exe
 
 if not exist "%MAPSERVER_EXE%" (
     echo [ERROR] rust-gisserver not found: %MAPSERVER_EXE%
@@ -50,41 +50,53 @@ REM Copy PROJ DLL and data
 REM Layout: proj_9.dll and its 12 transitive deps go into bin\ (same dir as map-api.exe) because
 REM LoadLibraryExW(LOAD_WITH_ALTERED_SEARCH_PATH) resolves proj_9.dll's imports only from
 REM proj_9.dll's own directory. proj.db goes to share\proj (referenced by PROJ_DATA).
-echo [3/6] Copying PROJ library...
-set PROJ_DLL=%~dp0..\..\proj_9.dll
-if exist "%PROJ_DLL%" (
-    copy /Y "%PROJ_DLL%" "%INSTALL_DIR%\bin\proj_9.dll"
-) else (
-    echo [WARN] proj_9.dll not found
-)
-
-REM proj_9.dll transitive dependencies (must sit next to proj_9.dll).
-REM Each dependency is searched independently across the candidate directories, so a partially
-REM populated first candidate does not shadow the later ones. This keeps the script working from
-REM a source checkout as well as from a staged tree that already carries the closure.
-set PROJ_DEPS=
+REM
+REM These assets are NOT in git: .gitignore excludes /proj_9.dll and /share/. They live in
+REM the parent gis-wt workspace (build / dist / GDAL3.13). Search a candidate list for every
+REM file: a single hard-coded source silently produces a PROJ-less package on a clean checkout.
+REM %~dp0 is <gis-wt>\thirdparty\rust-gisserver\mapserver\install\windows\, so five levels up
+REM is the gis-wt root. Keep this in sync if the workspace is ever moved.
+set "PROJ_DEPS="
 for %%P in (
-    "%~dp0..\..\bin"
-    "%~dp0..\..\..\..\build"
-    "%~dp0..\..\..\..\thirdparty\GDAL3.13\dll"
+    "%~dp0..\..\..\..\..\build"
+    "%~dp0..\..\..\..\..\dist"
+    "%~dp0..\..\..\..\..\thirdparty\GDAL3.13\dll"
 ) do if exist "%%~P" set "PROJ_DEPS=!PROJ_DEPS!;%%~P"
-for %%D in (sqlite3 libcurl tiff zlib libssh2 brotlidec brotlicommon jpeg62 libcrypto-3-x64 MSVCP140 VCRUNTIME140 VCRUNTIME140_1) do (
+
+echo [3/6] Copying PROJ library...
+set "PROJ_DLL_FOUND="
+for %%D in (proj_9 sqlite3 libcurl tiff zlib libssh2 brotlidec brotlicommon jpeg62 libcrypto-3-x64 MSVCP140 VCRUNTIME140 VCRUNTIME140_1) do (
     set "FOUND="
     for %%P in (%PROJ_DEPS%) do (
         if not defined FOUND if exist "%%~P\%%D.dll" (
             copy /Y "%%~P\%%D.dll" "%INSTALL_DIR%\bin\%%D.dll" >nul
             set "FOUND=1"
+            if "%%D"=="proj_9" set "PROJ_DLL_FOUND=1"
         )
     )
     if not defined FOUND echo [WARN] proj dependency missing: %%D.dll
 )
-
-set PROJ_DATA=%~dp0..\..\share\proj
-if exist "%PROJ_DATA%" (
-    xcopy /E /I /Y "%PROJ_DATA%" "%INSTALL_DIR%\share\proj"
+if defined PROJ_DLL_FOUND (
+    echo [OK] proj_9.dll copied
 ) else (
-    echo [WARN] share\proj not found
+    echo [WARN] proj_9.dll not found, PROJ coordinate transform unavailable
 )
+REM MSVCP140 / VCRUNTIME140 / VCRUNTIME140_1 come from the VC++ 2015-2022 redistributable,
+REM not from PROJ; a WARN for those three is expected unless the redist is staged locally.
+
+REM proj.db sits directly in <source>\share\, while PROJ_DATA needs share\proj\.
+REM Only copy proj.db: the grid files in GDAL3.13\share are not required by this build.
+set "PROJ_DB_FOUND="
+for %%P in (
+    "%~dp0..\..\..\..\..\build\share\proj.db"
+    "%~dp0..\..\..\..\..\dist\share\proj.db"
+    "%~dp0..\..\..\..\..\thirdparty\GDAL3.13\share\proj.db"
+) do if not defined PROJ_DB_FOUND if exist "%%~P" (
+    copy /Y "%%~P" "%INSTALL_DIR%\share\proj\proj.db" >nul
+    set "PROJ_DB_FOUND=1"
+    echo [OK] proj.db copied: %%~P
+)
+if not defined PROJ_DB_FOUND echo [WARN] proj.db not found; PROJ needs LAYOUT.MINOR ^>= 5
 
 REM Copy configs
 echo [4/6] Copying configs...
@@ -93,7 +105,7 @@ if exist "%MAPSERVER_CONFIG%" (
     xcopy /E /I /Y "%MAPSERVER_CONFIG%" "%INSTALL_DIR%\config"
 )
 
-set MANAGER_CONFIG=%~dp0..\..\..\rust-gisserver\backend\config
+set MANAGER_CONFIG=%~dp0..\..\..\manager\backend\config
 if exist "%MANAGER_CONFIG%" (
     xcopy /E /I /Y "%MANAGER_CONFIG%" "%INSTALL_DIR%\config\manager"
     REM Copy manager.xml to config root for default path
@@ -108,7 +120,7 @@ if exist "%MANAGER_CONFIG%" (
 
 REM Copy frontend if built
 echo [5/6] Copying frontend...
-set FRONTEND_DIR=%~dp0..\..\..\rust-gisserver\ui\dist
+set FRONTEND_DIR=%~dp0..\..\..\manager\ui\dist
 if exist "%FRONTEND_DIR%" (
     xcopy /E /I /Y "%FRONTEND_DIR%" "%INSTALL_DIR%\web"
     echo [OK] Frontend copied

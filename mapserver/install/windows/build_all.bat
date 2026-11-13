@@ -46,9 +46,9 @@ echo [OK] rust-gisserver built: target\release\map-api.exe
 
 REM Build rust-gisserver
 echo [4/4] Building rust-gisserver (release)...
-cd /d "%~dp0..\..\..\rust-gisserver\backend"
+cd /d "%~dp0..\..\..\manager\backend"
 if not exist "Cargo.toml" (
-    echo [ERROR] rust-gisserver not found at ..\..\..\rust-gisserver\backend
+    echo [ERROR] manager not found at ..\..\..\manager\backend
     exit /b 1
 )
 cargo build --release
@@ -61,7 +61,7 @@ echo [OK] rust-gisserver built: target\release\manager.exe
 REM Optional: build frontend
 if "%1"=="frontend" (
     echo [EXTRA] Building frontend...
-    cd /d "%~dp0..\..\..\rust-gisserver\ui"
+    cd /d "%~dp0..\..\..\manager\ui"
     if exist "package.json" (
         where pnpm >/dev/null 2>&1 && pnpm install && pnpm build || (
             where npm >/dev/null 2>&1 && npm install && npm run build || (
@@ -76,5 +76,5 @@ echo ============================================
 echo Build complete!
 echo ============================================
 echo rust-gisserver: %~dp0..\..\target\release\map-api.exe
-echo rust-gisserver:   %~dp0..\..\..\rust-gisserver\backend\target\release\manager.exe
+echo manager:   %~dp0..\..\..\manager\target\release\manager.exe
 endlocal
