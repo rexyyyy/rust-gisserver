@@ -24,7 +24,7 @@ mapserver/
 | 协议 | 入口 | 说明 |
 |---|---|---|
 | **WMS** 1.1.1 / 1.3.0 | `/wms` | GetCapabilities / GetMap / GetFeatureInfo（栅格采样 + 矢量命中测试，INFO_FORMAT 支持 text/plain、text/html、application/json，无命中返回 200 空体——同 GeoServer）/ GetLegendGraphic（符号图例 PNG，默认高度随行数自适应），1.3.0 轴序处理、ServiceException/ExceptionReport |
-| **PostGIS 动态矢量瓦片** | `/mvt/{layer}/…` | 双坐标接口：`/{z}/{x}/{y}.pbf`（EPSG:3857 经纬度 XYZ）与 `/{srid}/{z}/{x}/{y}.pbf`（源投影，如 4543，无 ST_Transform）；TileJSON 按接口分别宣告 bounds/crs/vector_layers 字段类型；foyer output 缓存（命中 ~2-25ms；`server.disk_cache` 可选磁盘 L2 跨重启保留）；仅当图层配置 `source.type: postgis` 时启用（按 DSN 共享连接池，版本预检 PG≥11/PostGIS≥3.0）。P3 增强：`simplify`（低 z 服务端 `ST_SimplifyPreserveTopology` 分级简化）；`from` 表达式发布**SQL/视图图层**（免落表）；OAF items 支持 `sortby` 下推；启动自检 GiST 索引、bounds/count 走统计估计（缺失自动回退精确扫描） |
+| **PostGIS 动态矢量瓦片** | `/mvt/{layer}/…` | 双坐标接口：`/{z}/{x}/{y}.pbf`（EPSG:3857 经纬度 XYZ）与 `/{srid}/{z}/{x}/{y}.pbf`（源 CRS 自身单位建矩阵，如 4543 米制、4326 度数，无 ST_Transform）；TileJSON 按接口分别宣告 bounds/crs/grid 与 vector_layers 字段类型；foyer output 缓存（命中 ~2-25ms；`server.disk_cache` 可选磁盘 L2 跨重启保留）；仅当图层配置 `source.type: postgis` 时启用（按 DSN 共享连接池，版本预检 PG≥11/PostGIS≥3.0）。P3 增强：`simplify`（低 z 服务端 `ST_SimplifyPreserveTopology` 分级简化）；`from` 表达式发布**SQL/视图图层**（免落表）；OAF items 支持 `sortby` 下推；启动自检 GiST 索引、bounds/count 走统计估计（缺失自动回退精确扫描） |
 | **WMTS** 1.0.0 | `/wmts`、`/wmts/1.0.0/WMTSCapabilities.xml`、`/wmts/rest/...`、`/tileMatrixSets/:id` | KVP + RESTful + 能力文档；预设 TileMatrixSet（WebMercatorQuad / WorldCRS84Quad）及自定义 |
 | **TMS** 1.0.0 | `/tms/1.0.0/{layer}/{z}/{x}/{y}.png` | 底行起算 y-flip |
 | **XYZ**（别名） | `/tiles/{layer}/{z}/{x}/{y}.png` | 顶行起算，Leaflet/MapLibre 直连 |
@@ -204,10 +204,13 @@ XML → 内部结构的映射约定见 `services/map-api/src/xmlcfg.rs` 模块�
 - 矢量层同时服务栅格协议（WMS/WMTS/TMS，内部栅格化）与 `/mvt/*` 矢量协议。
 - 远程 COG 使用 `http(s)://` 路径，通过 HTTP Range 定位读取（含 S3 预签名 URL）。
 - **PROJ 投影后端属环境配置**（不在 mapserver.xml）：解析顺序为
-  环境变量 `PROJ_DLL` / `PROJ_DATA` → 运行目录默认值（工作目录下的
-  `proj_9.dll` 与 `<工作目录>/share/proj`）；PROJ ≥ 8 均可（实测用 PostGIS 自带的
-  `libproj_8_2.dll` + `proj.db`）。未找到时只禁用**跨 CRS** 互转，内置 4326↔3857
-  与「请求 CRS == 源 CRS」的原生产物直出不受影响。详见下一节《坐标系支持》。
+  显式参数（当前未暴露）→ 环境变量 `PROJ_DLL` / `PROJ_DATA` → 运行目录默认值
+  （工作目录下的 `proj_9.dll` 与 `<工作目录>/share/proj`）→ **可执行文件旁**
+  （`<exe目录>/proj_9.dll`、`<exe目录>/share/proj`、`<exe目录>/../share/proj`，
+  对应安装包 `bin/` + `share/proj/` 布局，服务从任意 CWD 启动均可）。PROJ ≥ 8 均可
+  （实测用 PostGIS 自带的 `libproj_8_2.dll` + `proj.db`）。未找到时只禁用**跨 CRS**
+  互转，内置 4326↔3857 与「请求 CRS == 源 CRS」的原生产物直出不受影响。
+  部署时**不要**设置 `PROJ_LIB`（系统 PostGIS 常指向旧版 proj.db），详见 `THIRD-PARTY-NOTICES.md`。
 
 ## 坐标系支持
 
@@ -235,8 +238,14 @@ XML → 内部结构的映射约定见 `services/map-api/src/xmlcfg.rs` 模块�
   `/tileMatrixSets/{id}`、`/tiles/{layer}/{grid}/…`、`/tms/1.0.0/{layer}/{grid}/…`、
   WMTS 与 OGC API - Tiles 提供。
 - **矢量侧**：PostGIS 图层除 `EPSG:3857` XYZ 外还有源投影接口
-  `/mvt/{layer}/{srid}/{z}/{x}/{y}.pbf`（如 `4543`，服务端不做 `ST_Transform`），
-  TileJSON 按接口分别宣告 bounds/crs。
+  `/mvt/{layer}/{srid}/{z}/{x}/{y}.pbf`（服务端不做 `ST_Transform`），按**源 CRS
+  自身单位**建矩阵：经纬度源（4326/4490/4214/4258）为 `2^(z+1)×2^z` 度数矩阵，
+  瓦号与预设网格 `WorldCRS84Quad`（4490 为 `CGCS2000Quad`）逐瓦一致，TileJSON 的
+  `grid` 也就宣告这两个网格名；投影源（高斯-克吕格/UTM，如 `4543`）为 `2^z×2^z`
+  米制矩阵，世界范围取 ±20037508.342789244 米，使各地面分辨率与 WebMercatorQuad
+  可比。接口段只接受 `3857`/`EPSG:3857`/`WebMercatorQuad*`、本图层源 SRID
+  （`{srid}` 或 `EPSG:{srid}`）与本图层可解析的网格 id，其余一律 400；行列号越出
+  该 zoom 矩阵返回 404。TileJSON 按接口分别宣告 bounds/crs。
 - **错误语义**：无法兑现的 CRS 一律 4xx（WMS 回 `InvalidCRS`，WMTS 回
   `InvalidParameterValue`，瓦片端点回 400），不会伪装成 500 让客户端重试。
 
@@ -336,7 +345,7 @@ CRS 链路落在正确地面范围。
 
 - **自动选源**：`web/viewer.html` 按图层探测最快源（MVT/XYZ/WMS 兜底），并把 `VectorTile` 的 `tileGrid` 显式设为 `createXYZ({tileSize:256})`（OpenLayers 默认 512 会与服务器 256 网格错位导致要素偏移/空白）。
 - **ETag + 304**：所有瓦片响应带 FNV-1a `ETag` + `Cache-Control`，未变即 304，浏览器/CDN 二次命中零传输。
-- **Range 206**：COG/PMTiles/3D Tiles 走 `Accept-Ranges: bytes`，客户端（QGIS/rasterio/Cesium）按需取字节，不全量下载。
+- **Range 206**：COG/PMTiles/3D Tiles 走 `Accept-Ranges: bytes`，客户端（QGIS/rasterio/Cesium）按需取字节，不全量下载。按 RFC 9110 §14.2 支持 `a-b`、`a-`、`-N`（suffix）三种形态，`end` 越界收敛到文件尾，起点≥长度回 **416 + `Content-Range: bytes */total`**；多区间或无法解析的 Range 一律忽略并回 200 全量（不报错、不重试死循环）。
 - **压缩策略**：`CompressionLayer` 只压文本类响应；`image/*`、`application/x-protobuf`、MVT、二进制 3D Tiles **跳过二次 gzip**（瓦片是流量主体，二次压缩纯耗 CPU）。
 
 ### 6. 运维调优清单
