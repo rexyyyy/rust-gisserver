@@ -3,7 +3,7 @@
 -- ---------------------------------------------------------------------
 -- 用途：清除组织层四表（published/resource/store/workspace）的全部测试记录，
 --       保留默认工作空间 ws1；清理引擎关联表与事件日志。
--- 用法：psql -h 127.0.0.1 -p 5434 -U postgres -d mapserver_manager -f cleanup.sql
+-- 用法：psql -h 127.0.0.1 -p 5434 -U postgres -d mapserver-manager -f cleanup.sql
 -- 注意：不可逆操作，执行前请确认备份。
 -- =====================================================================
 

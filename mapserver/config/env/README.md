@@ -55,8 +55,19 @@ copy env\.env.zh-TW .env
 ## 维护约定
 
 这 5 份模板**只有 `GIS_ENCODING_REGION` 一行与文件头注释不同**，其余公共项
-完全一致；公共项的真源是 `.env.example`。改公共项时请同步 5 份模板，
-或只保留 `.env.example` 里的那一行变量（单变量方案同样满足需求）。
+完全一致；公共项的真源是安装脚本 `build/script/install.bat` 生成的 `.env.example`。
+改公共项时请同步 5 份模板与 `mapserver/install/windows/install.bat`。
+
+公共项分两档（判据与逐项说明见 `build/script/README.md` §3.3）：
+
+- **必需**：`MANAGER_DB_PASSWORD`、`MANAGER_JWT_SECRET`、`MAPSERVER_DB_PASSWORD`、
+  `DATA_ROOT` —— 配置 XML 里写成 `${VAR}` 无默认值，不设就展开成空串。
+- **可选**：`MANAGER_DB_HOST` / `MANAGER_DB_PORT`、`MAPSERVER_DB_HOST` /
+  `MAPSERVER_DB_PORT`、`MAPSRV_HOST` / `MAPSRV_PORT`、`MAPSERVER_MANAGER_URL`、
+  `TESTDATA_ROOT`、`SHPPGSQL_BIN`。
+
+`MAPSERVER_PORT`、`MAPSERVER_DATA_DIR`、`MAPSERVER_CACHE_DIR`、`API_KEY` 已失效、
+代码不再读取：端口取 `config/mapserver.xml` 的 `<server port>`，数据根统一用 `DATA_ROOT`。
 
 `start-mapserver.bat` / `start-mapapi.bat` / `start-manager.bat` 都会从 `.env`
 加载变量，地区值因此对 map-api 与 manager 同时生效。Docker 部署用

@@ -9,7 +9,7 @@
 --          服务引擎管理 —— 已发布出去的服务的运维面。
 --       「数据服务」排在「地图服务」之前：先管数据源，再管已发布服务。
 -- 依赖：需先执行 system.sql（建好 sys_menu / sys_role_menu 等系统表）
--- 用法：psql -h localhost -p 5434 -U postgres -d mapserver_manager -f map.sql
+-- 用法：psql -h localhost -p 5434 -U postgres -d mapserver-manager -f map.sql
 -- ---------------------------------------------------------------------
 -- 内容：
 --   §0  顶级菜单 ID 归一（老库迁移；与 system.sql §0 同一块，可重复执行）
@@ -601,6 +601,14 @@ comment on column sys_workspace.engine_id is '绑定的地图引擎 ID（sys_eng
 -- 字段：sld_content 存完整 XML，style_name / layer_name / rule_count 为解析冗余，
 -- 便于列表显示；sld_name 不含 .sld 后缀，sld_file 含后缀。
 -- 菜单：已在 §1 预置 menu_id=112 样式库 + 按钮 1056 样式上传 / 1057 样式删除。
+--
+-- 三个解析冗余列的必填口径：SLD/SE 规范里 <UserStyle><Name> 与
+-- <NamedLayer><Name> 都是可选元素（gisserver::renderer::sld::SldDocument 中
+-- 均为 Option<String>）；map-api 上传校验只要求根为 StyledLayerDescriptor
+-- 且至少一个 FeatureTypeStyle，不校验 Name；Rule 列表允许为空，故规则数可
+-- 以为 0。所以三者业务上都不强制填写，一律用 '' / 0 表示「SLD 未写」。
+-- 但存储层必须 NOT NULL：manager 的 style_list / style_content 用
+-- r.get::<String>() / r.get::<i32>() 直接取值，遇到 NULL 会 panic。
 -- =====================================================================
 
 create table if not exists sys_sld (
@@ -608,9 +616,9 @@ create table if not exists sys_sld (
   sld_name    varchar(100)  NOT NULL,
   sld_file    varchar(120)  NOT NULL,
   sld_content text          NOT NULL,
-  style_name  varchar(100)  DEFAULT '',
-  layer_name  varchar(100)  DEFAULT '',
-  rule_count  integer       DEFAULT 0,
+  style_name  varchar(100)  NOT NULL DEFAULT '',
+  layer_name  varchar(100)  NOT NULL DEFAULT '',
+  rule_count  integer       NOT NULL DEFAULT 0,
   remark      varchar(500)  DEFAULT '',
   create_by   bigint,
   create_time timestamp NOT NULL DEFAULT now(),
@@ -620,6 +628,18 @@ create table if not exists sys_sld (
   CONSTRAINT uk_sys_sld_file UNIQUE (sld_file)
 );
 
+-- 兼容已建表的部署：create table if not exists 不会收紧已有列，先清理历史
+-- NULL 再补约束。全幂等，可随全量脚本重复执行。
+update sys_sld set style_name = '' where style_name is null;
+update sys_sld set layer_name = '' where layer_name is null;
+update sys_sld set rule_count = 0 where rule_count is null;
+alter table sys_sld alter column style_name set not null;
+alter table sys_sld alter column layer_name set not null;
+alter table sys_sld alter column rule_count set not null;
+alter table sys_sld alter column style_name set default '';
+alter table sys_sld alter column layer_name set default '';
+alter table sys_sld alter column rule_count set default 0;
+
 create index if not exists idx_sys_sld_update_time on sys_sld (update_time desc);
 
 comment on table  sys_sld             is 'SLD 样式库：数据库主存储 + map-api styles 目录双写';
@@ -627,9 +647,9 @@ comment on column sys_sld.sld_id     is '自增主键';
 comment on column sys_sld.sld_name   is '样式名（不含 .sld 扩展名，全局唯一，前端/XML 引用用这个）';
 comment on column sys_sld.sld_file   is '文件名（含 .sld 扩展名）';
 comment on column sys_sld.sld_content is 'SLD XML 原文';
-comment on column sys_sld.style_name is '解析冗余：UserStyle Name';
-comment on column sys_sld.layer_name is '解析冗余：NamedLayer Name';
-comment on column sys_sld.rule_count is '解析冗余：SLD 规则数';
+comment on column sys_sld.style_name is '解析冗余：UserStyle Name（SLD 未写则空串，业务非必填，存储 NOT NULL）';
+comment on column sys_sld.layer_name is '解析冗余：NamedLayer Name（SLD 未写则空串，业务非必填，存储 NOT NULL）';
+comment on column sys_sld.rule_count is '解析冗余：规则数（解析器统计，可为 0，非用户填写，存储 NOT NULL）';
 
 -- =====================================================================
 -- §9 MVT 前端样式 JSON（sys_published_layer）

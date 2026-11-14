@@ -105,12 +105,25 @@ cd <安装目录>
 copy .env.example .env
 notepad .env
 ```
-关键变量（见 `.env.example`）：
-- `MANAGER_DB_HOST` / `MANAGER_DB_PORT` / `MANAGER_DB_PASSWORD` —— PostgreSQL 连接
-- `MANAGER_JWT_SECRET` —— JWT 密钥
-- `MAPSRV_HOST` / `MAPSRV_PORT` —— manager 反代 map-api 的地址（默认 `127.0.0.1:8080`）
-- `MAPSERVER_PORT` —— map-api 监听端口（默认 `8080`）
-- `GIS_ENCODING_REGION` —— 中文路径归一化区域（默认 `zh-CN`）
+关键变量（见 `.env.example`）。判据：`xmlcfg.rs::expand_env` 对 `${VAR}` 未设置时展开为**空串**，
+`${VAR:-默认}` 未设置时取默认值——所以无默认值的占位符就是必需项。
+
+| 级别 | 变量 | 读取位置 | 未设置后果 |
+| --- | --- | --- | --- |
+| **必需** | `MANAGER_DB_PASSWORD` | `config/manager/manager.xml` 的 `<database url>` | DSN 口令为空，manager 连不上库 |
+| **必需** | `MANAGER_JWT_SECRET` | 同上 `<security jwt_secret>` | 签名密钥为空串，登录态不可用 |
+| **必需** | `MAPSERVER_DB_PASSWORD` | `config/mapserver.xml` 的 `<admin dsn>` | `/admin/*` 管理面连库失败 |
+| **必需** | `DATA_ROOT` | `<server data_root>` 及 `archives` 路径前缀 | 所有 `${DATA_ROOT}` 图层路径失效 |
+| 可选 | `MANAGER_DB_HOST` / `MANAGER_DB_PORT` | manager DSN | 默认 `localhost` / `5434` |
+| 可选 | `MAPSERVER_DB_HOST` / `MAPSERVER_DB_PORT` | map-api admin DSN | 默认 `localhost` / `5434` |
+| 可选 | `MAPSRV_HOST` / `MAPSRV_PORT` | manager 反代 map-api | 默认 `127.0.0.1` / `8080` |
+| 可选 | `MAPSERVER_MANAGER_URL` | map-api 回连 manager（跨机部署） | 默认 `http://127.0.0.1:6180` |
+| 可选 | `GIS_ENCODING_REGION` / `GIS_ENCODING_LOCALE` | `gisserver::encoding` | 默认 `zh-CN` |
+| 可选 | `TESTDATA_ROOT` / `SHPPGSQL_BIN` | e2e 数据根 / shp2pgsql 路径 | 不影响正常服务 |
+
+- `PROJ_DLL` / `PROJ_DATA` / `PROJ_LIB` 由 `start-*.bat` 自动设置，无需手填。
+- **已失效、代码不再读取**：`MAPSERVER_PORT`（端口取 `config/mapserver.xml` 的 `<server port>` 或 CLI `--listen`）、
+  `MAPSERVER_DATA_DIR`、`MAPSERVER_CACHE_DIR`、`API_KEY`。数据根目录统一用 `DATA_ROOT`，别再补这几个。
 
 ### 3.4 启动
 ```powershell

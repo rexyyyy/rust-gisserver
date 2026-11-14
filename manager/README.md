@@ -35,12 +35,12 @@ manager/
 ### 1. 数据库
 
 ```bash
-# 建库
-psql -h localhost -p 5434 -U postgres -c "CREATE DATABASE mapserver_manager"
+# 建库（库名含连字符，SQL 标识符必须加双引号；外层改用单引号包裹）
+psql -h localhost -p 5434 -U postgres -c 'CREATE DATABASE "mapserver-manager"'
 
 # 建表 + 初始化数据（两个文件都要跑；顺序不敏感，均可重复执行）
-psql -h localhost -p 5434 -U postgres -d mapserver_manager -f manager/backend/sql/system.sql
-psql -h localhost -p 5434 -U postgres -d mapserver_manager -f manager/backend/sql/map.sql
+psql -h localhost -p 5434 -U postgres -d mapserver-manager -f manager/backend/sql/system.sql
+psql -h localhost -p 5434 -U postgres -d mapserver-manager -f manager/backend/sql/map.sql
 ```
 
 两个脚本都是**全量幂等**的：建表 `create ... if not exists`、索引 `create index if not exists`、

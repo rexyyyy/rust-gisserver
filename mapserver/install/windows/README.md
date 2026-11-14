@@ -115,11 +115,11 @@ share\proj\*
 
 ### 端口被占用
 
-修改 `.env` 中的端口:
-```env
-MAPSERVER_PORT=8081
-MANAGER_PORT=6181
-```
+端口**不通过 `.env` 配置**（`MAPSERVER_PORT` / `MANAGER_PORT` 已失效，代码不读取），改配置文件：
+
+- map-api：`config\mapserver.xml` 的 `<server port="8080" ...>`；或启动时用 `map-api.exe serve --listen 127.0.0.1:8081`。
+- manager：`config\manager.xml` 的 `<server addr="0.0.0.0:6180" ...>`。
+- 改了 map-api 端口后，同步 `config\manager\manager.xml` 的 `<mapsvc base_url>`（或 `.env` 的 `MAPSRV_PORT`）。
 
 ### 前端 404
 

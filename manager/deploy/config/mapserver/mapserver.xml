@@ -20,5 +20,5 @@
          与 manager 发布链路对接；需先建库表（挂 backend/sql 初始化）。两后端的
          ${DATA_ROOT} 占位都会在加载时展开（rust-gisserver db_catalog 已接 expand_env）。 -->
   <catalog root="/app/config" backend="files"/>
-  <admin dsn="postgresql://postgres:${MAPSERVER_DB_PASSWORD}@postgis:5432/mapserver_manager"/>
+  <admin dsn="postgresql://postgres:${MAPSERVER_DB_PASSWORD}@postgis:5432/mapserver-manager"/>
 </config>

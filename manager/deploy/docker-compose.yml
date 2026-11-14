@@ -4,7 +4,7 @@
 # 位置：rust-gisserver/deploy/（管理与集成平面）。两个 build 上下文指向兄弟仓：
 #   map-api  → ../../rust-gisserver      （发布服务平面，:8080）
 #   manager  → ..                     （rust-gisserver 管理平面，:6180）
-#   postgis  → 镜像 postgis/postgis   （单库 mapserver_manager，:5434→5432）
+#   postgis  → 镜像 postgis/postgis   （单库 mapserver-manager，:5434→5432）
 #
 # 使用：
 #   cd rust-gisserver/deploy
@@ -23,7 +23,7 @@ services:
     image: postgis/postgis:16-3.4
     container_name: gis-postgis
     environment:
-      POSTGRES_DB: mapserver_manager
+      POSTGRES_DB: "mapserver-manager"
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: ${MAPSERVER_DB_PASSWORD:?MAPSERVER_DB_PASSWORD 未设置，请在 .env 中配置}
     ports:
@@ -33,7 +33,7 @@ services:
       # 首次启动自动执行建表脚本（system.sql + map.sql）
       - ../backend/sql:/docker-entrypoint-initdb.d:ro
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U postgres -d mapserver_manager"]
+      test: ["CMD-SHELL", "pg_isready -U postgres -d 'mapserver-manager'"]
       interval: 5s
       timeout: 5s
       retries: 20

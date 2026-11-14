@@ -7,7 +7,7 @@ gis-srv（能力底座 / MCP）以 profile 占位、默认不启动。
 
 | 服务      | 镜像 / 构建               | 宿主端口 | 说明                        |
 |-----------|---------------------------|----------|-----------------------------|
-| postgis   | `postgis/postgis:16-3.4`  | 5434→5432| 单库 `mapserver_manager`    |
+| postgis   | `postgis/postgis:16-3.4`  | 5434→5432| 单库 `mapserver-manager`    |
 | map-api   | `../../rust-gisserver`       | 8080     | WMS/WMTS/WFS/MVT/COG/PMTiles… |
 | manager   | `..`（rust-gisserver）         | 6180     | 管理平面 + 前端静态资源     |
 

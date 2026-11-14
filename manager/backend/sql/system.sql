@@ -4,7 +4,7 @@
 -- 用途：rust-gisserver 管理端（Axum + PostgreSQL）的系统底座，一次性建表并写入
 --       系统管理 / 系统监控两个板块的菜单、角色、用户、字典与参数。
 -- 依赖：无（可独立执行）
--- 用法：psql -h localhost -p 5434 -U postgres -d mapserver_manager -f system.sql
+-- 用法：psql -h localhost -p 5434 -U postgres -d mapserver-manager -f system.sql
 -- ---------------------------------------------------------------------
 -- 内容：
 --   §1 建表：sys_dept / sys_user / sys_post / sys_role / sys_menu /
