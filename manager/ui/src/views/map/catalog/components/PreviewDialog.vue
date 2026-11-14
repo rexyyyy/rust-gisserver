@@ -73,6 +73,7 @@
 import { listPublishedEndpoints } from '@/api/map/catalog';
 import { PublishedEndpoints, PublishedVO } from '@/api/map/catalog/types';
 import { stateLabel, stateTag } from '../composables/useCatalog';
+import { getMvtStyle } from '@/api/map/service/style';
 
 const { proxy } = getCurrentInstance() as ComponentInternalInstance;
 
@@ -85,6 +86,7 @@ const data = ref<PublishedEndpoints>({ layerName: '', state: '', found: false, s
 // WMTS 也照样能答），这里按声明收口，与列表里的「协议」列保持一致。
 const declared = ref<string[]>([]);
 const showAll = ref(false);
+const pendingRow = ref<PublishedVO | null>(null);
 
 // 端点名称 → 服务类型。归档信息 / layer.json / 内置预览这类与具体协议无关的
 // 条目匹配不到（返回空串），一律保留，避免把有用信息藏掉。
@@ -109,8 +111,24 @@ const shownEndpoints = computed(() => {
 });
 const hiddenCount = computed(() => (data.value.endpoints || []).length - shownEndpoints.value.length);
 
-// 引擎在端点里给出「内置预览（OpenLayers / Cesium）」，这里只挑出来，不猜 URL
-const previewUrl = computed(() => data.value.endpoints.find((e) => e.name.startsWith('内置预览'))?.url || '');
+// 引擎在端点里给出「内置预览（OpenLayers / Cesium）」
+// 对 MVT：拼上 ?style=<base64> 把后端存的自定义样式注入预览页
+const previewUrl = ref('');
+
+async function buildPreviewUrl(baseUrl: string, row: PublishedVO): Promise<string> {
+  if (!baseUrl || !baseUrl.includes('viewer_mvt')) return baseUrl;
+  try {
+    const kind = row.mapserverKind || row.mapserver_kind || 'postgis';
+    const res = await getMvtStyle(kind, row.layerName);
+    const style = res?.data?.style || res?.style;
+    if (style && typeof style === 'object') {
+      const b64 = btoa(unescape(encodeURIComponent(JSON.stringify(style))));
+      const sep = baseUrl.includes('?') ? '&' : '?';
+      return baseUrl + sep + 'style=' + b64;
+    }
+  } catch {}
+  return baseUrl;
+}
 
 const open = async (row: PublishedVO) => {
   visible.value = true;
@@ -120,9 +138,12 @@ const open = async (row: PublishedVO) => {
   showAll.value = false;
   loading.value = true;
   data.value = { layerName: row.layerName, state: row.state, found: false, serving: false, endpoints: [] };
+  previewUrl.value = '';
   try {
     data.value = (await listPublishedEndpoints(row.id)).data;
     state.value = data.value.state || row.state;
+    const baseUrl = data.value.endpoints.find((e) => e.name.startsWith('内置预览'))?.url || '';
+    previewUrl.value = await buildPreviewUrl(baseUrl, row);
   } finally {
     loading.value = false;
   }
@@ -144,8 +165,8 @@ const openUrl = (url: string) => window.open(url, '_blank');
 // 因此换图层/换网格时随之变化。矢量瓦片（MVT）与 ArcGIS 缓存（XYZ 栅格）都支持。
 const previewKind = computed<'mvt' | 'raster' | ''>(() => {
   const u = previewUrl.value;
-  if (u.includes('viewer-mvt')) return 'mvt';
-  if (u.includes('viewer-arcgis')) return 'raster';
+  if (u.includes('viewer_mvt')) return 'mvt';
+  if (u.includes('viewer_arcgis')) return 'raster';
   return '';
 });
 const isCodeable = computed(() => !!previewKind.value);

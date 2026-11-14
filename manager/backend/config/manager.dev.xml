@@ -12,7 +12,7 @@
       <item>http://127.0.0.1:5100</item>
     </cors_origins>
   </server>
-  <database url="postgresql://postgres:${MANAGER_DB_PASSWORD}@${MANAGER_DB_HOST:-localhost}:${MANAGER_DB_PORT:-5434}/mapserver_manager" pool_max="16"/>
+  <database url="postgresql://postgres:${MANAGER_DB_PASSWORD}@${MANAGER_DB_HOST:-localhost}:${MANAGER_DB_PORT:-5434}/mapserver-manager" pool_max="16"/>
   <!-- 头像本地存储根目录。相对路径按后端进程工作目录解析；
        生产部署建议改绝对路径（如 /var/lib/rust-gisserver/avatar），便于挂数据盘。 -->
   <storage avatar_dir="storage/avatar"/>

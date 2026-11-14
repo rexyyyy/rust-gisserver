@@ -2575,6 +2575,13 @@ fn row_to_published(r: &tokio_postgres::Row) -> PublishedRow {
 }
 
 fn published_json(p: &PublishedRow, extra: &Value) -> Value {
+    // geometry_type 从 extra.meta 里拿（sys_resource.meta.geometry_type）
+    let geom = extra
+        .get("meta")
+        .and_then(|m| m.get("geometry_type"))
+        .and_then(|v| v.as_str())
+        .map(|s| s.to_string())
+        .unwrap_or_default();
     json!({
         "id": p.id,
         "workspaceId": p.workspace_id,
@@ -2593,6 +2600,7 @@ fn published_json(p: &PublishedRow, extra: &Value) -> Value {
         "resourceName": extra.get("resourceName").cloned().unwrap_or(Value::Null),
         "dataType": extra.get("dataType").cloned().unwrap_or(Value::Null),
         "source": extra.get("source").cloned().unwrap_or(Value::Null),
+        "geometryType": geom,
     })
 }
 

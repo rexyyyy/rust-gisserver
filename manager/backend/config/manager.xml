@@ -18,7 +18,7 @@
       <item>http://127.0.0.1:5100</item>
     </cors_origins>
   </server>
-  <database url="postgresql://postgres:${MANAGER_DB_PASSWORD}@${MANAGER_DB_HOST:-localhost}:${MANAGER_DB_PORT:-5434}/mapserver_manager" pool_max="16"/>
+  <database url="postgresql://postgres:${MANAGER_DB_PASSWORD}@${MANAGER_DB_HOST:-localhost}:${MANAGER_DB_PORT:-5434}/mapserver-manager" pool_max="16"/>
   <!-- Avatar local storage root. Relative paths resolve against the backend
        process working directory. For production prefer an absolute path
        (e.g. /var/lib/rust-gisserver/avatar) to ease mounting a data disk. -->

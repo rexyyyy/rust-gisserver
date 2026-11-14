@@ -59,7 +59,7 @@
       <div class="avatar-container">
         <el-dropdown class="right-menu-item hover-effect" trigger="click" @command="handleCommand">
           <div class="avatar-wrapper">
-            <img :src="userStore.avatar" class="user-avatar" />
+            <img :src="userStore.avatar || defAva" class="user-avatar" @error="userStore.setAvatar(defAva)" />
             <el-icon><caret-bottom /></el-icon>
           </div>
           <template #dropdown>
@@ -94,6 +94,7 @@ import { NavTypeEnum } from '@/enums/NavTypeEnum';
 import Logo from "@/layout/components/Sidebar/Logo.vue";
 import TopBar from './TopBar'
 import DarkSwitch from './TopBar/DarkSwitch.vue'
+import defAva from '@/assets/images/profile.jpg'
 
 const appStore = useAppStore();
 const userStore = useUserStore();

@@ -50,6 +50,10 @@ pub fn routes() -> Router<Arc<AppState>> {
             get(service_config).put(service_update),
         )
         .route("/map/services/{kind}/{name}/state", put(set_state))
+        .route(
+            "/map/services/{kind}/{name}/mvt-style",
+            get(get_mvt_style).put(put_mvt_style),
+        )
         // 服务分组（两级命名空间）
         .route("/map/service-groups", get(service_groups))
         .route(
@@ -394,10 +398,66 @@ pub async fn logs(
 
 // ---- 样式库（SLD）----
 
-/// `GET /map/styles` — 样式清单（解析摘要 + 被引用图层）。
+/// SLD 文件名安全检查：`.sld` 后缀 + ASCII 字符集（与 map-api 一致）。
+fn safe_style_name(name: &str) -> Option<String> {
+    let n = name.trim();
+    if n.is_empty() || n.len() > 100 {
+        return None;
+    }
+    let file = if n.ends_with(".sld") || n.ends_with(".SLD") {
+        n.to_ascii_lowercase()
+    } else {
+        format!("{n}.sld").to_ascii_lowercase()
+    };
+    if file.contains("..") || !file.chars().all(|c| c.is_ascii_alphanumeric() || matches!(c, '_' | '-' | '.'))
+    {
+        return None;
+    }
+    Some(file)
+}
+
+/// `GET /map/styles` — 样式清单（查 sys_sld 表）。
+///
+/// 返回结构与 map-api `/admin/styles` 兼容，前端无感知。
 pub async fn style_list(State(state): State<Arc<AppState>>) -> AppResult<Json<Resp<Value>>> {
-    let data = upstream_json(&state, reqwest::Method::GET, "/admin/styles", None, None).await?;
-    Ok(Resp::ok(data))
+    let c = conn(&state.pool).await?;
+    let rows = c
+        .query(
+            "SELECT sld_id, sld_name, sld_file, char_length(sld_content)::bigint AS size, \
+                    coalesce(extract(epoch from update_time)::bigint, \
+                             extract(epoch from create_time)::bigint) AS modified, \
+                    style_name, layer_name, rule_count \
+             FROM sys_sld ORDER BY sld_name",
+            &[],
+        )
+        .await?;
+    let mut styles: Vec<Value> = Vec::new();
+    for r in &rows {
+        let id: i64 = r.get("sld_id");
+        let name: String = r.get("sld_name");
+        let file: String = r.get("sld_file");
+        let size: i64 = r.get("size");
+        let modified: i64 = r.get("modified");
+        let style_name: String = r.get("style_name");
+        let layer_name: String = r.get("layer_name");
+        let rules: i32 = r.get("rule_count");
+        styles.push(json!({
+            "id": id,
+            "name": file,
+            "sld_name": name,
+            "size": size,
+            "modified": modified,
+            "style_name": style_name,
+            "layer_name": layer_name,
+            "rules": rules,
+            "parse_ok": true,
+            "used_by": []
+        }));
+    }
+    Ok(Resp::ok(json!({
+        "count": styles.len(),
+        "styles": styles
+    })))
 }
 
 #[derive(Deserialize)]
@@ -406,19 +466,33 @@ pub struct StyleUploadBody {
     pub content: String,
 }
 
-/// `POST /map/styles/:name` — 上传/替换一个 SLD（map-api 端先解析校验再落盘）。
+/// `POST /map/styles/{name}` — 上传/替换一个 SLD。
+///
+/// 双写：先 proxy 给 map-api 做解析校验 + 文件落盘（map-api 是 SLD 渲染的真源），
+/// 成功后 UPSERT 到 sys_sld 表，把 XML 原文和解析摘要一并存库。
 pub async fn style_upload(
     State(state): State<Arc<AppState>>,
     Path(name): Path<String>,
     Json(body): Json<StyleUploadBody>,
 ) -> AppResult<Json<Resp<Value>>> {
+    // 1. 文件名安全检查
+    let file = safe_style_name(&name).ok_or_else(|| {
+        AppError::Msg("样式名无效：使用 ASCII 字母/数字/下划线/中划线，且需 .sld 后缀".to_string())
+    })?;
+    let sld_name = file.trim_end_matches(".sld").to_string();
+
+    if body.content.trim().is_empty() {
+        return Err(AppError::Msg("SLD 内容为空".to_string()));
+    }
+
+    // 2. Proxy 给 map-api 做解析校验 + 文件落盘
     let (base_raw, token) = super::engine::default_engine(&state).await;
     let base = base_raw.trim_end_matches('/');
     let mut req = state
         .map_http
-        .post(format!("{base}/admin/styles/{name}"))
+        .post(format!("{base}/admin/styles/{file}"))
         .header("Content-Type", "application/xml")
-        .body(body.content);
+        .body(body.content.clone());
     if let Some(tok) = &token {
         req = req.header("X-Admin-Token", tok);
     }
@@ -427,50 +501,179 @@ pub async fn style_upload(
         .await
         .map_err(|e| AppError::Msg(format!("map-api 服务不可达：{e}")))?;
     let status = resp.status();
-    let val: Value = resp
+    let map_api_resp: Value = resp
         .json()
         .await
         .map_err(|e| AppError::Msg(format!("map-api 返回非 JSON（HTTP {status}）：{e}")))?;
     if !status.is_success() {
-        let msg = val
+        let msg = map_api_resp
             .get("error")
             .and_then(|v| v.as_str())
             .unwrap_or("map-api 返回错误");
         return Err(AppError::Msg(format!("map-api HTTP {status}: {msg}")));
     }
-    Ok(Resp::ok(val))
+
+    // 3. UPSERT 到 sys_sld 表
+    let parsed_rules = map_api_resp.get("rules").and_then(|v| v.as_i64()).unwrap_or(0) as i32;
+    let (parsed_style, parsed_layer) = parse_sld_basic(&body.content);
+
+    let c = conn(&state.pool).await?;
+    let row = c
+        .query_opt(
+            "SELECT sld_id FROM sys_sld WHERE sld_name = $1",
+            &[&sld_name],
+        )
+        .await?;
+    let (affected, sld_id) = if let Some(r) = row {
+        let id: i64 = r.get(0);
+        c.execute(
+            "UPDATE sys_sld SET sld_content=$2, style_name=$3, layer_name=$4, \
+                    rule_count=$5, update_time=now() WHERE sld_id=$1",
+            &[&id, &body.content, &parsed_style, &parsed_layer, &parsed_rules],
+        )
+        .await?;
+        (1, id)
+    } else {
+        let r = c
+            .query_one(
+                "INSERT INTO sys_sld (sld_name, sld_file, sld_content, style_name, layer_name, rule_count) \
+                 VALUES ($1, $2, $3, $4, $5, $6) RETURNING sld_id",
+                &[&sld_name, &file, &body.content, &parsed_style, &parsed_layer, &parsed_rules],
+            )
+            .await?;
+        (1, r.get(0))
+    };
+
+    Ok(Resp::ok(json!({
+        "ok": true,
+        "id": sld_id,
+        "name": file,
+        "sld_name": sld_name,
+        "rules": parsed_rules,
+        "bytes": body.content.len(),
+        "rows": affected
+    })))
 }
 
-/// `DELETE /map/styles/:name` — 删除样式。
+/// 从 SLD XML 里快速提取 UserStyle Name 和 NamedLayer Name（不依赖 map-api 完整 parser）。
+fn parse_sld_basic(xml: &str) -> (String, String) {
+    let mut style_name = String::new();
+    let mut layer_name = String::new();
+    // NamedLayer -> Name
+    if let Some(start) = xml.find("<NamedLayer>") {
+        let rest = &xml[start..];
+        if let (Some(s1), Some(s2)) = (rest.find("<Name>"), rest.find("</Name>")) {
+            if s2 > s1 {
+                let v = &rest[s1 + 6..s2];
+                if !v.is_empty() {
+                    layer_name = v.trim().to_string();
+                }
+            }
+        }
+    }
+    // UserStyle -> Name（取第一个）
+    if let Some(start) = xml.find("<UserStyle>") {
+        let rest = &xml[start..];
+        if let (Some(s1), Some(s2)) = (rest.find("<Name>"), rest.find("</Name>")) {
+            if s2 > s1 {
+                let v = &rest[s1 + 6..s2];
+                if !v.is_empty() {
+                    style_name = v.trim().to_string();
+                }
+            }
+        }
+    }
+    (style_name, layer_name)
+}
+
+/// `DELETE /map/styles/{name}` — 删除样式。
+///
+/// 双删：先删 DB 再删 map-api 文件，文件删不掉不回滚 DB（日志警告即可）。
 pub async fn style_remove(
     State(state): State<Arc<AppState>>,
     Path(name): Path<String>,
 ) -> AppResult<Json<Resp<Value>>> {
-    let data = upstream_json(
+    let file = safe_style_name(&name).ok_or_else(|| {
+        AppError::Msg("样式名无效".to_string())
+    })?;
+    let sld_name = file.trim_end_matches(".sld").to_string();
+
+    // 1. 先查 DB 确认存在
+    let c = conn(&state.pool).await?;
+    let row = c
+        .query_opt(
+            "SELECT sld_id FROM sys_sld WHERE sld_name = $1",
+            &[&sld_name],
+        )
+        .await?;
+    let sld_id: Option<i64> = row.map(|r| r.get(0));
+    if sld_id.is_none() {
+        return Err(AppError::Msg(format!("样式「{sld_name}」不存在")));
+    }
+
+    // 2. 删 DB
+    let n = c
+        .execute(
+            "DELETE FROM sys_sld WHERE sld_name = $1",
+            &[&sld_name],
+        )
+        .await?;
+
+    // 3. Proxy 删 map-api 文件（失败不回滚 DB，只告警）
+    let map_api_resp = upstream_json(
         &state,
         reqwest::Method::DELETE,
-        &format!("/admin/styles/{name}"),
+        &format!("/admin/styles/{file}"),
         None,
         None,
     )
-    .await?;
-    Ok(Resp::ok(data))
+    .await;
+    if let Err(e) = map_api_resp {
+        tracing::warn!("删除 map-api SLD 文件失败（DB 已删）：{e}");
+    }
+
+    Ok(Resp::ok(json!({
+        "ok": true,
+        "name": file,
+        "rows": n
+    })))
 }
 
-/// `GET /map/styles/:name/content` — 样式原文。
+/// `GET /map/styles/{name}/content` — 样式原文（查 sys_sld 表）。
 pub async fn style_content(
     State(state): State<Arc<AppState>>,
     Path(name): Path<String>,
 ) -> AppResult<Json<Resp<Value>>> {
-    let data = upstream_json(
-        &state,
-        reqwest::Method::GET,
-        &format!("/admin/styles/{name}/content"),
-        None,
-        None,
-    )
-    .await?;
-    Ok(Resp::ok(data))
+    let file = safe_style_name(&name).ok_or_else(|| {
+        AppError::Msg("样式名无效".to_string())
+    })?;
+    let sld_name = file.trim_end_matches(".sld").to_string();
+
+    let c = conn(&state.pool).await?;
+    let row = c
+        .query_opt(
+            "SELECT sld_id, sld_content, style_name, layer_name, rule_count \
+             FROM sys_sld WHERE sld_name = $1",
+            &[&sld_name],
+        )
+        .await?;
+    let r = row.ok_or_else(|| AppError::Msg(format!("样式「{sld_name}」不存在")))?;
+    let id: i64 = r.get("sld_id");
+    let content: String = r.get("sld_content");
+    let style_name: String = r.get("style_name");
+    let layer_name: String = r.get("layer_name");
+    let rules: i32 = r.get("rule_count");
+
+    Ok(Resp::ok(json!({
+        "id": id,
+        "name": file,
+        "sld_name": sld_name,
+        "content": content,
+        "style_name": style_name,
+        "layer_name": layer_name,
+        "rules": rules,
+        "parse_ok": true
+    })))
 }
 
 /// `GET /map/styles/:name/legend.png?w=&h=` — 样式图例预览（PNG 直通）。
@@ -486,6 +689,118 @@ pub async fn style_legend(
     )
     .await?;
     Ok((StatusCode::OK, [( "content-type", ct.as_str() )], bytes).into_response())
+}
+
+// =====================================================================
+// MVT 矢量瓦片前端样式（OpenLayers Style JSON）
+// ---------------------------------------------------------------------
+// MVT 是 protobuf 要素流（几何 + 属性），不带样式。样式必须在前端
+// client-side 渲染（OpenLayers / Mapbox GL）。这里存一份 JSON，viewer_mvt.html
+// 预览页 fetch 后用 jsonToStyle() 动态生成 styleFunction。
+// 样式 JSON 结构：
+//   {
+//     "version": 1,
+//     "point":   { "radius": 4, "fill": {...}, "stroke": {...} },
+//     "line":    { "stroke": {...} },
+//     "polygon": { "fill": {...}, "stroke": {...} },
+//     "label":   { "field": "NAME", "font": "...", "fill": {...}, "stroke": {...}, "offsetY": -10 }
+//   }
+// 空值时前端走默认样式（蓝描边 + 半透明填充）。
+// =====================================================================
+
+/// 默认 MVT 样式模板（与 viewer_mvt.html 里的硬编码默认一致）。
+fn default_mvt_style() -> Value {
+    json!({
+        "version": 1,
+        "point": {
+            "radius": 4,
+            "fill": { "color": "rgba(214,60,50,.85)" },
+            "stroke": { "color": "#ffffff", "width": 1 }
+        },
+        "line": {
+            "stroke": { "color": "#1e6fd9", "width": 1.4 }
+        },
+        "polygon": {
+            "fill": { "color": "rgba(30,111,217,.18)" },
+            "stroke": { "color": "#1e6fd9", "width": 1.4 }
+        },
+        "label": null
+    })
+}
+
+/// `GET /map/services/{kind}/{name}/mvt-style` — 取 MVT 前端样式 JSON。
+pub async fn get_mvt_style(
+    State(state): State<Arc<AppState>>,
+    Path((kind, name)): Path<(String, String)>,
+) -> AppResult<Json<Resp<Value>>> {
+    let c = conn(&state.pool).await?;
+    let row = c
+        .query_opt(
+            "SELECT mvt_style_json::text AS mvt_style_json FROM sys_published_layer \
+             WHERE mapserver_kind=$1 AND layer_name=$2 AND del_flag=0",
+            &[&kind, &name],
+        )
+        .await?;
+    let exists = row.is_some();
+    let stored: Option<Value> = match row {
+        Some(r) => {
+            let s: Option<&str> = r.get("mvt_style_json");
+            s.and_then(|v| serde_json::from_str(v).ok())
+        }
+        None => None,
+    };
+    Ok(Resp::ok(json!({
+        "exists": exists,
+        "style": stored.unwrap_or_else(default_mvt_style),
+        "kind": kind,
+        "name": name
+    })))
+}
+
+#[derive(Deserialize)]
+pub struct MvtStyleBody {
+    pub style: Value,
+}
+
+/// `PUT /map/services/{kind}/{name}/mvt-style` — 保存 MVT 前端样式 JSON。
+pub async fn put_mvt_style(
+    State(state): State<Arc<AppState>>,
+    Path((kind, name)): Path<(String, String)>,
+    Json(body): Json<MvtStyleBody>,
+) -> AppResult<Json<Resp<Value>>> {
+    // 结构校验：根必须是 object，version 可选整数，其余字段可选 object/null
+    let s = &body.style;
+    if !s.is_object() {
+        return Err(AppError::Msg("样式 JSON 根必须是 object（{...}）".to_string()));
+    }
+    let obj = s.as_object().unwrap();
+    for key in ["point", "line", "polygon", "label"] {
+        if let Some(v) = obj.get(key) {
+            if !v.is_object() && !v.is_null() {
+                return Err(AppError::Msg(format!(
+                    "样式字段「{key}」必须是 object 或 null"
+                )));
+            }
+        }
+    }
+
+    let c = conn(&state.pool).await?;
+    let style_str = serde_json::to_string(&s)
+        .map_err(|e| AppError::Msg(format!("样式 JSON 序列化失败：{e}")))?;
+    let affected = c
+        .execute(
+            "UPDATE sys_published_layer \
+                SET mvt_style_json=$1::text::jsonb, update_time=now() \
+              WHERE mapserver_kind=$2 AND layer_name=$3 AND del_flag=0",
+            &[&style_str, &kind, &name],
+        )
+        .await?;
+    if affected == 0 {
+        return Err(AppError::Msg(format!(
+            "服务「{kind}/{name}」不存在或已删除"
+        )));
+    }
+    Ok(Resp::ok(json!({ "ok": true, "rows": affected })))
 }
 
 /// `GET /map/health` — map-api 存活探测（供页面顶部的组件状态灯）。

@@ -52,7 +52,7 @@ impl MbtilesMeta {
         let conn = open_readonly(p)?;
         let tiles_ok: bool = conn
             .query_row(
-                "SELECT EXISTS(SELECT 1 FROM sqlite_master WHERE type='table' AND name='tiles')",
+                "SELECT EXISTS(SELECT 1 FROM sqlite_master WHERE name='tiles')",
                 [],
                 |r| r.get(0),
             )
@@ -203,5 +203,236 @@ pub fn tile_out(mb: &MbtilesMeta, bytes: Vec<u8>) -> TileOut {
         } else {
             None
         },
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use rusqlite::{params, Connection};
+    use std::path::PathBuf;
+    use std::time::{SystemTime, UNIX_EPOCH};
+
+    /// 生成唯一临时路径
+    fn tmp_path(prefix: &str) -> PathBuf {
+        let ts = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap()
+            .as_nanos();
+        std::env::temp_dir().join(format!("{prefix}_{ts}.mbtiles"))
+    }
+
+    /// 创建 MBTiles metadata 表和测试行
+    fn write_metadata(conn: &Connection, fmt: &str) {
+        let sql = format!(
+            "CREATE TABLE metadata (name TEXT, value TEXT);
+             INSERT INTO metadata (name, value) VALUES
+               ('name',    'test'),
+               ('format',  '{fmt}'),
+               ('bounds',  '-180,-85,180,85'),
+               ('minzoom', '0'),
+               ('maxzoom', '3');"
+        );
+        conn.execute_batch(&sql).unwrap();
+    }
+
+    /// 创建 tiles 表（单表形式，回归已有行为）
+    fn create_single_table(conn: &Connection) {
+        conn.execute_batch(
+            "CREATE TABLE tiles (
+                 zoom_level INTEGER, tile_column INTEGER, tile_row INTEGER,
+                 tile_data BLOB NOT NULL);
+             CREATE UNIQUE INDEX idx_tiles_zc ON tiles(zoom_level, tile_column, tile_row);",
+        )
+        .unwrap();
+        conn.execute(
+            "INSERT INTO tiles (zoom_level, tile_column, tile_row, tile_data) VALUES (?,?,?,?)",
+            params![0i32, 0i32, 0i32, b"FAKE"],
+        )
+        .unwrap();
+    }
+
+    /// 创建双表稀疏存储 + tiles VIEW（WeMapGIS 等工具产物）
+    fn create_view(conn: &Connection) {
+        conn.execute_batch(
+            "CREATE TABLE images (
+                 tile_id INTEGER PRIMARY KEY, tile_data BLOB NOT NULL);
+             CREATE TABLE map (
+                 zoom_level INTEGER, tile_column INTEGER, tile_row INTEGER, tile_id INTEGER,
+                 PRIMARY KEY(zoom_level, tile_column, tile_row));
+             CREATE VIEW tiles AS
+                 SELECT m.zoom_level, m.tile_column, m.tile_row, i.tile_data
+                 FROM map m JOIN images i ON m.tile_id = i.tile_id;",
+        )
+        .unwrap();
+        conn.execute(
+            "INSERT INTO images (tile_id, tile_data) VALUES (1, ?1)",
+            params![b"FAKE"],
+        )
+        .unwrap();
+        conn.execute(
+            "INSERT INTO map (zoom_level, tile_column, tile_row, tile_id) VALUES (?,?,?,?)",
+            params![0i32, 0i32, 0i32, 1i64],
+        )
+        .unwrap();
+    }
+
+    /// 没有 tiles 表也没有 tiles view → 应报 "no 'tiles' table"
+    fn create_invalid(conn: &Connection) {
+        write_metadata(conn, "png");
+        // 故意不建 tiles 相关对象
+    }
+
+    // ────────────────────────────────────────────────────────────────────────
+    // 核心修复回归：view 形式 tiles 表必须能识别
+    // ────────────────────────────────────────────────────────────────────────
+
+    #[test]
+    fn opens_mbtiles_with_view_tiles_schema() {
+        let path = tmp_path("view");
+        {
+            let conn = Connection::open(&path).unwrap();
+            write_metadata(&conn, "jpg");
+            create_view(&conn);
+        }
+        let mb = MbtilesMeta::open(path.to_str().unwrap()).expect("view schema must open");
+        assert_eq!(mb.format(), "jpg");
+        assert_eq!(mb.content_type(), "image/jpeg");
+        // 验证 tiles 查询也能通过 view 执行
+        let tile = mb.read_tile(0, 0, 0).expect("tile read must succeed").expect("has tile");
+        assert_eq!(tile.as_slice(), b"FAKE");
+        std::fs::remove_file(&path).ok();
+    }
+
+    #[test]
+    fn opens_mbtiles_with_single_table_schema() {
+        let path = tmp_path("single");
+        {
+            let conn = Connection::open(&path).unwrap();
+            write_metadata(&conn, "png");
+            create_single_table(&conn);
+        }
+        let mb = MbtilesMeta::open(path.to_str().unwrap()).expect("single-table schema must open");
+        assert_eq!(mb.format(), "png");
+        assert_eq!(mb.content_type(), "image/png");
+        let tile = mb.read_tile(0, 0, 0).expect("tile read must succeed").expect("has tile");
+        assert_eq!(tile.as_slice(), b"FAKE");
+        std::fs::remove_file(&path).ok();
+    }
+
+    #[test]
+    fn rejects_missing_tiles_object() {
+        let path = tmp_path("nope");
+        {
+            let conn = Connection::open(&path).unwrap();
+            create_invalid(&conn);
+        }
+        let err = MbtilesMeta::open(path.to_str().unwrap()).expect_err("missing tiles must fail");
+        assert!(
+            err.to_string().contains("no 'tiles' table"),
+            "unexpected error: {err}"
+        );
+        std::fs::remove_file(&path).ok();
+    }
+
+    #[test]
+    fn view_and_single_table_are_both_found_in_sqlite_master() {
+        // 验证我们的 SQL 去掉 type 过滤后两种形式都被识别
+        let check_sql = "SELECT EXISTS(SELECT 1 FROM sqlite_master WHERE name='tiles')";
+
+        let p_view = tmp_path("sv");
+        let p_single = tmp_path("st");
+
+        // view
+        {
+            let c = Connection::open(&p_view).unwrap();
+            create_view(&c);
+            let ok: bool = c.query_row(check_sql, [], |r| r.get(0)).unwrap();
+            assert!(ok, "view: sqlite_master 必须列出 tiles view");
+        }
+        // table
+        {
+            let c = Connection::open(&p_single).unwrap();
+            create_single_table(&c);
+            let ok: bool = c.query_row(check_sql, [], |r| r.get(0)).unwrap();
+            assert!(ok, "single: sqlite_master 必须列出 tiles table");
+        }
+
+        std::fs::remove_file(&p_view).ok();
+        std::fs::remove_file(&p_single).ok();
+    }
+
+    // ────────────────────────────────────────────────────────────────────────
+    // format() / content_type() 工具方法
+    // ────────────────────────────────────────────────────────────────────────
+
+    #[test]
+    fn format_maps_to_correct_content_type() {
+        for (fmt, ct) in [
+            ("png", "image/png"),
+            ("jpg", "image/jpeg"),
+            ("jpeg", "image/jpeg"),
+            ("webp", "image/webp"),
+            ("pbf", "application/x-protobuf"),
+            ("protobuf", "application/x-protobuf"),
+            ("mvt", "application/x-protobuf"),
+            ("", "image/png"), // 空 → 默认 png
+            ("unknown", "image/png"), // 未知 → 回退 png
+        ] {
+            let path = tmp_path(fmt);
+            {
+                let conn = Connection::open(&path).unwrap();
+                write_metadata(&conn, fmt);
+                create_single_table(&conn);
+            }
+            let mb = MbtilesMeta::open(path.to_str().unwrap()).unwrap();
+            assert_eq!(mb.content_type(), ct, "fmt={fmt}");
+            std::fs::remove_file(&path).ok();
+        }
+    }
+
+    // ────────────────────────────────────────────────────────────────────────
+    // tile_out gzip 检测
+    // ────────────────────────────────────────────────────────────────────────
+
+    #[test]
+    fn tile_out_detects_gzip_for_vector() {
+        let path = tmp_path("gz");
+        {
+            let conn = Connection::open(&path).unwrap();
+            write_metadata(&conn, "pbf");
+            create_single_table(&conn);
+        }
+        let mb = MbtilesMeta::open(path.to_str().unwrap()).unwrap();
+        // 伪造 gzip magic bytes
+        let gz = vec![0x1f, 0x8b, 0x00, 0x00, b'x', b'y', b'z'];
+        let out = tile_out(&mb, gz);
+        assert_eq!(out.content_type, "application/x-protobuf");
+        assert_eq!(out.content_encoding.as_deref(), Some("gzip"));
+
+        // 非 gzip pbf 不带 encoding
+        let nogz = vec![0x50, 0x42, 0x46]; // "PBF"
+        let out2 = tile_out(&mb, nogz);
+        assert_eq!(out2.content_encoding, None);
+
+        std::fs::remove_file(&path).ok();
+    }
+
+    #[test]
+    fn tile_out_never_claims_gzip_for_raster() {
+        let path = tmp_path("ngz");
+        {
+            let conn = Connection::open(&path).unwrap();
+            write_metadata(&conn, "png");
+            create_single_table(&conn);
+        }
+        let mb = MbtilesMeta::open(path.to_str().unwrap()).unwrap();
+        // 即使 png tile 意外以 gzip magic 开头（极罕见），也不能标 gzip
+        let fake = vec![0x1f, 0x8b, 0x00, 0x00, 0x89, 0x50, 0x4E, 0x47];
+        let out = tile_out(&mb, fake);
+        assert_eq!(out.content_type, "image/png");
+        assert!(out.content_encoding.is_none(), "raster tiles must not be marked gzip");
+
+        std::fs::remove_file(&path).ok();
     }
 }

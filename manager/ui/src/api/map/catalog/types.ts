@@ -280,6 +280,8 @@ export interface PublishedVO {
   source: string | null;
   /** ArcGIS 发布时固化的原生网格快照 */
   grid?: NativeGrid | null;
+  /** 几何类型（从 sys_resource.meta.geometry_type 透出）：MULTIPOLYGON / LINESTRING / POINT / GEOMETRY */
+  geometryType?: string;
 }
 
 export interface PublishedListResp {

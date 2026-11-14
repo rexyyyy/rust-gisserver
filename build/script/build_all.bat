@@ -1,110 +1,109 @@
 @echo off
 chcp 65001 >nul
-REM Build rust-gisserver (mapserver + manager) and optional frontend, in release mode.
-REM All cargo output is redirected to <repo>\build\target via CARGO_TARGET_DIR,
-REM NOT the per-crate target dirs. install.bat reads from there.
+REM Build rust-gisserver (mapserver + manager), release mode.
+REM CARGO_TARGET_DIR = <repo>\build\target  (SHARED between all Rust crates)
 REM Usage: build_all.bat [frontend]
 
-setlocal enabledelayedexpansion
+REM IMPORTANT: do NOT use setlocal here!
+REM call vcvars64.bat + setlocal = env vars lost when vcvars exits inside setlocal.
 
-REM ---- Canonical build output directory ----
+REM ---- canonical output dir ----
 set "CARGO_TARGET_DIR=%~dp0..\target"
 if not exist "%CARGO_TARGET_DIR%" mkdir "%CARGO_TARGET_DIR%"
 
 echo ============================================
-echo Building rust-gisserver (target: %CARGO_TARGET_DIR%)
+echo Build rust-gisserver
+echo CARGO_TARGET_DIR=%CARGO_TARGET_DIR%
 echo ============================================
 
-REM Check Rust toolchain
 where rustc >nul 2>&1
 if errorlevel 1 (
-    echo [ERROR] Rust not found. Install from https://rustup.rs
+    echo [ERROR] rustc not found
     exit /b 1
 )
-
-echo [1/4] Rust version:
 rustc --version
 cargo --version
 
-REM Load MSVC environment if available
-if exist "C:\Program Files\Microsoft Visual Studio\2022\Community\VC\Auxiliary\Build\vcvars64.bat" (
-    echo [2/4] Loading MSVC 2022 Community...
-    call "C:\Program Files\Microsoft Visual Studio\2022\Community\VC\Auxiliary\Build\vcvars64.bat"
-) else if exist "C:\Program Files\Microsoft Visual Studio\2022\Professional\VC\Auxiliary\Build\vcvars64.bat" (
-    echo [2/4] Loading MSVC 2022 Professional...
-    call "C:\Program Files\Microsoft Visual Studio\2022\Professional\VC\Auxiliary\Build\vcvars64.bat"
-) else if exist "C:\Program Files (x86)\Microsoft Visual Studio\2019\Community\VC\Auxiliary\Build\vcvars64.bat" (
-    echo [2/4] Loading MSVC 2019 Community...
-    call "C:\Program Files (x86)\Microsoft Visual Studio\2019\Community\VC\Auxiliary\Build\vcvars64.bat"
-) else (
-    echo [WARN] MSVC not found, using default toolchain
-)
+REM ---- MSVC (linear, NO paren blocks) ----
+set "MSVC_BAT="
+if exist "C:\Program Files\Microsoft Visual Studio\2022\Community\VC\Auxiliary\Build\vcvars64.bat" set "MSVC_BAT=C:\Program Files\Microsoft Visual Studio\2022\Community\VC\Auxiliary\Build\vcvars64.bat"
+if "%MSVC_BAT%"=="" if exist "C:\Program Files\Microsoft Visual Studio\2022\Professional\VC\Auxiliary\Build\vcvars64.bat" set "MSVC_BAT=C:\Program Files\Microsoft Visual Studio\2022\Professional\VC\Auxiliary\Build\vcvars64.bat"
+if "%MSVC_BAT%"=="" if exist "C:\Program Files (x86)\Microsoft Visual Studio\2019\Community\VC\Auxiliary\Build\vcvars64.bat" set "MSVC_BAT=C:\Program Files (x86)\Microsoft Visual Studio\2019\Community\VC\Auxiliary\Build\vcvars64.bat"
+if "%MSVC_BAT%"=="" goto :skip_msvc
+echo [MSVC] %MSVC_BAT%
+call "%MSVC_BAT%"
 
-REM Ensure Windows SDK import libs / headers are on LIB/INCLUDE.
-REM vcvars normally adds these, but on some installs the SDK lib path is missing,
-REM which makes link.exe fail with LNK1181 (cannot find kernel32.lib).
-REM Fall back to the newest Windows SDK actually present on disk.
-set "SDKROOT=C:\Program Files (x86)\Windows Kits\10"
-if exist "%SDKROOT%" (
-    set "SDKVER="
-    for /f "delims=" %%V in ('dir /b /ad /o-n "%SDKROOT%\Lib" 2^>nul') do (
-        if not defined SDKVER if exist "%SDKROOT%\Lib\%%V\um\x64\kernel32.lib" set "SDKVER=%%V"
-    )
-    if defined SDKVER (
-        set "LIB=%LIB%;%SDKROOT%\Lib\%SDKVER%\um\x64;%SDKROOT%\Lib\%SDKVER%\ucrt\x64"
-        set "INCLUDE=%INCLUDE%;%SDKROOT%\Include\%SDKVER%\um;%SDKROOT%\Include\%SDKVER%\shared;%SDKROOT%\Include\%SDKVER%\ucrt"
-        echo [2/4] Windows SDK %SDKVER% lib/include appended
-    ) else (
-        echo [WARN] Windows SDK lib not found under %SDKROOT%\Lib
-    )
-)
+REM call vcvars may reset vars - re-apply CARGO_TARGET_DIR
+set "CARGO_TARGET_DIR=%~dp0..\target"
+goto :after_msvc
 
-REM Build mapserver
-echo [3/4] Building mapserver (release)...
+:skip_msvc
+echo [WARN] MSVC not found, use default toolchain
+
+:after_msvc
+REM ---- build mapserver ----
+echo.
+echo [1/2] mapserver (release)...
 cd /d "%~dp0..\..\mapserver"
-if not exist "Cargo.toml" (
-    echo [ERROR] mapserver not found at %~dp0..\..\mapserver
+if not exist Cargo.toml (
+    echo [ERROR] mapserver not found
     exit /b 1
 )
+echo   cargo target: %CARGO_TARGET_DIR%
 cargo build --release -p mapserver
 if errorlevel 1 (
     echo [ERROR] mapserver build failed
     exit /b 1
 )
-echo [OK] mapserver built: %CARGO_TARGET_DIR%\release\map-api.exe
+for %%F in ("%CARGO_TARGET_DIR%\release\map-api.exe") do echo [OK] map-api.exe - %%~zF bytes
 
-REM Build manager
-echo [4/4] Building manager (release)...
+REM ---- build manager ----
+echo.
+echo [2/2] manager (release)...
 cd /d "%~dp0..\..\manager\backend"
-if not exist "Cargo.toml" (
-    echo [ERROR] manager not found at %~dp0..\..\manager\backend
+if not exist Cargo.toml (
+    echo [ERROR] manager backend not found
     exit /b 1
 )
+echo   cargo target: %CARGO_TARGET_DIR%
 cargo build --release
 if errorlevel 1 (
     echo [ERROR] manager build failed
     exit /b 1
 )
-echo [OK] manager built: %CARGO_TARGET_DIR%\release\manager.exe
+for %%F in ("%CARGO_TARGET_DIR%\release\manager.exe") do echo [OK] manager.exe - %%~zF bytes
 
-REM Optional: build frontend
-if "%1"=="frontend" (
-    echo [EXTRA] Building frontend...
-    cd /d "%~dp0..\..\manager\ui"
-    if exist "package.json" (
-        where pnpm >nul 2>&1 && pnpm install && pnpm build || (
-            where npm >nul 2>&1 && npm install && npm run build || (
-                echo [WARN] No pnpm/npm found, skip frontend build
-            )
-        )
-    )
-)
+REM ---- optional frontend ----
+if not "%1"=="frontend" goto :done
+echo.
+echo [EXTRA] frontend...
+cd /d "%~dp0..\..\manager\ui"
+if not exist package.json goto :done
+where pnpm >nul 2>&1
+if errorlevel 1 goto :try_npm
+echo [UI] pnpm
+call pnpm install
+if errorlevel 1 goto :done
+call pnpm run build:prod
+goto :done
 
+:try_npm
+where npm >nul 2>&1
+if errorlevel 1 goto :skip_ui
+echo [UI] npm
+call npm install
+if errorlevel 1 goto :done
+call npm run build
+goto :done
+
+:skip_ui
+echo [WARN] no pnpm/npm, skip frontend
+
+:done
 echo.
 echo ============================================
-echo Build complete!
+echo Build done!
 echo ============================================
-echo target dir: %CARGO_TARGET_DIR%
-echo   map-api.exe : %CARGO_TARGET_DIR%\release\map-api.exe
-echo   manager.exe : %CARGO_TARGET_DIR%\release\manager.exe
-endlocal
+echo   %CARGO_TARGET_DIR%\release\map-api.exe
+echo   %CARGO_TARGET_DIR%\release\manager.exe
+cd /d "%~dp0"

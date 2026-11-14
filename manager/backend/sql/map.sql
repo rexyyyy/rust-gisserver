@@ -593,3 +593,50 @@ alter table sys_workspace add column if not exists data_root varchar(512) defaul
 comment on column sys_workspace.data_root is '数据文件根路径（统一用 / 分隔，末尾带 /）';
 alter table sys_workspace add column if not exists engine_id varchar(64) default '';
 comment on column sys_workspace.engine_id is '绑定的地图引擎 ID（sys_engine.engine_id，空=默认引擎）';
+
+-- =====================================================================
+-- §8 SLD 样式库 sys_sld
+-- ---------------------------------------------------------------------
+-- 数据库存储为主，map-api styles 目录为文件系统副本（manager 写入时双写）。
+-- 字段：sld_content 存完整 XML，style_name / layer_name / rule_count 为解析冗余，
+-- 便于列表显示；sld_name 不含 .sld 后缀，sld_file 含后缀。
+-- 菜单：已在 §1 预置 menu_id=112 样式库 + 按钮 1056 样式上传 / 1057 样式删除。
+-- =====================================================================
+
+create table if not exists sys_sld (
+  sld_id      bigint GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+  sld_name    varchar(100)  NOT NULL,
+  sld_file    varchar(120)  NOT NULL,
+  sld_content text          NOT NULL,
+  style_name  varchar(100)  DEFAULT '',
+  layer_name  varchar(100)  DEFAULT '',
+  rule_count  integer       DEFAULT 0,
+  remark      varchar(500)  DEFAULT '',
+  create_by   bigint,
+  create_time timestamp NOT NULL DEFAULT now(),
+  update_by   bigint,
+  update_time timestamp,
+  CONSTRAINT uk_sys_sld_name UNIQUE (sld_name),
+  CONSTRAINT uk_sys_sld_file UNIQUE (sld_file)
+);
+
+create index if not exists idx_sys_sld_update_time on sys_sld (update_time desc);
+
+comment on table  sys_sld             is 'SLD 样式库：数据库主存储 + map-api styles 目录双写';
+comment on column sys_sld.sld_id     is '自增主键';
+comment on column sys_sld.sld_name   is '样式名（不含 .sld 扩展名，全局唯一，前端/XML 引用用这个）';
+comment on column sys_sld.sld_file   is '文件名（含 .sld 扩展名）';
+comment on column sys_sld.sld_content is 'SLD XML 原文';
+comment on column sys_sld.style_name is '解析冗余：UserStyle Name';
+comment on column sys_sld.layer_name is '解析冗余：NamedLayer Name';
+comment on column sys_sld.rule_count is '解析冗余：SLD 规则数';
+
+-- =====================================================================
+-- §9 MVT 前端样式 JSON（sys_published_layer）
+-- ---------------------------------------------------------------------
+-- MVT 是 protobuf 要素流，样式由前端 OpenLayers 渲染；manager 的
+-- /map/services/{kind}/{name}/mvt-style 接口读写此列，map-api 不消费。
+-- 空值走 viewer_mvt.html 内置默认样式。
+-- =====================================================================
+alter table sys_published_layer add column if not exists mvt_style_json jsonb;
+comment on column sys_published_layer.mvt_style_json is 'MVT 矢量瓦片前端样式 JSON（OpenLayers Style JSON，manager 预览页读写）';

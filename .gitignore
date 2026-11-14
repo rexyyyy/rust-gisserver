@@ -17,3 +17,17 @@
 # The authoritative copy lives in build/script/. This on-disk copy under
 # mapserver/install/windows/ is kept only locally to avoid confusion.
 /mapserver/install/windows/PROJ_RUNTIME_MANIFEST.csv
+
+# ===== Local run environment / caches (never commit) =====
+# build/script/install.bat deploys into <repo>/run-env: 20+ GB of COG / 3D Tiles
+# data, an 8 GiB foyer cache, generated bin/ and web/, and .env with real
+# DB passwords / JWT secrets. It is a runtime artifact, not source.
+/run-env/
+/cache/
+# Scratch workspaces used to rebuild the OpenLayers vendor bundle.
+/build/_tmp_*/
+
+# ===== Local-only layer configs (contain plaintext DSN passwords) =====
+# Authoritative examples live in mapserver/config/*/README.md; the postgis/
+# layer files are machine-local test fixtures with hardcoded credentials.
+/mapserver/config/postgis/

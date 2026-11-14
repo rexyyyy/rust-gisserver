@@ -3,8 +3,7 @@
 <head>
 <meta charset="utf-8"/>
 <script>
-  // 预览页由 manager 托管、数据面在 map-api：引擎地址经 ?base= 注入，页面不写死端口。
-  // 同源相对请求（fetch('/wms') 等）统一改写为引擎地址；瓦片 URL 模板见下方 MAP_BASE。
+  // 预览页由 manager 托管、数据面在 map-api：引擎地址经 ?base= 注入。
   (function () {
     var b = (new URLSearchParams(location.search).get('base') || '').replace(/\/+$/, '');
     window.MAP_BASE = b || location.origin;
@@ -15,29 +14,17 @@
     };
   })();
 </script>
-<title>rust-gisserver · PostGIS 矢量瓦片浏览（发布网格 · 源 LOD 原生寻址）</title>
+<title>rust-gisserver · PostGIS 矢量瓦片浏览</title>
 <meta name="viewport" content="width=device-width, initial-scale=1"/>
-<!--
-  PostGIS 矢量瓦片（MVT）浏览页。与 /viewer（纯 Web Mercator XYZ）不同：图层的
-  网格取自发布时选择的定义（OGC 标准 / 天地图 / Conf.xml 自定义），因此：
-    1) 读 /ogc/tiles/v1/tileMatrixSets/{grid}，取 tileMatrices[].resolutions
-       的 native（= 源 LOD 分辨率）与 topLeftCorner，建与切片端一致的 TileGrid；
-    2) 用返回的 proj4 动态注册该 EPSG（非 OL 内置，必须注册）；
-    3) 在该坐标系下建 VectorTile 源，请求
-       /mvt/{layer}/{grid}/{z}/{col}/{row}.pbf —— 与引擎 serve_pg 的网格寻址一致；
-    4) View 直接建在源坐标系下，不做重投影；首屏 fit 到 tileMatrixSet 的 bbox。
-  用法：?layer=guandu_xzq_530111（默认 grid 取图层首个网格，可由 ?grid= 覆盖）；
-       ?base= 覆盖服务地址。
-  依赖库 proj4 / OpenLayers 由本服务同源伺服（/vendor/），无需联网 CDN。
--->
 <script src="./vendor/proj4.js"></script>
 <link href="./vendor/ol.css" rel="stylesheet"/>
 <script src="./vendor/ol.js"></script>
 <style>
   html, body, #map { height: 100%; margin: 0; }
+  /* 顶栏（左上） — 注意给右上角 Zoom 留空间 */
   #bar { position: absolute; top: 10px; left: 12px; z-index: 1000; background: rgba(255,255,255,.94);
          padding: 6px 10px; border-radius: 6px; font: 13px/1.5 sans-serif; box-shadow: 0 1px 4px rgba(0,0,0,.3);
-         display: flex; align-items: center; gap: 8px; flex-wrap: wrap; max-width: calc(100% - 24px); }
+         display: flex; align-items: center; gap: 8px; flex-wrap: wrap; max-width: calc(100% - 140px); }
   #hint { color: #b06000; }
   #codeBtn { font: 12px/1 sans-serif; padding: 4px 10px; border: 1px solid #1e6fd9; background: #fff;
              color: #1e6fd9; border-radius: 4px; cursor: pointer; }
@@ -57,6 +44,20 @@
   #info { position: absolute; bottom: 8px; right: 12px; z-index: 1000; background: rgba(0,0,0,.72);
           color: #fff; padding: 4px 10px; border-radius: 4px; font: 12px/1.6 monospace;
           pointer-events: none; white-space: nowrap; }
+  /* 自定义缩放按钮（不依赖 ol.control 模块） */
+  .custom-zoom {
+    position: absolute; top: 12px; right: 12px; z-index: 1000;
+    display: flex; flex-direction: column; gap: 0;
+  }
+  .custom-zoom button {
+    width: 32px; height: 32px; font-size: 18px; font-weight: bold;
+    border: 1px solid #999; background: #fff; color: #333; cursor: pointer;
+    font-family: sans-serif; line-height: 1;
+  }
+  .custom-zoom button:hover { background: #f0f0f0; }
+  .custom-zoom button:first-child { border-radius: 4px 4px 0 0; border-bottom: none; }
+  .custom-zoom button:last-child  { border-radius: 0 0 4px 4px; }
+  .custom-zoom button:active { background: #d0d0d0; }
 </style>
 </head>
 <body>
@@ -66,6 +67,10 @@
   <span id="hint">加载中…</span>
 </div>
 <div id="map"></div>
+<div class="custom-zoom">
+  <button id="zoomIn"  type="button" title="放大">+</button>
+  <button id="zoomOut" type="button" title="缩小">−</button>
+</div>
 <div id="codeWrap">
   <div id="codeBox">
     <div id="codeHead">
@@ -81,16 +86,19 @@
 <script>
 (function () {
   if (!window.proj4) { document.getElementById('hint').textContent = 'proj4 未加载'; return; }
-  if (!window.ol) { document.getElementById('hint').textContent = 'OpenLayers 未加载'; return; }
+  if (!window.ol)   { document.getElementById('hint').textContent = 'OpenLayers 未加载'; return; }
 
   var ARCGIS_PX = 0.0254 / 96;
   var Q = new URLSearchParams(location.search);
   var BASE = window.MAP_BASE;
   var LAYER = Q.get('layer') || '';
-  var GRID = Q.get('grid') || '';
+  var GRID  = Q.get('grid')  || '';
+  var KIND  = Q.get('kind')  || 'postgis';
   var hintEl = document.getElementById('hint');
   var infoEl = document.getElementById('info');
-  document.getElementById('title').textContent = '矢量瓦片浏览：' + (LAYER || '(未指定 layer)');
+  document.getElementById('title').textContent = '矢量瓦片浏览：' + (LAYER || '(未指定 layer)')
+    + (KIND ? ' · ' + KIND : '');
+
   function setHint(t) { hintEl.textContent = t; }
   function toEpsgCode(crs) {
     var m = /(?:EPSG[:/]|EPSG\/0\/)(\d+)\s*$/i.exec(String(crs || ''));
@@ -105,7 +113,113 @@
 
   if (!LAYER) { setHint('缺少 ?layer='); return; }
 
-  // 网格分辨率取服务端下发的 native（源 LOD，CRS 单位/px），与 /mvt 寻址同源。
+  // ====== 默认样式（兜底） ======
+  var DEFAULT_STYLE = {
+    version: 1,
+    point:   { radius: 4, fill: { color: 'rgba(214,60,50,.85)' }, stroke: { color: '#ffffff', width: 1 } },
+    line:    { stroke: { color: '#1e6fd9', width: 1.4 } },
+    polygon: { fill: { color: 'rgba(30,111,217,.18)' }, stroke: { color: '#1e6fd9', width: 1.4 } },
+    label:   null
+  };
+
+  // ====== 从 URL 参数注入样式 ======
+  //   ?style=<base64(JSON)>   manager UI 的 StyleJsonEditor 预览按钮会这样传
+  //   ?labelField=CN_NAME     覆盖标注字段
+  function loadStyleFromUrl() {
+    try {
+      var b64 = Q.get('style');
+      if (b64) {
+        var json = JSON.parse(decodeURIComponent(escape(atob(b64))));
+        if (json && typeof json === 'object') return json;
+      }
+    } catch (_) {}
+    return null;
+  }
+  var STYLE_JSON = loadStyleFromUrl() || DEFAULT_STYLE;
+  var LABEL_FIELD = Q.get('labelField') || (STYLE_JSON.label && STYLE_JSON.label.field) || null;
+
+  // ====== jsonToStyle：把后端 JSON 样式转成 OpenLayers ol.style.Style ======
+  function jsonToStyle(styleJson, labelField) {
+    var s = styleJson || DEFAULT_STYLE;
+
+    function makeFill(f) {
+      if (!f || !f.color) return null;
+      return new ol.style.Fill({ color: f.color });
+    }
+    function makeStroke(st) {
+      if (!st || !st.color) return null;
+      return new ol.style.Stroke({ color: st.color, width: st.width || 1 });
+    }
+
+    function makePointStyle(pt) {
+      var cfg = pt || { radius: 4, fill: { color: 'rgba(214,60,50,.85)' }, stroke: { color: '#fff', width: 1 } };
+      return new ol.style.Style({
+        image: new ol.style.Circle({
+          radius: cfg.radius || 4,
+          fill: makeFill(cfg.fill),
+          stroke: makeStroke(cfg.stroke)
+        })
+      });
+    }
+
+    function makeLineStyle(ln) {
+      var cfg = ln || { stroke: { color: '#1e6fd9', width: 1.4 } };
+      return new ol.style.Style({
+        stroke: makeStroke(cfg.stroke) || new ol.style.Stroke({ color: '#1e6fd9', width: 1.4 })
+      });
+    }
+
+    function makePolygonStyle(pg) {
+      var cfg = pg || { fill: { color: 'rgba(30,111,217,.18)' }, stroke: { color: '#1e6fd9', width: 1.4 } };
+      return new ol.style.Style({
+        fill: makeFill(cfg.fill) || new ol.style.Fill({ color: 'rgba(30,111,217,.18)' }),
+        stroke: makeStroke(cfg.stroke) || new ol.style.Stroke({ color: '#1e6fd9', width: 1.4 })
+      });
+    }
+
+    function makeLabelStyle(labelCfg, field) {
+      if (!labelCfg && !field) return null;
+      if (labelCfg && labelCfg.enabled === false) return null;
+      var fld = field || (labelCfg && labelCfg.field);
+      if (!fld) return null;
+      return function (feature) {
+        var val = feature.get(fld);
+        if (!val) return null;
+        var cfg = labelCfg || {};
+        return new ol.style.Style({
+          text: new ol.style.Text({
+            text: String(val),
+            font: cfg.font || 'bold 13px sans-serif',
+            offsetY: cfg.offsetY != null ? cfg.offsetY : -8,
+            fill: makeFill(cfg.fill) || new ol.style.Fill({ color: '#000' }),
+            stroke: makeStroke(cfg.stroke) || new ol.style.Stroke({ color: '#fff', width: 3 })
+          })
+        });
+      };
+    }
+
+    var pointS = makePointStyle(s.point);
+    var lineS  = makeLineStyle(s.line);
+    var polyS  = makePolygonStyle(s.polygon);
+    var labelFn = makeLabelStyle(s.label, labelField);
+
+    return function (feature) {
+      var geom = feature.getGeometry();
+      if (!geom) return null;
+      var gt = geom.getType();
+      var arr = [];
+      if (gt === 'Point' || gt === 'MultiPoint') arr.push(pointS);
+      else if (gt === 'LineString' || gt === 'MultiLineString') arr.push(lineS);
+      else arr.push(polyS);
+      if (labelFn) {
+        var ls = labelFn(feature);
+        if (ls) arr.push(ls);
+      }
+      return arr.length ? arr : null;
+    };
+  }
+
+  // ====== 网格分辨率 ======
   var MPU = 1;
   function nativeResolution(t) {
     var v = t.resolutions || {};
@@ -116,64 +230,43 @@
 
   var state = null, loaded = 0, features = 0;
 
-  /** 「代码」按钮：把本页实际使用的网格常量（坐标系 / 原点 / LOD 分辨率 / 全幅 /
-   *  瓦片模板）原样打印成一段可独立运行的 OpenLayers 代码。常量取自 state，
-   *  因此换图层（= 换发布网格）时这些值随之变化，而不是写死的示例。 */
+  // 「代码」按钮 — 保持原功能
   function jsArray(a) { return '[' + a.map(function (x) { return String(x); }).join(', ') + ']'; }
   function buildSnippet() {
     if (!state || !state.resolutions) return '';
     var res = state.resolutions;
     var bbox = state.bbox || state.extent;
     var L = [];
-    L.push('// ===== 图层加载常量（随图层 / 发布网格变化；由 rust-gisserver 预览页生成）=====');
-    L.push('const TILE_SERVER = ' + JSON.stringify(BASE) + ';   // 瓦片服务地址（http/https）');
+    L.push('// rust-gisserver 矢量瓦片加载代码');
+    L.push('const TILE_SERVER = ' + JSON.stringify(BASE) + ';');
     L.push('const LAYER = ' + JSON.stringify(LAYER) + ';');
-    L.push('const CRS = ' + JSON.stringify(state.code) + ';                  // 源坐标系，不做 WebMercator 重投影');
-    L.push('const GRID = ' + JSON.stringify(state.grid) + ';        // 发布网格（LOD 体系）');
-    L.push('const ORIGIN = ' + jsArray(state.origin) + ';           // 网格左上角（CRS 单位）');
-    L.push('const TILE_SIZE = [' + state.tileW + ', ' + state.tileH + '];');
-    L.push('const RESOLUTIONS = ' + jsArray(res) + ';  // ' + res.length + ' 级，CRS 单位/像素（源 LOD）');
-    L.push('const EXTENT = ' + jsArray(state.extent) + ';   // 网格全幅');
-    L.push('const BBOX = ' + jsArray(bbox) + ';   // 图层四至（首屏 fit）');
+    L.push('const CRS = ' + JSON.stringify(state.code) + ';');
+    L.push('const GRID = ' + JSON.stringify(state.grid) + ';');
+    L.push('const ORIGIN = ' + jsArray(state.origin) + ';');
+    L.push('const RESOLUTIONS = ' + jsArray(res) + ';');
     L.push('const TILE_URL = TILE_SERVER + ' + JSON.stringify('/mvt/' + LAYER + '/' + state.grid + '/{z}/{x}/{y}.pbf') + ';');
     L.push('');
     if (!BUILTIN[state.code] && state.proj4) {
-      L.push('// 1) 非内置坐标系必须先注册 proj4（否则 OpenLayers 不认识该 EPSG）');
       L.push('proj4.defs(CRS, ' + JSON.stringify(state.proj4) + ');');
       L.push('ol.proj.proj4.register(proj4);');
       L.push('');
     }
-    L.push('// 2) 按发布网格建 TileGrid：用源 LOD 分辨率，而不是默认 WebMercator 金字塔');
     L.push('const tileGrid = new ol.tilegrid.TileGrid({');
-    L.push('  extent: EXTENT,');
-    L.push('  origin: ORIGIN,');
-    L.push('  resolutions: RESOLUTIONS,');
-    L.push('  tileSize: TILE_SIZE');
+    L.push('  extent: ' + jsArray(state.extent) + ',');
+    L.push('  origin: ORIGIN, resolutions: RESOLUTIONS, tileSize: [256,256]');
     L.push('});');
-    L.push('');
-    L.push('// 3) 矢量瓦片源：非 WebMercator 网格必须显式给 projection + tileGrid');
     L.push('const source = new ol.source.VectorTile({');
-    L.push('  projection: CRS,');
-    L.push('  tileGrid: tileGrid,');
-    L.push('  format: new ol.format.MVT(),');
-    L.push('  url: TILE_URL');
+    L.push('  projection: CRS, tileGrid: tileGrid,');
+    L.push('  format: new ol.format.MVT(), url: TILE_URL');
     L.push('});');
-    L.push('');
     L.push('const map = new ol.Map({');
-    L.push("  target: 'map',");
-    L.push('  layers: [new ol.layer.VectorTile({ source: source })],');
-    L.push('  view: new ol.View({');
-    L.push('    projection: CRS,');
-    L.push('    center: [(BBOX[0] + BBOX[2]) / 2, (BBOX[1] + BBOX[3]) / 2],');
-    L.push('    resolution: RESOLUTIONS[0]');
-    L.push('  })');
+    L.push("  target: 'map', layers: [new ol.layer.VectorTile({ source })],");
+    L.push('  view: new ol.View({ projection: CRS, center: [' + ((bbox[0]+bbox[2])/2) + ',' + ((bbox[1]+bbox[3])/2) + '], resolution: RESOLUTIONS[0] })');
     L.push('});');
-    L.push('map.getView().fit(BBOX, { padding: [20, 20, 20, 20] });');
     return L.join('\n');
   }
-
   var codeWrap = document.getElementById('codeWrap');
-  var codeBtn = document.getElementById('codeBtn');
+  var codeBtn  = document.getElementById('codeBtn');
   codeBtn.addEventListener('click', function () {
     document.getElementById('code').textContent = buildSnippet();
     codeWrap.classList.add('open');
@@ -182,15 +275,13 @@
   codeWrap.addEventListener('click', function (e) { if (e.target === codeWrap) codeWrap.classList.remove('open'); });
   document.getElementById('copyBtn').addEventListener('click', function () {
     var btn = this, txt = document.getElementById('code').textContent;
-    function done(ok) {
-      btn.textContent = ok ? '已复制' : '复制失败';
-      setTimeout(function () { btn.textContent = '复制'; }, 1500);
-    }
+    function done(ok) { btn.textContent = ok ? '已复制' : '复制失败'; setTimeout(function () { btn.textContent = '复制'; }, 1500); }
     if (navigator.clipboard && navigator.clipboard.writeText) {
       navigator.clipboard.writeText(txt).then(function () { done(true); }, function () { done(false); });
     } else { done(false); }
   });
 
+  // ====== 主渲染 ======
   function render() {
     if (!state) return;
     var tms = state.tms, origin = state.origin, code = state.code;
@@ -208,7 +299,6 @@
     tms.forEach(function (t) { matrixBounds[String(t.id)] = { w: t.matrixWidth, h: t.matrixHeight }; });
     var tileBase = BASE + '/mvt/' + encodeURIComponent(LAYER) + '/' + encodeURIComponent(state.grid);
 
-    // 记录本页实际使用的加载常量，「代码」按钮与地图渲染读同一组值
     state.resolutions = resolutions;
     state.extent = extent;
     state.tileW = tileW;
@@ -229,34 +319,33 @@
       }
     });
 
-    var labelField = state.labelField;
+    // ★★★ 用 jsonToStyle 生成的 styleFunction —— 应用自定义样式 ★★★
+    var styleFn = jsonToStyle(STYLE_JSON, LABEL_FIELD);
     var layer = new ol.layer.VectorTile({
       source: src,
-      style: function (feature) {
-        var props = feature.getProperties();
-        var geomType = (feature.getGeometry() || {}).getType && feature.getGeometry().getType();
-        if (geomType === 'Point' || geomType === 'MultiPoint') {
-          return new ol.style.Style({
-            image: new ol.style.Circle({
-              radius: 4, fill: new ol.style.Fill({ color: 'rgba(214,60,50,.85)' }),
-              stroke: new ol.style.Stroke({ color: '#fff', width: 1 })
-            })
-          });
-        }
-        return new ol.style.Style({
-          stroke: new ol.style.Stroke({ color: '#1e6fd9', width: 1.4 }),
-          fill: new ol.style.Fill({ color: 'rgba(30,111,217,.18)' })
-        });
-      }
+      style: styleFn
     });
 
+    // 不传 controls —— 避免依赖缺失的 ol.control.defaults / Zoom
+    // 我们用自绘的 .custom-zoom 按钮绑定 view.setResolution 实现缩放
     var map = new ol.Map({
-      target: 'map', layers: [layer],
+      target: 'map',
+      layers: [layer],
       view: new ol.View({
         projection: code,
         center: [(fitExtent[0] + fitExtent[2]) / 2, (fitExtent[1] + fitExtent[3]) / 2],
         resolution: resolutions[0], maxResolution: resolutions[0], constrainResolution: true
       })
+    });
+
+    // ★ 绑定自定义缩放按钮（不依赖 ol.control 模块）
+    document.getElementById('zoomIn').addEventListener('click', function () {
+      var v = map.getView(), r = v.getResolution();
+      v.animate({ resolution: r / 1.5, duration: 120 });
+    });
+    document.getElementById('zoomOut').addEventListener('click', function () {
+      var v = map.getView(), r = v.getResolution();
+      v.animate({ resolution: r * 1.5, duration: 120 });
     });
 
     var fitted = false;
@@ -283,14 +372,12 @@
 
     setHint(code + ' · ' + tms.length + ' 级 · 加载中…');
     function bump() {
-      setHint('已加载瓦片 ' + loaded + ' 张 · 要素 ' + features + ' 个（' + code + '）');
+      var styleTag = (STYLE_JSON !== DEFAULT_STYLE) ? '（自定义样式 ✓）' : '';
+      setHint('已加载瓦片 ' + loaded + ' 张 · 要素 ' + features + ' 个（' + code + '）' + styleTag);
     }
     src.on('tileloadend', function (e) {
       loaded++;
-      try {
-        var fc = src.getFeatures(e.tile.getTileCoord());
-        features += fc ? fc.length : 0;
-      } catch (_) {}
+      try { var fc = src.getFeatures(e.tile.getTileCoord()); features += fc ? fc.length : 0; } catch (_) {}
       bump();
     });
     src.on('tileloaderror', function () { loaded++; bump(); });
@@ -312,22 +399,19 @@
     map.on('moveend', function () { var v = map.getView(); updateInfo(v.getResolution(), v.getCenter()[0], v.getCenter()[1]); });
     updateInfo(map.getView().getResolution(), map.getView().getCenter()[0], map.getView().getCenter()[1]);
 
-    window.__mvt = { map: map, src: src, grid: grid, code: code, resolutions: resolutions, state: state };
+    window.__mvt = { map: map, src: src, grid: grid, code: code, resolutions: resolutions,
+                     state: state, styleJson: STYLE_JSON };
   }
 
-  // 未显式给 grid 时，先读 TileJSON 拿发布网格 id。
-  // 注意：TileJSON 的 grid 可能是 crs 标签（如 "3857"），需归一成网格名才能查 tileMatrixSets。
+  // ====== 网格查询 ======
   function normalizeGridId(id) {
     var s = String(id || '');
     return (/^(3857|EPSG:3857)$/i.test(s)) ? 'WebMercatorQuad' : s;
   }
-
-  /** TileJSON 的 bounds 按规范是 WGS84 经纬度；网格是投影坐标（如 3857）时必须换算到
-   *  网格 CRS，否则首屏 fit 到错误位置 —— 表现就是「数据有瓦片但页面空白」。 */
   function toGridBbox(b, code) {
     if (!b) return null;
     if (code === 'EPSG:4326' || code === 'EPSG:4490') return b;
-    if (Math.abs(b[0]) > 180 || Math.abs(b[2]) > 180) return b; // 已是网格坐标
+    if (Math.abs(b[0]) > 180 || Math.abs(b[2]) > 180) return b;
     try {
       var a = proj4('EPSG:4326', code, [b[0], b[1]]);
       var c = proj4('EPSG:4326', code, [b[2], b[3]]);
@@ -354,7 +438,7 @@
               : (/4490|4326|CRS84/i.test(String(j.crs)) ? 111319.4907932736 : 1);
           if (!BUILTIN[code]) {
             var p4 = j.proj4;
-            if (!p4) { setHint('服务端未下发 ' + code + ' 的 proj4 定义（需加载 PROJ），无法建图'); return; }
+            if (!p4) { setHint('服务端未下发 ' + code + ' 的 proj4 定义，无法建图'); return; }
             proj4.defs(code, p4);
             ol.proj.proj4.register(proj4);
           }
@@ -366,10 +450,9 @@
           state = {
             grid: gid,
             code: code, tms: tms, origin: tms[0].topLeftCorner,
-            crs: j.crs,
-            proj4: j.proj4 || '',
+            crs: j.crs, proj4: j.proj4 || '',
             bbox: tjBounds ? toGridBbox(tjBounds, code) : tmsBounds,
-            labelField: (tj && tj.labelField) || prev.labelField || null
+            labelField: LABEL_FIELD || (tj && tj.labelField) || prev.labelField || null
           };
           render();
         });

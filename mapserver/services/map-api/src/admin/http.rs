@@ -149,9 +149,9 @@ pub fn endpoints_for(
         v.push((
             "内置预览（OpenLayers）".into(),
             if matches!(src, Some(gisserver::wms_common::layer::SourceKind::Postgis(_))) {
-                format!("/preview/viewer-mvt.html?layer={name}&grid={grid_id}&base={enc_base}")
+                format!("/preview/viewer_mvt.html?layer={name}&kind=postgis&grid={grid_id}&base={enc_base}")
             } else if native_grid {
-                format!("/preview/viewer-arcgis.html?layer={name}&grid={grid_id}&base={enc_base}")
+                format!("/preview/viewer_arcgis.html?layer={name}&grid={grid_id}&base={enc_base}")
             } else {
                 format!("/preview/viewer.html?layer={name}&base={enc_base}")
             },
@@ -159,14 +159,38 @@ pub fn endpoints_for(
     } else if kind == "pmtiles" || kind == "mbtiles" {
         // 归档类能力按 tiles.rs 实测：栅格归档走 raster_tile（WMTS/XYZ 同源），
         // 矢量归档只有 mvt_tile 认它；两者都不参与 WMS GetMap（无栅格源）。
-        let is_vector = state
+        // 扩展名按归档实际格式取：MBTiles 读 metadata.format，PMTiles 读 header.tile_type。
+        let ext = state
             .layer(name)
-            .map(|l| match (&l.pmtiles, &l.mbtiles) {
-                (Some(pm), _) => pm.tile_type() == gisserver::pmtiles::tile_type::MVT,
-                (_, Some(mb)) => matches!(mb.format().as_str(), "pbf" | "protobuf" | "mvt"),
-                _ => false,
+            .and_then(|l| match (&l.pmtiles, &l.mbtiles) {
+                (Some(pm), _) => {
+                    use gisserver::pmtiles::tile_type as pt;
+                    Some(match pm.tile_type() {
+                        pt::MVT => "pbf",
+                        pt::PNG => "png",
+                        pt::JPEG => "jpg",
+                        pt::WEBP => "webp",
+                        pt::AVIF => "avif",
+                        _ => "png",
+                    })
+                }
+                (_, Some(mb)) => {
+                    let fmt = mb.format();
+                    Some(match fmt.as_str() {
+                        "pbf" | "protobuf" | "mvt" => "pbf",
+                        "png" => "png",
+                        "jpg" | "jpeg" => "jpg",
+                        "webp" => "webp",
+                        "gif" => "gif",
+                        "avif" => "avif",
+                        "" => "png",
+                        _ => "png",
+                    })
+                }
+                _ => None,
             })
-            .unwrap_or(false);
+            .unwrap_or("png");
+        let is_vector = ext == "pbf";
         let tpl = if kind == "pmtiles" {
             format!("{b}/tiles/{name}/{{z}}/{{x}}/{{y}}")
         } else {
@@ -187,7 +211,7 @@ pub fn endpoints_for(
                 "WMTS Capabilities".into(),
                 format!("{b}/wmts/1.0.0/WMTSCapabilities.xml"),
             ));
-            v.push(("XYZ 瓦片模板".into(), format!("{tpl}.png")));
+            v.push(("XYZ 瓦片模板".into(), format!("{tpl}.{ext}")));
         }
         v.push((
             "内置预览（OpenLayers）".into(),
@@ -214,7 +238,7 @@ pub fn endpoints_for(
             // ArcGIS 缓存是源坐标系下的自定义网格，必须用专用的 viewer-arcgis
             // （读 tileMatrixSets/{grid} 的原生 LOD 与原点）；通用 /viewer 按
             // WebMercator XYZ 寻址，打开只会是空白底图。
-            format!("/preview/viewer-arcgis.html?layer={name}&grid=arcgis_{name}&base={enc_base}"),
+            format!("/preview/viewer_arcgis.html?layer={name}&grid=arcgis_{name}&base={enc_base}"),
         ));
     } else if kind == "3dtiles" {
         v.push(("tileset.json".into(), format!("{b}/3dtiles/{name}/tileset.json")));
@@ -571,6 +595,7 @@ mod endpoint_tests {
     use super::*;
     use crate::config::{ServerConfig, ServerOpts};
     use crate::manager::{ManagerLink, RunMode};
+    use gisserver::wms_common::layer::{Layer, SourceKind};
 
     fn test_config() -> ServerConfig {
         ServerConfig {
@@ -583,6 +608,42 @@ mod endpoint_tests {
             grids: Default::default(),
         }
     }
+
+    /// 构造一个带真实 mbtiles layer（PNG 格式）的 ServerConfig
+    fn config_with_mbtiles(fmt: &str) -> ServerConfig {
+        let name = match fmt {
+            "png" => "test_mbtiles_png",
+            "pbf" => "test_mbtiles_pbf",
+            _ => panic!("unsupported fixture fmt: {fmt}"),
+        };
+        let rel = match fmt {
+            "png" => "fixtures/test.mbtiles",
+            "pbf" => "fixtures/test-vector.mbtiles",
+            _ => unreachable!(),
+        };
+        let path = format!("{}/../../{}", env!("CARGO_MANIFEST_DIR"), rel);
+        ServerConfig {
+            layers: vec![Layer {
+                name: name.to_string(),
+                title: name.to_string(),
+                source: SourceKind::Mbtiles { path },
+                src_crs: "EPSG:3857".to_string(),
+                style: None,
+                sld: None,
+                grids: vec!["WebMercatorQuad".to_string()],
+                tile_px: 256,
+                extent: None,
+            }],
+            ..test_config()
+        }
+    }
+
+    // config_with_pmtiles 留空：fixtures 目录没有 pmtiles fixture，
+    // 后缀映射核心分支已被 mbtiles 三档覆盖；后续有 pmtiles fixture 时再补。
+
+    // ────────────────────────────────────────────────────────────────────────
+    // 已有：run_mode 切换预览入口
+    // ────────────────────────────────────────────────────────────────────────
 
     /// 独立引擎没有 manager 托管预览页：能力列表只给数据端点，不给死链。
     /// 受管模式则给出 `/preview/*.html?...&base=<引擎地址>` 入口。
@@ -612,5 +673,113 @@ mod endpoint_tests {
         assert!(url.starts_with("/preview/cesium.html?"), "{url}");
         assert!(url.contains("name=demo"), "{url}");
         assert!(url.contains("base=http://engine:8080"), "{url}");
+    }
+
+    // ────────────────────────────────────────────────────────────────────────
+    // 新增：动态后缀映射（本次修复回归）
+    // ────────────────────────────────────────────────────────────────────────
+
+    /// MBTiles PNG：XYZ 模板后缀必须是 .png（不硬编码）
+    #[tokio::test]
+    async fn mbtiles_png_preserves_png_ext_in_xyz_template() {
+        let state = crate::AppState::new(config_with_mbtiles("png"), None).await.unwrap();
+        let eps = endpoints_for(&state, "http://engine:8080/", "mbtiles", "test_mbtiles_png", &[]);
+        let xyz = eps
+            .iter()
+            .find(|v| v["name"].as_str() == Some("XYZ 瓦片模板"))
+            .expect("raster mbtiles 必须给出 XYZ 模板");
+        let url = xyz["url"].as_str().unwrap();
+        assert!(url.ends_with("/{z}/{x}/{y}.png"), "png 后缀被改坏: {url}");
+        assert!(!url.ends_with(".jpg"), "png fixture 不应误报 jpg: {url}");
+        assert!(!url.ends_with(".pbf"), "raster fixture 不应误报 pbf: {url}");
+        // 有 WMTS Capabilities
+        assert!(eps.iter().any(|v| v["name"].as_str() == Some("WMTS Capabilities")));
+    }
+
+    /// MBTiles PBF（矢量）：不宣 XYZ（没意义），只宣 MVT 模板 + TileJSON
+    #[tokio::test]
+    async fn mbtiles_pbf_publishes_mvt_not_xyz() {
+        let state = crate::AppState::new(config_with_mbtiles("pbf"), None).await.unwrap();
+        let eps = endpoints_for(&state, "http://engine:8080/", "mbtiles", "test_mbtiles_pbf", &[]);
+
+        // 不应有 XYZ 瓦片模板
+        assert!(
+            !eps.iter().any(|v| v["name"].as_str() == Some("XYZ 瓦片模板")),
+            "vector mbtiles 不应宣 XYZ"
+        );
+        // 应有 MVT 模板 .pbf
+        let mvt = eps
+            .iter()
+            .find(|v| v["name"].as_str() == Some("MVT 矢量瓦片模板"))
+            .expect("vector mbtiles 必须宣 MVT");
+        assert!(
+            mvt["url"].as_str().unwrap().ends_with(".pbf"),
+            "MVT 模板必须 .pbf: {}",
+            mvt["url"].as_str().unwrap()
+        );
+        // 应有 TileJSON
+        assert!(eps.iter().any(|v| v["name"].as_str() == Some("TileJSON")));
+    }
+
+    /// 旧 fixture test.mbtiles 的 format=png，test-vector.mbtiles 的 format=pbf——
+    /// 两条服务端实际跑起来也确实按各自 metadata 格式返回正确 Content-Type。
+    /// 这里通过 endpoints_for 后缀回归验证整个动态映射链路。
+    #[tokio::test]
+    async fn endpoints_for_reflects_real_archive_format() {
+        let cfg = ServerConfig {
+            layers: vec![
+                Layer {
+                    name: "rt_png".into(),
+                    title: "".into(),
+                    source: SourceKind::Mbtiles {
+                        path: format!("{}/../../fixtures/test.mbtiles", env!("CARGO_MANIFEST_DIR")),
+                    },
+                    src_crs: "EPSG:3857".into(),
+                    style: None,
+                    sld: None,
+                    grids: vec!["WebMercatorQuad".into()],
+                    tile_px: 256,
+                    extent: None,
+                },
+                Layer {
+                    name: "rt_vec".into(),
+                    title: "".into(),
+                    source: SourceKind::Mbtiles {
+                        path: format!(
+                            "{}/../../fixtures/test-vector.mbtiles",
+                            env!("CARGO_MANIFEST_DIR")
+                        ),
+                    },
+                    src_crs: "EPSG:3857".into(),
+                    style: None,
+                    sld: None,
+                    grids: vec!["WebMercatorQuad".into()],
+                    tile_px: 256,
+                    extent: None,
+                },
+            ],
+            ..test_config()
+        };
+        let state = crate::AppState::new(cfg, None).await.unwrap();
+
+        // PNG 层 → XYZ .png
+        let eps_png = endpoints_for(&state, "http://e/", "mbtiles", "rt_png", &[]);
+        let xyz_png = eps_png.iter().find(|v| v["name"].as_str() == Some("XYZ 瓦片模板"));
+        assert!(xyz_png.is_some(), "png fixture 必须宣 XYZ");
+        assert!(
+            xyz_png.unwrap()["url"].as_str().unwrap().ends_with(".png"),
+            "png fixture 后缀应为 .png"
+        );
+
+        // PBF 层 → MVT .pbf，不宣 XYZ
+        let eps_vec = endpoints_for(&state, "http://e/", "mbtiles", "rt_vec", &[]);
+        let xyz_vec = eps_vec.iter().find(|v| v["name"].as_str() == Some("XYZ 瓦片模板"));
+        assert!(xyz_vec.is_none(), "vector fixture 不应宣 XYZ");
+        let mvt_vec = eps_vec.iter().find(|v| v["name"].as_str() == Some("MVT 矢量瓦片模板"));
+        assert!(mvt_vec.is_some(), "vector fixture 必须宣 MVT");
+        assert!(
+            mvt_vec.unwrap()["url"].as_str().unwrap().ends_with(".pbf"),
+            "MVT 后缀应为 .pbf"
+        );
     }
 }

@@ -66,7 +66,7 @@
         </el-table-column>
         <el-table-column label="协议" align="center" min-width="170">
           <template #default="{ row }">
-            <el-tag v-for="t in row.serviceTypes" :key="t" size="small" effect="plain" class="mr-1">
+            <el-tag v-for="t in toTypes(row.serviceTypes)" :key="t" size="small" effect="plain" class="mr-1">
               {{ protoLabel(t) }}
             </el-tag>
           </template>
@@ -77,9 +77,19 @@
             <el-tag :type="stateTag(row.state)" size="small" effect="dark">{{ stateLabel(row.state) }}</el-tag>
           </template>
         </el-table-column>
-        <el-table-column label="操作" align="center" width="260" fixed="right">
+        <el-table-column label="操作" align="center" width="320" fixed="right">
           <template #default="{ row }">
             <el-button link type="success" icon="View" @click="pvRef?.open(row)">预览</el-button>
+            <el-button
+              v-if="showStyleBtn(row)"
+              link
+              type="primary"
+              icon="Brush"
+              :disabled="row.state === 'deleted'"
+              @click="openStyle(row)"
+            >
+              样式
+            </el-button>
             <el-button
               v-hasPermi="['map:catalog:publish']"
               link
@@ -140,6 +150,7 @@
 
     <PublishDialog ref="pubRef" :caps="caps" @saved="load" />
     <PreviewDialog ref="pvRef" />
+    <StyleJsonEditor ref="styleRef" />
   </div>
 </template>
 
@@ -149,6 +160,7 @@ import { listPublished, setPublishedState } from '@/api/map/catalog';
 import { PublishedVO } from '@/api/map/catalog/types';
 import PublishDialog from '@/views/map/catalog/components/PublishDialog.vue';
 import PreviewDialog from '@/views/map/catalog/components/PreviewDialog.vue';
+import StyleJsonEditor from '@/views/map/service/components/StyleJsonEditor.vue';
 import { nativeGridInfo, nativeGridTip, protoLabel, stateLabel, stateTag, useCaps } from '@/views/map/catalog/composables/useCatalog';
 
 const props = defineProps<{ kinds?: string[] }>();
@@ -166,6 +178,7 @@ const pageSize = ref(20);
 
 const pubRef = ref<InstanceType<typeof PublishDialog>>();
 const pvRef = ref<InstanceType<typeof PreviewDialog>>();
+const styleRef = ref<InstanceType<typeof StyleJsonEditor>>();
 
 const displayKinds = computed(() => props.kinds?.length ? props.kinds : []);
 
@@ -221,6 +234,42 @@ const load = async () => {
 
 const goPublish = () => {
   router.push('/data/resource');
+};
+
+// 后端 serviceTypes 可能是 string ("mvt,wms") 也可能是 array (["mvt","wms"])
+const toTypes = (v: string | string[] | undefined | null): string[] =>
+  Array.isArray(v) ? v : (v ? v.split(',').map((s) => s.trim()).filter(Boolean) : []);
+
+// "样式" 按钮只对矢量/PostGIS 且支持 MVT 协议的服务显示
+const showStyleBtn = (row: PublishedVO) => {
+  const kindOk = ['postgis', 'vector'].includes(row.mapserverKind);
+  const hasMvt = toTypes(row.serviceTypes).includes('mvt');
+  return kindOk && hasMvt;
+};
+const geomTypeOf = (row: any): 'point' | 'line' | 'polygon' | 'mixed' => {
+  // 优先读后端顶层 geometryType 字段（catalog.rs published_json 返回）
+  // 兼容 row.meta.geometry_type（其他场景）
+  const raw = (
+    row?.geometryType ||
+    row?.geometry_type ||
+    row?.meta?.geometry_type ||
+    row?.meta?.geometryType ||
+    ''
+  ).toUpperCase();
+  if (!raw) return 'mixed';
+  if (raw === 'POINT' || raw === 'MULTIPOINT') return 'point';
+  if (raw === 'LINESTRING' || raw === 'MULTILINESTRING') return 'line';
+  if (raw === 'POLYGON' || raw === 'MULTIPOLYGON') return 'polygon';
+  return 'mixed'; // GEOMETRY / GEOMETRYCOLLECTION / 未知
+};
+
+const openStyle = (row: PublishedVO) => {
+  styleRef.value?.open({
+    kind: row.mapserverKind,
+    name: row.layerName,
+    title: row.title || row.layerName,
+    geometryType: geomTypeOf(row as any)
+  });
 };
 
 const openEdit = (row: PublishedVO) => {

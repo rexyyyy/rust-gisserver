@@ -9,9 +9,8 @@ echo ============================================
 echo Uninstalling rust-gisserver
 echo ============================================
 
-REM Script lives at <repo>\build\script\, so three levels up is gis-wt\thirdparty,
-REM and rmap_target sits there.
-set INSTALL_DIR=%~dp0..\..\..\rmap_target
+REM Script lives at <repo>\build\script\, two levels up is repo root, run-env sits there.
+set INSTALL_DIR=%~dp0..\..\run-env
 if not "%1"=="" set INSTALL_DIR=%1
 
 echo Install directory: %INSTALL_DIR%
