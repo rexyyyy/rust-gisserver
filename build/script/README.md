@@ -113,17 +113,21 @@ notepad .env
 | **必需** | `MANAGER_DB_PASSWORD` | `config/manager/manager.xml` 的 `<database url>` | DSN 口令为空，manager 连不上库 |
 | **必需** | `MANAGER_JWT_SECRET` | 同上 `<security jwt_secret>` | 签名密钥为空串，登录态不可用 |
 | **必需** | `MAPSERVER_DB_PASSWORD` | `config/mapserver.xml` 的 `<admin dsn>` | `/admin/*` 管理面连库失败 |
-| **必需** | `DATA_ROOT` | `<server data_root>` 及 `archives` 路径前缀 | 所有 `${DATA_ROOT}` 图层路径失效 |
 | 可选 | `MANAGER_DB_HOST` / `MANAGER_DB_PORT` | manager DSN | 默认 `localhost` / `5434` |
 | 可选 | `MAPSERVER_DB_HOST` / `MAPSERVER_DB_PORT` | map-api admin DSN | 默认 `localhost` / `5434` |
 | 可选 | `MAPSRV_HOST` / `MAPSRV_PORT` | manager 反代 map-api | 默认 `127.0.0.1` / `8080` |
 | 可选 | `MAPSERVER_MANAGER_URL` | map-api 回连 manager（跨机部署） | 默认 `http://127.0.0.1:6180` |
 | 可选 | `GIS_ENCODING_REGION` / `GIS_ENCODING_LOCALE` | `gisserver::encoding` | 默认 `zh-CN` |
+| 可选 | `DATA_ROOT` | `<server data_root>` 及 `archives` 路径前缀 | **默认 `data`**，即启动工作目录下的 `data\`（安装脚本已创建）；仅当数据放在外置盘时才需要设，例如 `DATA_ROOT=E:\data\1` |
 | 可选 | `TESTDATA_ROOT` / `SHPPGSQL_BIN` | e2e 数据根 / shp2pgsql 路径 | 不影响正常服务 |
 
+- `data_root` 写的是 `${DATA_ROOT:-data}`：不设变量即以相对路径 `data` 生效。`start-*.bat`
+  先 `cd /d` 到安装目录，所以它等价于 `<安装目录>\data`；源码开发从 `mapserver\` 启动时
+  等价于 `mapserver\data`（该目录留了 `.gitkeep`，真实数据已被 `.gitignore` 挡住）。
+  路径守卫会 `canonicalize`，目录必须存在——用安装脚本或保留 `.gitkeep` 即可。
 - `PROJ_DLL` / `PROJ_DATA` / `PROJ_LIB` 由 `start-*.bat` 自动设置，无需手填。
 - **已失效、代码不再读取**：`MAPSERVER_PORT`（端口取 `config/mapserver.xml` 的 `<server port>` 或 CLI `--listen`）、
-  `MAPSERVER_DATA_DIR`、`MAPSERVER_CACHE_DIR`、`API_KEY`。数据根目录统一用 `DATA_ROOT`，别再补这几个。
+  `MAPSERVER_DATA_DIR`、`MAPSERVER_CACHE_DIR`、`API_KEY`，别再补这几个。
 
 ### 3.4 启动
 ```powershell
@@ -138,9 +142,16 @@ cd <安装目录>
 ```powershell
 nssm install map-api  "<安装目录>\bin\map-api.exe"
 nssm install manager "<安装目录>\bin\manager.exe"
+nssm set map-api AppDirectory "<安装目录>"
+nssm set manager AppDirectory "<安装目录>"
 nssm start map-api
 nssm start manager
 ```
+**必须设 `AppDirectory`**：`data_root` 默认是相对路径 `data`，且路径守卫会
+`canonicalize`。NSSM 不设时工作目录是 exe 所在的 `bin\`，`data` 会解析成
+`bin\data`（不存在）并让管理面报 500 `data_root 不可访问`。同理，任何自定义
+启动方式（systemd / 计划任务）都要把工作目录设为安装目录，或显式设
+`DATA_ROOT` 为绝对路径。
 
 ---
 

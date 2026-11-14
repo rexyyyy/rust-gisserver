@@ -27,6 +27,13 @@
 # Scratch workspaces used to rebuild the OpenLayers vendor bundle.
 /build/_tmp_*/
 
+# ===== Default data root (relative to the map-api working directory) =====
+# mapserver/config/mapserver.xml defaults to "data", i.e. <install_dir>/data
+# in an installed layout and mapserver/data when running from source.
+# Only the placeholder is tracked; real imagery / tiles must never be committed.
+/mapserver/data/*
+!/mapserver/data/.gitkeep
+
 # ===== Local-only layer configs (contain plaintext DSN passwords) =====
 # Authoritative examples live in mapserver/config/*/README.md; the postgis/
 # layer files are machine-local test fixtures with hardcoded credentials.

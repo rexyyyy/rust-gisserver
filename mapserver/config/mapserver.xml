@@ -47,7 +47,13 @@
        foyer_cache_mib  = foyer 输出缓存 L1 内存（按字节计量，缺省跟随 cache_mib）
        disk_cache.capacity_mib = foyer L2 磁盘（重启可复用）
        动态 PostGIS MVT 瓦片在冷生成时已 gzip 一次，同样预算约可放 2 倍瓦片。 -->
-  <server host="0.0.0.0" port="8080" cache_mib="1024" foyer_cache_mib="2048" cache_ttl_secs="300" cache_stats_secs="60" data_root="${DATA_ROOT}">
+  <!-- data_root：默认取启动工作目录下的 data 子目录，无需配置环境变量。
+       安装布局下 start-*.bat 先 cd 到安装目录，即 <安装目录>\data；
+       源码开发从 mapserver/ 目录启动时即 mapserver/data。该目录由
+       install.bat 创建（源码树里留了 .gitkeep 占位）。只有把影像/瓦片
+       放到外置数据盘时才需要在 .env 里设 DATA_ROOT 覆盖，例如
+       DATA_ROOT=E:\data\1；容器模板另用固定的 /app/data。 -->
+  <server host="0.0.0.0" port="8080" cache_mib="1024" foyer_cache_mib="2048" cache_ttl_secs="300" cache_stats_secs="60" data_root="${DATA_ROOT:-data}">
     <disk_cache dir="cache/foyer" capacity_mib="8192"/>
     <!-- s3 全局凭证：图层 source path 写 s3://bucket/key 时必配。
          path-style 寻址，兼容 MinIO / RustFS / AWS 及各类 S3 兼容云。
@@ -82,6 +88,8 @@
   <!-- PMTiles 独立归档：name -> 绝对路径，暴露为 /pmtiles/{name}（Range 读取）。
        与同名 pmtiles 图层二选一；此处用归档映射，无需 config/pmtiles/*.xml。 -->
   <archives>
-    <wuhua_buildings>${DATA_ROOT}\pmtiles\wuhua_buildings.pmtiles</wuhua_buildings>
+    <!-- 与 server.data_root 同一默认值；用 / 分隔，Windows / Linux 均可解析。
+         该 demo 归档仅在本地放了 wuhua_buildings.pmtiles 时生效，缺失不影响其余服务。 -->
+    <wuhua_buildings>${DATA_ROOT:-data}/pmtiles/wuhua_buildings.pmtiles</wuhua_buildings>
   </archives>
 </config>

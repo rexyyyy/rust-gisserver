@@ -6,7 +6,7 @@
 #
 # 用法：
 #   pwsh -File validate.ps1                       # 默认探本机 8080/6180/5434
-#   pwsh -File validate.ps1 -CheckDataRoot        # 附带校验 DATA_ROOT/TESTDATA_ROOT 目录
+#   pwsh -File validate.ps1 -CheckDataRoot        # 附带校验 data_root（默认 ./data）及 TESTDATA_ROOT
 #   pwsh -File validate.ps1 -AdminToken 'xxx'     # map-api 配了 admin.token 时
 # ============================================================================
 param(
@@ -67,14 +67,17 @@ if ($ac) {
 $null = Probe 'manager /' "$ManagerBase/"
 
 # 6) 本地 data_root 目录存在性（可选）
+#    config/mapserver.xml 用 ${DATA_ROOT:-data}：未设置时取部署目录下 ./data。
 if ($CheckDataRoot) {
-    foreach ($v in 'DATA_ROOT', 'TESTDATA_ROOT') {
-        $val = [Environment]::GetEnvironmentVariable($v)
-        if ([string]::IsNullOrWhiteSpace($val)) {
-            Add "$v 目录" 'WARN' 'env 未设置（相关 demo 图层将被跳过）'
-        } else {
-            Add "$v 目录" ($(if (Test-Path $val) { 'PASS' } else { 'WARN' })) $val
-        }
+    $dr = [Environment]::GetEnvironmentVariable('DATA_ROOT')
+    if ([string]::IsNullOrWhiteSpace($dr)) { $dr = Join-Path $PSScriptRoot 'data' }
+    Add 'data_root 目录' ($(if (Test-Path $dr) { 'PASS' } else { 'WARN' })) $dr
+
+    $tdr = [Environment]::GetEnvironmentVariable('TESTDATA_ROOT')
+    if ([string]::IsNullOrWhiteSpace($tdr)) {
+        Add 'TESTDATA_ROOT 目录' 'INFO' 'env 未设置（e2e demo 图层跳过，非致命）'
+    } else {
+        Add 'TESTDATA_ROOT 目录' ($(if (Test-Path $tdr) { 'PASS' } else { 'WARN' })) $tdr
     }
 }
 

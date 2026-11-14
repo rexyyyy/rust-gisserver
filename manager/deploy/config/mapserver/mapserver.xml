@@ -18,7 +18,8 @@
        · files（默认）：扫描本目录下的图层 XML（<catalog.root>/<type>/*.xml），零配置即可演示。
        · db（PG 配置发布）：改 backend="db" 并从共享库 sys_published_layer.service_doc 读图层，
          与 manager 发布链路对接；需先建库表（挂 backend/sql 初始化）。两后端的
-         ${DATA_ROOT} 占位都会在加载时展开（rust-gisserver db_catalog 已接 expand_env）。 -->
+         DATA_ROOT 等环境变量占位都会在加载时展开（rust-gisserver db_catalog
+         已接 expand_env）；本模板的 data_root 固定 /app/data，不依赖该变量。 -->
   <catalog root="/app/config" backend="files"/>
   <admin dsn="postgresql://postgres:${MAPSERVER_DB_PASSWORD}@postgis:5432/mapserver-manager"/>
 </config>

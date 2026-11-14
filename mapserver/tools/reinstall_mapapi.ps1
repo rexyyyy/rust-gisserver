@@ -22,7 +22,8 @@ if (Test-Path "$install\.env") {
     if ($_ -match '^([^#][^=]+)=(.*)$') { Set-Item "env:$($Matches[1].Trim())" $Matches[2].Trim() }
   }
 }
-$env:DATA_ROOT = "E:\data"
+# data_root defaults to the data\ subdirectory of the working directory.
+# Do not inject DATA_ROOT here; set it only for an external data drive.
 $env:PROJ_DLL  = "$install\map-api\share\proj_9.dll"
 $env:PROJ_DATA = "$install\map-api\share\proj"
 $p = Start-Process -FilePath "$install\map-api\map-api.exe" `

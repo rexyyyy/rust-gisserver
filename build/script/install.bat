@@ -119,8 +119,6 @@ echo # manager JWT signing secret  ^(generate: openssl rand -hex 32^)
 echo MANAGER_JWT_SECRET=change-me-random-secret
 echo # map-api admin DSN password  ^(config/mapserver.xml^)
 echo MAPSERVER_DB_PASSWORD=change-me
-echo # Data root for COG/vector/mbtiles/pmtiles/3dtiles, absolute path
-echo DATA_ROOT=C:\data
 echo.
 echo # ==== OPTIONAL: config XML supplies these defaults ====
 echo MANAGER_DB_HOST=localhost
@@ -130,6 +128,10 @@ echo MAPSERVER_DB_PORT=5434
 echo MAPSRV_HOST=127.0.0.1
 echo MAPSRV_PORT=8080
 echo MAPSERVER_MANAGER_URL=http://127.0.0.1:6180
+echo # Data root defaults to the data\ subdirectory next to start-*.bat
+echo # ^(already created by install.bat^). Set DATA_ROOT only when the COG /
+echo # vector / mbtiles / pmtiles / 3dtiles data lives on another drive.
+echo # DATA_ROOT=E:\data\1
 echo.
 echo # Legacy filename encoding region: zh-CN / zh-TW / en / ko / ja
 echo GIS_ENCODING_REGION=zh-CN
@@ -139,7 +141,8 @@ echo # Absolute path to shp2pgsql.exe, only needed for SHP import
 echo # SHPPGSQL_BIN=
 echo # PROJ_DLL / PROJ_DATA / PROJ_LIB are set by start-*.bat; do not set here.
 echo # Deprecated, no longer read: MAPSERVER_PORT ^(use config/mapserver.xml^),
-echo #   MAPSERVER_DATA_DIR, MAPSERVER_CACHE_DIR, API_KEY. Use DATA_ROOT instead.
+echo #   MAPSERVER_DATA_DIR, MAPSERVER_CACHE_DIR, API_KEY. Data root defaults
+echo #   to data\ and can be overridden with DATA_ROOT.
 ) > "%INSTALL_DIR%\.env.example"
 
 REM ---- per-region env presets ----

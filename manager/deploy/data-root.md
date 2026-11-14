@@ -10,10 +10,10 @@
 gis-srv（能力底座/数据工厂, :7070）
       │  加工产物落数据根：COG / GeoJSON / MBTiles / PMTiles / 3D Tiles
       ▼
-DATA_ROOT（本机数据根，env 注入）
+data_root（默认 ./data；外置盘时用 DATA_ROOT 注入）
       │
 rust-gisserver map-api（发布平面, :8080）
-      │  图层配置文件 <source path="${DATA_ROOT}\…">；
+      │  图层配置文件 <source path="${DATA_ROOT:-data}/…">；
       │  server.data_root 限定「新增服务」只能引用其内文件
       ▼
 rust-gisserver（管理平面, :6180）
@@ -38,24 +38,30 @@ rust-gisserver（管理平面, :6180）
 - **两个根**（本机存在两处数据）：
   | 占位 | 含义 | 典型值 |
   |---|---|---|
-  | `${DATA_ROOT}` | 真实数据根（cog/vector/mbtiles/pmtiles/3dtiles + archives） | `E:\data\1` |
+  | `${DATA_ROOT:-data}` | 真实数据根（cog/vector/mbtiles/pmtiles/3dtiles + archives） | 默认 `data`（相对启动工作目录）；外置盘如 `E:\data\1` |
   | `${TESTDATA_ROOT}` | e2e 转换产物根 | `<…>\gis-wt\.testdata` |
-- **零破坏**：`within_data_root` 对空/未配的 `data_root` **不设限**。所以
-  `mapserver.xml` 用 `data_root="${DATA_ROOT}"`（无默认）：不设 env = 行为同今天
-  （向导可浏览全盘）；设了 env = 数据被收进根内。
+- **默认值语义（2026-11-14 起）**：`mapserver.xml` 用
+  `data_root="${DATA_ROOT:-data}"`，不设 env 即以相对路径 `data` 生效，等价于
+  安装目录 `data\`（`start-*.bat` 会先 `cd /d` 到安装目录；源码开发从
+  `mapserver\` 启动则是 `mapserver\data`）。`within_data_root` 仍对**空串**
+  不设限，因此想恢复「向导可浏览全盘」必须显式把 `DATA_ROOT` 设为空，或删掉
+  `server` 的 `data_root` 属性——这是有意收紧的默认边界，不是零破坏。
+  守卫会 `canonicalize` 该目录，目录不存在会 500，安装脚本与源码 `.gitkeep`
+  保证其存在；真实数据文件被 `.gitignore` 挡在仓库外。
 
 ## 怎么设
 
 **容器（推荐演示）**：compose 已把 `./data` 挂到 map-api `/app/data`，容器配置模板
 固定 `data_root=/app/data`，无需额外 env。数据文件放进 `deploy/data/` 即可。
 
-**本地 `cargo run map-api`**：配置加载器不读 `.env`，需在会话里注入：
+**本地安装 / `cargo run map-api`**：默认无需任何数据根变量，配置加载器取
+`${DATA_ROOT:-data}` → 工作目录下 `data\`。把 COG / 瓦片放进该目录即可。
+配置加载器不读 `.env`；只有数据在外置盘、或跑 e2e fixture 时才在会话注入：
 ```powershell
-$env:DATA_ROOT     = 'E:\data\1'
+$env:DATA_ROOT     = 'E:\data\1'   # 可选覆盖，默认 .\data
 $env:TESTDATA_ROOT = 'D:\mycomputor\documents\gis-wt\.testdata'
-# 之后启动 map-api，${DATA_ROOT}\… 会展开为真实路径
 ```
-未设置时，引用 `${DATA_ROOT}` 的 demo 图层会被**跳过并告警**（非致命，其余服务照常）。
+`TESTDATA_ROOT` 未设置时相关 e2e demo 图层会被**跳过并告警**（非致命，其余服务照常）。
 
 ## 换机不碎 · 现状与后续（务必知悉）
 
@@ -76,9 +82,10 @@ $env:TESTDATA_ROOT = 'D:\mycomputor\documents\gis-wt\.testdata'
 
 ```powershell
 cd rust-gisserver/deploy
-copy .env.example .env          # 填口令 + 本地 DATA_ROOT/TESTDATA_ROOT（容器无需）
+copy .env.example .env          # 只填口令；data_root 默认 ./data，容器固定 /app/data
 pwsh -File start.ps1            # 构建起栈 -> 等 PostGIS healthy -> 自动 validate
 pwsh -File validate.ps1 -CheckDataRoot   # 也可对已在跑的服务单独自检
 ```
 `validate.ps1` 检查：PostGIS TCP、map-api `/health`、WMS GetCapabilities、
-`/admin/components`（打印当前 data_root）、manager 根、（可选）DATA_ROOT/TESTDATA_ROOT 目录存在。
+`/admin/components`（打印当前 data_root）、manager 根、（可选）默认 `./data`
+或 `DATA_ROOT` 覆盖后的目录存在性，以及 `TESTDATA_ROOT`。
