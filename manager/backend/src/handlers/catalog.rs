@@ -1,19 +1,19 @@
-//! 数据目录：Workspace → Store → Resource → 已发布服务。
+//! Data catalog: Workspace → Store → Resource → published service.
 //!
-//! 边界（计划 §1 红线，本模块逐条遵守）：
-//! * 只做**服务发布与管理**的组织元数据；组织元数据全部落 rust-gisserver PostgreSQL。
-//! * 不读数据文件、不连业务库：数据侧一律走 map-api 的只读发现面
-//!   （`/admin/capabilities`、`/admin/discover`、`/admin/pg-tables`、`/admin/pg-test`）。
-//! * 发布产物是 rust-gisserver 的 `Layer` / `TilesetService` 文档，经
-//!   `POST /admin/services` 落盘并热重载；rust-gisserver 不写 XML、不生成瓦片、不导入要素。
-//! * 软删除仅标记：Resource `del_flag=1`，已发布层 `state='deleted'`（进垃圾箱，可恢复）。
+//! Boundaries (plan §1 red lines, followed strictly):
+//! * Only manages **service publish & organize metadata**; all metadata goes to rust-gisserver PostgreSQL.
+//! * Never reads data files or connects to business DB; data access goes through map-api's read-only discovery
+//!   (`/admin/capabilities`, `/admin/discover`, `/admin/pg-tables`, `/admin/pg-test`).
+//! * Publish output is rust-gisserver `Layer` / `TilesetService` doc, sent via
+//!   `POST /admin/services` to write and hot-reload; rust-gisserver does not write XML, generate tiles, or import features.
+//! * Soft-delete is marking only: Resource `del_flag=1`, published layer `state='deleted'` (trash, recoverable).
 //!
-//! 引擎口径：目录面（发现/连接测试/发布）当前一律走**默认引擎**
-//! （[`crate::handlers::engine::default_engine`]）；服务级读写（配置原文、启停、体检、
-//! 归属调整）仍由既有 `/map/services/*` 按服务归属路由，两者互不影响。
+//! Engine convention: catalog ops (discover / connection test / publish) all go through the **default engine** for now,
+//! ([`crate::handlers::engine::default_engine`]); service-level read/write (config, start/stop, health,
+//! ownership change) still goes through `/map/services/*` routed by ownership; both paths don't interfere.
 //!
-//! 能力矩阵（`data_type` → `kind` + 可发布服务类型）从 map-api `/admin/capabilities`
-//! 取，rust-gisserver 不重复维护第二份矩阵，避免两处口径漂移。
+//! Capability matrix (`data_type` → `kind` + publishable service types) is fetched from map-api `/admin/capabilities`;
+//! rust-gisserver does not maintain a second copy, to avoid drift between the two.
 use std::collections::HashMap;
 use std::sync::Arc;
 
@@ -34,13 +34,13 @@ use crate::handlers::{
 use crate::resp::Resp;
 use crate::state::{conn, AppState};
 
-/// PostGIS 型 Store：不是目录，`pg_dsn` + `pg_schema` 定位（map-api 的
-/// `store_types` 只列目录型，这里在本地补齐这一类）。
+/// PostGIS Store: not a directory, located by `pg_dsn` + `pg_schema` (map-api's
+/// `store_types` only lists dir types, we add this one locally).
 const STORE_TYPE_POSTGIS: &str = "postgis";
 
-/// 目录域路由（由 `handlers::router` 统一装配）。静态段在前，`:id` 通配在后。
-/// `GET /map/catalog/crs-tree` — 坐标系选择树（WGS84 系 + CGCS2000 系），
-/// 供发布向导在「坐标系缺失 / 可疑」时引导用户选择正确坐标系。
+/// Catalog routes (assembled by `handlers::router`). Static paths first, `:id` wildcard after.
+/// `GET /map/catalog/crs-tree` — CRS selection tree (WGS84 + CGCS2000),
+/// used by the publish wizard to guide correct CRS selection when 'missing / suspicious'.
 pub async fn crs_tree() -> AppResult<Json<Resp<Value>>> {
     let gk_zones = [33u32, 34, 35]; // 昆明及周边 3°带
     let gk: Vec<Value> = gk_zones
@@ -74,21 +74,21 @@ pub async fn crs_tree() -> AppResult<Json<Resp<Value>>> {
 
 pub fn routes() -> Router<Arc<AppState>> {
     Router::new()
-        // 能力矩阵（发布向导的数据字典）
+        // Capability matrix (publish wizard data dictionary)
         .route("/map/catalog/capabilities", get(capabilities))
-        // 工作区
+        // Workspace
         .route("/map/catalog/workspaces", get(ws_list).post(ws_add))
         .route(
             "/map/catalog/workspaces/{id}",
             put(ws_update).delete(ws_remove),
         )
-        // 工作空间数据根目录浏览（新建数据源左侧目录树，按工作区范围读取）
+        // Browse workspace data root (left tree in new data source, scoped to workspace)
         .route("/map/catalog/dirs", get(dir_list))
-        // 发布向导「选择瓦片配置 XML」：解析服务器上的 ArcGIS Conf.xml → 网格参数
+        // Publish wizard 'select tile config XML': parse server-side ArcGIS Conf.xml → grid params
         .route("/map/catalog/tile-grid", post(tile_grid_parse))
-        // 数据存储
+        // Data store
         .route("/map/catalog/stores", get(store_list).post(store_add))
-        // 新建数据源时的「测试连接」：无需已落库的 store id，直接用表单参数探测。
+        // 'Test connection' for new data source: no existing store id needed; probe directly with form params.
         .route("/map/catalog/stores/connect", post(store_connect_preflight))
         .route(
             "/map/catalog/stores/{id}/connect",
@@ -98,12 +98,12 @@ pub fn routes() -> Router<Arc<AppState>> {
             "/map/catalog/stores/{id}/discover",
             post(store_discover),
         )
-        // PostGIS 数据源：把工作空间内的 Shapefile 导入数据库。
+        // PostGIS data source: import a workspace Shapefile into the DB.
         .route(
             "/map/catalog/stores/{id}/import-shp",
             post(store_import_shp),
         )
-        // 同一导入的 SSE 版本：数据量大时前端持续收到进度，避免长请求看起来卡死
+        // SSE version of the same import: front-end keeps receiving progress for large data, avoids long requests looking frozen
         .route(
             "/map/catalog/stores/{id}/import-shp/stream",
             post(store_import_shp_stream),
@@ -116,7 +116,7 @@ pub fn routes() -> Router<Arc<AppState>> {
             "/map/catalog/stores/{id}",
             put(store_update).delete(store_remove),
         )
-        // 数据图层（Resource）
+        // Data layer (Resource)
         .route("/map/catalog/resources", get(resource_list))
         .route(
             "/map/catalog/resources/{id}/restore",
@@ -126,13 +126,13 @@ pub fn routes() -> Router<Arc<AppState>> {
             "/map/catalog/resources/{id}/refresh",
             post(resource_refresh),
         )
-        // PostGIS 普通表的数据查询服务（不发布图层，直接返回表数据）。
+        // PostGIS plain-table data query service (no layer publish, returns table data directly).
         .route(
             "/map/catalog/resources/{id}/query",
             get(resource_query),
         )
         .route("/map/catalog/resources/{id}", delete(resource_remove))
-        // 发布
+        // Publish
         .route("/map/catalog/publish", post(publish))
         .route("/map/catalog/published", get(published_list))
         .route(
@@ -144,15 +144,15 @@ pub fn routes() -> Router<Arc<AppState>> {
             get(published_endpoints),
         )
         .route("/map/catalog/published/{id}", put(published_update))
-        // 坐标系选择树（发布向导的 CRS 字典，覆盖 WGS84/CGCS2000 常用系）
+        // CRS selection tree (publish wizard CRS dict, covers common WGS84/CGCS2000 systems)
         .route("/map/catalog/crs-tree", get(crs_tree))
 }
 
 // =====================================================================
-// 能力矩阵（来自 map-api，单一口径）
+// Capability matrix (from map-api, single source of truth)
 // =====================================================================
 
-/// 一种 `data_type` 的发布口径。
+/// Publish definition for a single `data_type`.
 #[derive(Debug, Clone)]
 struct CapRow {
     kind: String,
@@ -162,7 +162,7 @@ struct CapRow {
     note: String,
 }
 
-/// `/admin/capabilities` 的本地视图。
+/// Local view of `/admin/capabilities`.
 struct Caps {
     by_type: HashMap<String, CapRow>,
     store_types: Vec<String>,
@@ -198,7 +198,7 @@ impl CapRow {
         }
     }
 
-    /// 校验勾选的服务类型：空则取默认，越界则拒绝并列出可选值。
+    /// Validate picked service types: empty → use defaults; out-of-range → reject with options listed.
     fn resolve_service_types(&self, picked: &[String]) -> AppResult<Vec<String>> {
         let list: Vec<String> = if picked.is_empty() {
             self.defaults.clone()
@@ -240,7 +240,7 @@ fn arr_field(v: &Value, key: &str) -> Vec<String> {
         .unwrap_or_default()
 }
 
-/// 拉取并解析 `/admin/capabilities`。
+/// Fetch and parse `/admin/capabilities`.
 async fn load_caps(state: &AppState) -> AppResult<Caps> {
     let data = upstream_json(
         state,
@@ -281,7 +281,7 @@ async fn load_caps(state: &AppState) -> AppResult<Caps> {
     Ok(Caps { by_type, store_types })
 }
 
-/// `GET /map/catalog/capabilities` — 原样透传引擎能力矩阵，供发布向导渲染勾选。
+/// `GET /map/catalog/capabilities` — passthrough engine capability matrix for publish wizard.
 pub async fn capabilities(
     State(state): State<Arc<AppState>>,
 ) -> AppResult<Json<Resp<Value>>> {
@@ -291,7 +291,7 @@ pub async fn capabilities(
 }
 
 // =====================================================================
-// 工作区
+// Workspace
 // =====================================================================
 
 #[derive(Debug, Deserialize)]
@@ -308,7 +308,7 @@ pub struct WorkspaceBody {
     pub remark: String,
 }
 
-/// 将用户输入的路径规范化：`\` → `/`，末尾补 `/`，空串保持空串。
+/// Normalize user-entered path: `\` → `/`, append trailing `/`, keep empty as empty.
 fn normalize_data_root(raw: &str) -> String {
     let s = raw.trim().replace('\\', "/");
     if s.is_empty() {
@@ -321,17 +321,17 @@ fn normalize_data_root(raw: &str) -> String {
     }
 }
 
-/// 工作空间数据根目录下的标准子目录（绑定 / 修改 data_root 保存前自动补建）。
+/// Standard subdirs under workspace data root (auto-created before bind / modify save).
 const WORKSPACE_STD_SUBDIRS: [&str; 13] = [
     "3dtiles", "arcgis_cah", "cog", "docs", "geojson", "mbtiles", "pmtiles", "postgis", "prj",
     "recon", "shapefile", "terrain", "xml-grid",
 ];
 
-/// 保存前确保数据根目录存在且标准子目录齐全。
+/// Ensure data root exists and standard subdirs are in place before save.
 ///
-/// - `data_root` 为空（纯数据库工作区）直接放行；
-/// - 根目录本身不存在 → 视为录入错误，拒绝保存（防止 create_dir_all 连带造出拼错的根）；
-/// - 子目录已存在则跳过，缺哪个补哪个；建目录失败（权限等）报错不落库。
+/// - `data_root` empty (DB-only workspace) → pass through;
+/// - Root itself missing → treat as input error, reject save (prevents create_dir_all from creating misspelled paths);
+/// - Existing subdirs → skip; missing ones → create; create failure (permission etc.) → error, no DB write.
 fn ensure_std_subdirs(data_root: &str) -> AppResult<()> {
     if data_root.is_empty() {
         return Ok(());
@@ -354,7 +354,7 @@ fn ensure_std_subdirs(data_root: &str) -> AppResult<()> {
     Ok(())
 }
 
-/// 工作区名 = 命名空间标识，必须是简单标识符（树节点与 URL 都用它）。
+/// Workspace name = namespace ID; must be a simple identifier (used by tree nodes and URLs).
 fn validate_ident(name: &str, label: &str, max: usize) -> AppResult<String> {
     let n = name.trim();
     if n.is_empty() {
@@ -410,7 +410,7 @@ pub async fn ws_list(
     Ok(Resp::ok(json!({ "workspaces": items, "total": items.len() })))
 }
 
-/// 把路径 canonicalize 成绝对目录；文件或不可访问一律报错。
+/// Canonicalize path to absolute dir; file or inaccessible → error.
 fn canonical_dir(raw: &str) -> std::io::Result<std::path::PathBuf> {
     let p = std::fs::canonicalize(raw)?;
     if !p.is_dir() {
@@ -422,11 +422,11 @@ fn canonical_dir(raw: &str) -> std::io::Result<std::path::PathBuf> {
     Ok(p)
 }
 
-/// `GET /map/catalog/dirs?workspaceId=&path=` — 列出工作空间数据根目录下的子目录（一层）。
+/// `GET /map/catalog/dirs?workspaceId=&path=` — List subdirs (one level) under workspace data root.
 ///
-/// 供「新建数据源」左侧目录树使用。数据根目录不一定在引擎 `DATA_ROOT` 之内，
-/// 因此不复用 `/admin/browse` 的前缀守卫；这里只读取目录/文件元信息，不读数据内容，
-/// 且 `path` 必须落在该工作空间 `data_root` 内（canonicalize 后做前缀校验，防目录穿越）。
+/// Used by the left-side tree in 'new data source'. Data root may not be inside engine `DATA_ROOT`,
+/// so we don't reuse `/admin/browse`'s prefix guard; we only read dir/file metadata, not data content,
+/// and `path` must stay inside workspace `data_root` (prefix check after canonicalize, prevents path traversal).
 pub async fn dir_list(
     State(state): State<Arc<AppState>>,
     RawQuery(qs): RawQuery,
@@ -521,9 +521,9 @@ pub struct TileGridBody {
     pub path: String,
 }
 
-/// `POST /map/catalog/tile-grid` — 解析服务器上的 ArcGIS `Conf.xml`，返回发布
-/// 向导需要的网格参数（CRS/原点/瓦片尺寸/LOD 阶梯），由引擎复用 `arcgis-cache`
-/// 的解析逻辑（含 DPI、瓦片对齐）。
+/// `POST /map/catalog/tile-grid` — Parse server-side ArcGIS `Conf.xml`, return the grid params the publish
+/// wizard needs (CRS / origin / tile size / LOD levels). Engine reuses `arcgis-cache`
+/// parsing logic (incl. DPI, tile alignment).
 pub async fn tile_grid_parse(
     State(state): State<Arc<AppState>>,
     Json(form): Json<TileGridBody>,
@@ -650,8 +650,8 @@ pub async fn ws_update(
     Ok(Resp::ok(json!({ "id": id, "name": name })))
 }
 
-/// `DELETE /map/catalog/workspaces/:id` — 软删除；仍有 Store 或已发布服务时拒绝，
-/// 避免一次误点把整个命名空间下的目录连带打进垃圾箱。
+/// `DELETE /map/catalog/workspaces/:id` — Soft-delete; reject if Stores or published services still exist,
+/// to avoid accidentally moving the entire namespace into trash with one click.
 pub async fn ws_remove(
     State(state): State<Arc<AppState>>,
     AxumPath(id): AxumPath<i64>,
@@ -699,7 +699,7 @@ pub async fn ws_remove(
 }
 
 // =====================================================================
-// 数据存储（纯指针：目录 或 PostGIS 连接）
+// Data store (pointer only: directory or PostGIS connection)
 // =====================================================================
 
 #[derive(Debug, Clone, Deserialize)]
@@ -754,7 +754,7 @@ async fn load_store(state: &AppState, id: i64) -> AppResult<StoreRow> {
     })
 }
 
-/// Store 表单校验：类型合法 + 定位字段齐备（目录要路径，PostGIS 要 DSN）。
+/// Store form validation: legal type + required locator fields (dir needs path, PostGIS needs DSN).
 fn validate_store(b: &StoreBody, caps: &Caps) -> AppResult<StoreRow> {
     let name = validate_ident(&b.name, "Store 名", 128)?;
     let store_type = b.store_type.trim().to_string();
@@ -772,8 +772,8 @@ fn validate_store(b: &StoreBody, caps: &Caps) -> AppResult<StoreRow> {
         b.pg_schema.trim().to_string()
     };
     if store_type == STORE_TYPE_POSTGIS {
-        // 留空 = 沿用已登记的连接串（回显只有掩码，无法原样回填）；
-        // 因此这里不判空，由新增/编辑各自的调用点决定「必须有」。
+        // Empty = keep registered DSN (echo is masked only, can't round-trip);
+        // so we don't check empty here; each add/edit caller decides whether it's required.
         if !pg_dsn.is_empty()
             && !(pg_dsn.starts_with("postgres://") || pg_dsn.starts_with("postgresql://"))
         {
@@ -797,7 +797,7 @@ fn validate_store(b: &StoreBody, caps: &Caps) -> AppResult<StoreRow> {
     })
 }
 
-/// 对外回显：DSN 只给掩码 + 是否已配置，绝不回传口令。
+/// Public response: DSN is masked + configured flag only — password never leaks back.
 fn store_json(s: &StoreRow, extra: Option<&Value>) -> Value {
     let mut v = json!({
         "id": s.id,
@@ -820,7 +820,7 @@ fn store_json(s: &StoreRow, extra: Option<&Value>) -> Value {
     v
 }
 
-/// `GET /map/catalog/stores?workspaceId=` — Store 清单（含资源计数）。
+/// `GET /map/catalog/stores?workspaceId=` — Store list (incl. resource counts).
 pub async fn store_list(
     State(state): State<Arc<AppState>>,
     RawQuery(qs): RawQuery,
@@ -832,7 +832,7 @@ pub async fn store_list(
     let ws_id = ws.unwrap_or(0);
     let show_deleted = if include { 1 } else { 0 };
     let c = conn(&state.pool).await?;
-    // 总数（不受分页影响）
+    // Total count (unaffected by pagination)
     let total: i64 = c
         .query(
             "SELECT count(*) FROM sys_store s WHERE ($1::bigint = 0 OR s.workspace_id = $1) \
@@ -853,7 +853,7 @@ pub async fn store_list(
          FROM sys_store s WHERE ($1::bigint = 0 OR s.workspace_id = $1) \
          AND ($2::int = 1 OR s.del_flag = 0) ORDER BY s.workspace_id, s.id",
     );
-    // 后端分页：仅当显式传 page/pageSize 时切片（pageSize<=0 视为不分页，向下兼容）
+    // Server-side pagination: slice only when page/pageSize are explicitly passed (pageSize<=0 means no pagination, backward-compat)
     if size > 0 {
         let off = if page < 1 { 0 } else { (page - 1) * size };
         sql.push_str(&format!(" LIMIT {size} OFFSET {off}"));
@@ -939,9 +939,9 @@ pub async fn store_add(
     Ok(Resp::ok(store_json(&row, None)))
 }
 
-/// `PUT /map/catalog/stores/:id` — 编辑指针；目录/连接串变更不自动重扫，
-/// 由前端提示「需重新发现」。`pgDsn` 留空表示沿用已登记的连接串
-/// （对外只回显掩码，无法原样回填）。
+/// `PUT /map/catalog/stores/:id` — Edit pointer; path / DSN changes do NOT auto-rescan,
+/// front-end prompts 're-discover needed'. `pgDsn` empty means keep the registered DSN
+/// (public response is masked only, can't round-trip).
 pub async fn store_update(
     State(state): State<Arc<AppState>>,
     AxumPath(id): AxumPath<i64>,
@@ -981,8 +981,8 @@ pub async fn store_update(
     Ok(Resp::ok(store_json(&row, None)))
 }
 
-/// `DELETE /map/catalog/stores/:id` — 软删除 Store：其在线服务全部停止并进垃圾箱
-/// （`state='deleted'`），资源快照保留（随 Store 一起恢复），数据文件不动。
+/// `DELETE /map/catalog/stores/:id` — Soft-delete Store: all its online services stop and go to trash
+/// (`state='deleted'`); resource snapshots preserved (recover with Store), data files untouched.
 pub async fn store_remove(
     State(state): State<Arc<AppState>>,
     AxumPath(id): AxumPath<i64>,
@@ -1008,9 +1008,9 @@ pub async fn store_remove(
     })))
 }
 
-/// `POST /map/catalog/stores/:id/restore` — 垃圾箱恢复 Store 指针。
-/// 只解自身的 `del_flag`；被级联打进垃圾箱的资源与已发布层保持原状，
-/// 由各自的「恢复」按钮逐个处理（一次点击只改一类状态，失败面可控）。
+/// `POST /map/catalog/stores/:id/restore` — Restore Store pointer from trash.
+/// Only clears its own `del_flag`; resources and published layers cascaded into trash stay as-is,
+/// handled one by one via their own 'restore' button (one click changes one state type, bounded blast radius).
 pub async fn store_restore(
     State(state): State<Arc<AppState>>,
     AxumPath(id): AxumPath<i64>,
@@ -1029,15 +1029,15 @@ pub async fn store_restore(
 }
 
 // =====================================================================
-// 连接测试与只读发现
+// Connection test and read-only discovery
 // =====================================================================
 
-/// `POST /map/catalog/stores/:id/connect` — 可达性测试（不落库、不改状态）。
+/// `POST /map/catalog/stores/:id/connect` — Reachability test (no DB write, no state change).
 ///
-/// * PostGIS → map-api `/admin/pg-test`；
-/// * 目录型 → map-api `/admin/discover?depth=1`，能列出条目即为可达。
+/// * PostGIS → map-api `/admin/pg-test`;
+/// * Directory type → map-api `/admin/discover?depth=1`; reachable if entries are listed.
 ///
-/// 引擎请求失败不抛错，返回 `{ok:false, detail}`，让「测试连接」按钮拿到可读结论。
+/// Engine request failure is swallowed, returns `{ok:false, detail}` — 'test connection' button gets readable feedback.
 pub async fn store_connect(
     State(state): State<Arc<AppState>>,
     AxumPath(id): AxumPath<i64>,
@@ -1082,7 +1082,7 @@ pub async fn store_connect(
     Ok(Resp::ok(out))
 }
 
-/// 新建数据源「测试连接」请求体：由前端表单字段拼装，后端生成 DSN 后转发引擎。
+/// New data-source 'test connection' body: assembled from front-end form fields; backend builds DSN and forwards to engine.
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct StoreConnectBody {
@@ -1098,10 +1098,10 @@ fn default_pg_port() -> u16 {
     54321
 }
 
-/// `POST /map/catalog/stores/connect` — 新建数据源时的连接测试（无需 store id）。
+/// `POST /map/catalog/stores/connect` — Connection test for new data source (no store id needed).
 ///
-/// 前端传入 host/port/username/password/database，后端拼成 `postgres://...` DSN
-/// 转发引擎 `/admin/pg-test`，返回 `{ok, detail}`。不落库、不记状态。
+/// Front-end sends host/port/username/password/database; backend assembles `postgres://...` DSN
+/// and forwards to engine `/admin/pg-test`, returns `{ok, detail}`. No DB write, no state record.
 pub async fn store_connect_preflight(
     State(state): State<Arc<AppState>>,
     Json(body): Json<StoreConnectBody>,
@@ -1114,7 +1114,7 @@ pub async fn store_connect_preflight(
     if database.is_empty() {
         return Err(AppError::Param("database 不能为空".into()));
     }
-    // DSN 中的口令走请求体（不进 URL / 访问日志），与 pg-test 约定一致。
+    // Password in DSN goes through request body (not URL / access log), consistent with pg-test contract.
     let dsn = format!(
         "postgres://{}:{}@{}:{}/{}",
         body.username.trim(),
@@ -1144,10 +1144,10 @@ pub async fn store_connect_preflight(
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct DiscoverBody {
-    /// 目录型 Store 的递归层深（1..=4）；PostGIS 忽略。
+    /// Recursion depth for dir-type Store (1..=4); ignored for PostGIS.
     #[serde(default)]
     pub depth: Option<i64>,
-    /// 仅 PostGIS：只发现该模式下的表（省略则用 Store 的 pg_schema）。
+    /// PostGIS only: discover tables in this schema only (default: Store's pg_schema).
     #[serde(default)]
     pub schema: Option<String>,
 }
@@ -1155,18 +1155,18 @@ pub struct DiscoverBody {
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ImportShpBody {
-    /// 工作空间数据根目录内的 .shp 绝对路径（由前端目录树选出）。
+    /// Absolute path to .shp under workspace data root (picked by front-end tree).
     pub path: String,
-    /// 导入后 PostGIS 中的表名（数据图层名）。
+    /// Target PostGIS table name after import (data layer name).
     pub table: String,
-    /// 可选：覆盖 .prj 自动识别的 EPSG。
+    /// Optional: override EPSG auto-detected from .prj.
     #[serde(default)]
     pub srid: Option<i32>,
 }
 
-/// `POST /map/catalog/stores/:id/import-shp` — 把工作空间内的 Shapefile 导入该 PostGIS 库。
+/// `POST /map/catalog/stores/:id/import-shp` — Import a workspace Shapefile into this PostGIS DB.
 ///
-/// manager 只做路径/名称校验与 DSN 转发，实际导入由 map-api 调 `shp2pgsql` 完成。
+/// Manager only does path/name validation and DSN forwarding; actual import is done by map-api calling `shp2pgsql`.
 pub async fn store_import_shp(
     State(state): State<Arc<AppState>>,
     AxumPath(id): AxumPath<i64>,
@@ -1190,11 +1190,11 @@ pub async fn store_import_shp(
     Ok(Resp::ok(data))
 }
 
-/// `POST /map/catalog/stores/:id/import-shp/stream` — 同一导入的 SSE 版本。
+/// `POST /map/catalog/stores/:id/import-shp/stream` — SSE version of the same import.
 ///
-/// 大 Shapefile 的 shp2pgsql → COPY 可能持续几分钟，同步接口在前端看起来像卡死。
-/// 这里把 map-api 的 SSE 原样透传给浏览器：`stage=start/copy/done/error`，
-/// `copy` 事件带已写入行数与耗时，前端可持续刷新进度。
+/// Large Shapefile shp2pgsql → COPY can take minutes; the sync API looks frozen to front-end users.
+/// We pass map-api's SSE through directly to the browser: `stage=start/copy/done/error`,
+/// `copy` events carry written row count and elapsed time, so front-end can refresh progress continuously.
 pub async fn store_import_shp_stream(
     State(state): State<Arc<AppState>>,
     AxumPath(id): AxumPath<i64>,
@@ -1237,8 +1237,8 @@ pub async fn store_import_shp_stream(
         .unwrap_or_else(|_| sse_error("构建流式响应失败"))
 }
 
-/// 错误也包装成 SSE 事件（HTTP 200），前端统一按 `stage=error` 处理，
-/// 避免 4xx 让浏览器/RestTemplate 直接把流判为失败而丢掉错误原因。
+/// Errors are also wrapped as SSE events (HTTP 200); front-end handles all via `stage=error`,
+/// to avoid 4xx making the browser/RestTemplate declare the stream failed and drop the error reason.
 fn sse_error(msg: &str) -> Response {
     let payload = json!({ "stage": "error", "error": msg }).to_string();
     let body = format!("data: {payload}\n\n");
@@ -1251,9 +1251,9 @@ fn sse_error(msg: &str) -> Response {
         .unwrap_or_else(|_| Response::new(Body::empty()))
 }
 
-/// 导入前的公共校验（同步接口与 SSE 接口共用）：Store 必须是 PostGIS、
-/// 表名合法、.shp 必须落在所属工作空间的数据根目录内。
-/// 返回 `(dsn, schema, table, shp 绝对路径)`。
+/// Common pre-import validation (shared by sync and SSE paths): Store must be PostGIS,
+/// table name legal, .shp must reside inside the owning workspace's data root.
+/// Returns `(dsn, schema, table, shp absolute path)`.
 async fn prepare_import(
     state: &AppState,
     id: i64,
@@ -1274,7 +1274,7 @@ async fn prepare_import(
     let table = body.table.trim().to_lowercase();
     validate_pg_ident(&table)?;
 
-    // 文件必须落在该 Store 所属工作空间的数据根目录内（防目录穿越）。
+    // File must reside inside the Store's owning workspace data root (prevents path traversal).
     let c = conn(&state.pool).await?;
     let row = c
         .query_opt(
@@ -1315,9 +1315,9 @@ async fn prepare_import(
     Ok((store.pg_dsn, store.pg_schema, table, shp))
 }
 
-/// 把 `canonicalize` 得到的 Windows verbatim 路径还原成普通绝对路径
-/// （`\\?\E:\a.shp` → `E:\a.shp`，`\\?\UNC\srv\a.shp` → `\\srv\a.shp`）。
-/// 非 Windows 或已是普通路径时原样返回。
+/// Restore Windows verbatim path from `canonicalize` to a plain absolute path
+/// (`\\?\E:\a.shp` → `E:\a.shp`, `\\?\UNC\srv\a.shp` → `\\srv\a.shp`).
+/// On non-Windows or when already plain, returns as-is.
 fn plain_abs_path(p: &std::path::Path) -> String {
     let s = p.to_string_lossy();
     if let Some(rest) = s.strip_prefix(r"\\?\UNC\") {
@@ -1329,7 +1329,7 @@ fn plain_abs_path(p: &std::path::Path) -> String {
     }
 }
 
-/// PostGIS 标识符（导入表名）：小写字母/下划线开头，仅字母数字下划线，长度 ≤ 63。
+/// PostGIS identifier (import table name): starts with lowercase letter or underscore, only [A-Za-z0-9_], length ≤ 63.
 fn validate_pg_ident(name: &str) -> AppResult<()> {
     if name.is_empty() {
         return Err(AppError::Param("数据图层名不能为空".to_string()));
@@ -1357,10 +1357,10 @@ fn validate_pg_ident(name: &str) -> AppResult<()> {
     Ok(())
 }
 
-/// `POST /map/catalog/stores/:id/discover` — 只读发现并刷新资源清单。
+/// `POST /map/catalog/stores/:id/discover` — Read-only discover and refresh resource list.
 ///
-/// 引擎侧只读扫描（文件头 / 归档元数据 / `geometry_columns`），本接口把结果
-/// 原样快照进 `sys_resource`（同名刷新元数据，不改 `del_flag`）。
+/// Engine does read-only scan (file headers / archive metadata / `geometry_columns`); this endpoint snapshots results
+/// as-is into `sys_resource` (same-name rows refresh metadata, `del_flag` untouched).
 pub async fn store_discover(
     State(state): State<Arc<AppState>>,
     AxumPath(id): AxumPath<i64>,
@@ -1462,8 +1462,8 @@ fn resource_json(x: &ResourceRow) -> Value {
     })
 }
 
-/// 坐标系合理性校验：坐标范围是否落在 `src_crs` 的合理包围盒内。
-/// 返回 `true` 表示「可疑」——坐标系名与坐标值明显不匹配，或坐标系缺失/未知。
+/// CRS sanity check: does the coord range fall within `src_crs`'s expected bounding box?
+/// Returns `true` for 'suspicious' — CRS name clearly mismatches coord values, or CRS missing/unknown.
 fn crs_suspicious(src_crs: &str, bbox: Option<&Vec<f64>>) -> bool {
     let epsg = match parse_epsg(src_crs) {
         Some(c) => c,
@@ -1485,7 +1485,7 @@ fn crs_suspicious(src_crs: &str, bbox: Option<&Vec<f64>>) -> bool {
     }
 }
 
-/// 解析 `EPSG:<code>` 为整型；空 / LOCAL / UNKNOWN 返回 None（视为坐标系缺失）。
+/// Parse `EPSG:<code>` to int; empty / LOCAL / UNKNOWN returns None (treat as missing CRS).
 fn parse_epsg(s: &str) -> Option<i32> {
     let s = s.trim().to_uppercase();
     if s.is_empty() || s == "LOCAL" || s == "UNKNOWN" {
@@ -1497,19 +1497,19 @@ fn parse_epsg(s: &str) -> Option<i32> {
     s.parse().ok()
 }
 
-/// 已知坐标系的合理坐标范围候选列表 `((xmin,xmax),(ymin,ymax))`。
-/// 同一坐标系可能有多种量纲语义（如 EPSG:3857 的 bbox 既可用经纬度描述，
-/// 也可用米制 Web Mercator 描述），任一候选命中即视为合法。
+/// Known CRS expected coord-range candidates `((xmin,xmax),(ymin,ymax))`.
+/// Same CRS may have multiple unit semantics (e.g. EPSG:3857 bbox can be in degrees
+/// or in Web Mercator meters). Any one candidate match counts as legal.
 fn expected_ranges(epsg: i32) -> Vec<((f64, f64), (f64, f64))> {
     match epsg {
-        // 地理坐标（经纬度）
+        // Geographic coords (lat/lon)
         4326 | 4490 => vec![((-180.0, 180.0), (-90.0, 90.0))],
-        // Web Mercator：接受经纬度语义，也接受米制语义
+        // Web Mercator: accepts lat/lon semantics AND meter semantics
         3857 => vec![
             ((-180.0, 180.0), (-90.0, 90.0)),
             ((-20037508.34, 20037508.34), (-20037508.34, 20037508.34)),
         ],
-        // CGCS2000 高斯克吕格 3°带：EPSG = 4509 + 带号（34 带 = 4543，昆明）
+        // CGCS2000 Gauss-Kruger 3° zone: EPSG = 4509 + zone (zone 34 = 4543, Kunming)
         c if (4509 + 25..=4509 + 45).contains(&c) => {
             let zone = c - 4509; // 25..45
             let base = (zone as f64) * 1_000_000.0 + 500_000.0;
@@ -1519,15 +1519,15 @@ fn expected_ranges(epsg: i32) -> Vec<((f64, f64), (f64, f64))> {
     }
 }
 
-/// 发现结果快照进 `sys_resource`：`on conflict do update` 只刷新元数据，
-/// 保留用户的软删除标记（`del_flag` 不在更新列内）。
+/// Snap discoveries into `sys_resource`: `on conflict do update` refreshes metadata only,
+/// preserving user's soft-delete mark (`del_flag` not in update columns).
 async fn upsert_resources(state: &AppState, store_id: i64, entries: &[Value]) -> AppResult<usize> {
     if entries.is_empty() {
         return Ok(0);
     }
     let c = conn(&state.pool).await?;
-    // `::text::jsonb`：单写 `$9::jsonb` 会让 Postgres 把参数本身推断成 jsonb，
-    // 而 tokio-postgres 未启用 serde_json feature，String 只能序列化为 text。
+    // `::text::jsonb`: writing `$9::jsonb` alone makes Postgres infer the param itself as jsonb,
+    // but tokio-postgres doesn't enable serde_json feature; String serializes to text only.
     const SQL: &str = "INSERT INTO sys_resource (store_id, name, data_type, source, src_crs, \
                        bbox, publishable, reason, meta, crs_suspicious) \
                        VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9::text::jsonb,$10) \
@@ -1543,13 +1543,13 @@ async fn upsert_resources(state: &AppState, store_id: i64, entries: &[Value]) ->
             continue;
         }
         let bbox = bbox_of(e);
-        // 坐标系缺失不再静默默认 EPSG:4326（那会掩盖「数据无坐标系」问题）：
-        // 保留空值并标记可疑，发布时引导用户用 GIS 软件赋予或用坐标系树选择。
+        // Missing CRS no longer silently defaults to EPSG:4326 (that would hide the 'data has no CRS' issue):
+        // Keep empty and mark suspicious; at publish time guide user to assign CRS with GIS software or pick from CRS tree.
         let src_crs = str_field(e, "src_crs");
         let data_type = str_field(e, "data_type");
-        // 坐标系合理性：坐标系名与坐标值范围不匹配 → 标记可疑（发布时拦截）。
-        // 3dtiles / terrain 本身按 WGS 84/ECEF 规范渲染，不需要也不记录 EPSG；
-        // pg_table（无 geometry）也没有坐标系语义。这三类不参与可疑校验。
+        // CRS sanity: CRS name doesn't match coord range → mark suspicious (block at publish).
+        // 3dtiles / terrain render per WGS 84/ECEF spec, don't need or record EPSG;
+        // pg_table (no geometry) also has no CRS semantics. These three types skip suspicious check.
         let suspicious = !matches!(data_type.as_str(), "3dtiles" | "terrain" | "pg_table")
             && crs_suspicious(&src_crs, bbox.as_ref());
         let publishable = e
@@ -1600,8 +1600,8 @@ async fn resources_of(state: &AppState, store_id: i64) -> AppResult<Vec<Value>> 
 }
 
 /// `GET /map/catalog/resources?storeId=&workspaceId=&includeDeleted=1`
-/// 过滤优先级：storeId > workspaceId > 全量。三者均未指定（或 storeId=0）时
-/// 列出全部资源，避免默认查 `store_id = 0` 永远返回空、被误判为接口故障。
+/// Filter priority: storeId > workspaceId > all. When none is specified (or storeId=0),
+/// list all resources; avoids `store_id = 0` always returning empty and being misdiagnosed as a broken API.
 pub async fn resource_list(
     State(state): State<Arc<AppState>>,
     RawQuery(qs): RawQuery,
@@ -1611,8 +1611,8 @@ pub async fn resource_list(
     let include = query_flag(qs.as_deref(), "includeDeleted");
     let page = query_i64(qs.as_deref(), "page").unwrap_or(0);
     let size = query_i64(qs.as_deref(), "pageSize").unwrap_or(0);
-    // 作用域：优先按 store；其次按 workspace；都不传则列出全部（`$1 >= 0` 恒真，
-    // 仅用于占位以复用统一的参数绑定）。
+    // Scope: prefer store; then workspace; neither → list all (`$1 >= 0` always true,
+    // placeholder to reuse unified param binding).
     let (scope, param): (String, i64) = if store_id > 0 {
         ("r.store_id = $1".to_string(), store_id)
     } else if workspace_id > 0 {
@@ -1625,7 +1625,7 @@ pub async fn resource_list(
     };
     let del_prefix = if include { "" } else { "r.del_flag = 0 AND " };
     let c = conn(&state.pool).await?;
-    // 总数（不受分页影响）
+    // Total count (unaffected by pagination)
     let total: i64 = c
         .query(
             &format!("SELECT count(*) FROM sys_resource r WHERE {del_prefix}{scope}"),
@@ -1636,7 +1636,7 @@ pub async fn resource_list(
         .map(|r| r.get::<_, i64>(0))
         .unwrap_or(0);
     let mut sql = format!("{RES_SELECT} WHERE {del_prefix}{scope} ORDER BY r.name");
-    // 后端分页：仅当显式传 page/pageSize 时切片（pageSize<=0 视为不分页，向下兼容）
+    // Server-side pagination: slice only when page/pageSize are explicitly passed (pageSize<=0 means no pagination, backward-compat)
     if size > 0 {
         let off = if page < 1 { 0 } else { (page - 1) * size };
         sql.push_str(&format!(" LIMIT {size} OFFSET {off}"));
@@ -1654,9 +1654,9 @@ pub async fn resource_list(
     Ok(Resp::ok(json!({ "resources": items, "total": total })))
 }
 
-/// `DELETE /map/catalog/resources/:id` — 软删除（假删除仅标记）：
-/// `del_flag=1` + 其已发布服务转 `state='deleted'`（rust-gisserver 停止服务、保留
-/// XML，进垃圾箱），不物理删文件、不调物理 DELETE。
+/// `DELETE /map/catalog/resources/:id` — Soft-delete (mark only):
+/// `del_flag=1` + its published services set to `state='deleted'` (rust-gisserver stops, keeps
+/// XML, goes to trash). No physical file delete, no physical DELETE.
 pub async fn resource_remove(
     State(state): State<Arc<AppState>>,
     AxumPath(id): AxumPath<i64>,
@@ -1676,9 +1676,9 @@ pub async fn resource_remove(
     Ok(Resp::ok(json!({ "id": id, "retiredLayers": retired })))
 }
 
-/// `POST /map/catalog/resources/:id/restore` — 垃圾箱恢复：`del_flag=0`。
-/// 服务侧恢复由 `/map/catalog/published/:id/state` 单独做（避免一次点击
-/// 同时改两类状态却只成功一半时说不清）。
+/// `POST /map/catalog/resources/:id/restore` — Restore from trash: `del_flag=0`.
+/// Service-side restore is done separately via `/map/catalog/published/:id/state` (avoids one click
+/// changing two state types at once but only half succeeding, which is confusing).
 pub async fn resource_restore(
     State(state): State<Arc<AppState>>,
     AxumPath(id): AxumPath<i64>,
@@ -1696,10 +1696,10 @@ pub async fn resource_restore(
     Ok(Resp::ok(json!({ "id": id, "delFlag": 0 })))
 }
 
-/// `POST /map/catalog/resources/:id/refresh` — 重新探查单个图层的元数据并刷新账本。
+/// `POST /map/catalog/resources/:id/refresh` — Re-probe a single layer's metadata and refresh the ledger.
 ///
-/// 数据图层是发现出来的派生记录，源文件/库表变化后靠这里单条重读：只调引擎
-/// 只读探测（文件头 / 归档元数据 / `pg-tables`），不重扫整个数据源、不改发布态。
+/// Data layers are derived from discovery; when source file/table changes, this is the single-entry re-read:
+/// only calls engine read-only probes (file headers / archive metadata / `pg-tables`), no full rescan, no publish-state change.
 pub async fn resource_refresh(
     State(state): State<Arc<AppState>>,
     AxumPath(id): AxumPath<i64>,
@@ -1742,11 +1742,11 @@ pub async fn resource_refresh(
     })))
 }
 
-/// `GET /map/catalog/resources/:id/query?limit=` — PostGIS 普通表数据查询服务。
+/// `GET /map/catalog/resources/:id/query?limit=` — PostGIS plain-table data query service.
 ///
-/// 仅对 `data_type=pg_table`（无 geometry 列的普通表）开放：加载资源所属 Store
-/// 的连接串与表定位，转发引擎 `/admin/pg-query`，返回 `{columns, rows}`。
-/// 空间图层走发布服务（MVT/WFS/OAF/WMS），不走此接口。
+/// Open only for `data_type=pg_table` (plain tables with no geometry col): loads the owning Store's
+/// DSN and table locator, forwards to engine `/admin/pg-query`, returns `{columns, rows}`.
+/// Spatial layers use published services (MVT/WFS/OAF/WMS), not this endpoint.
 pub async fn resource_query(
     State(state): State<Arc<AppState>>,
     AxumPath(id): AxumPath<i64>,
@@ -1788,8 +1788,8 @@ pub async fn resource_query(
     Ok(Resp::ok(data))
 }
 
-/// 把若干资源的已发布服务停止并打进垃圾箱（本地 `state` + 引擎登记簿同步）。
-/// 返回处理的层数；单个层失败只记日志，不回滚软删除（软删除是本侧的权威意图）。
+/// Stop and trash published services of multiple resources (local `state` + engine registry sync).
+/// Returns processed layer count; per-layer failure is logged only, soft-delete is NOT rolled back (it is the authoritative intent).
 async fn retire_resources(state: &AppState, resource_ids: &[i64]) -> AppResult<usize> {
     if resource_ids.is_empty() {
         return Ok(0);
@@ -1827,7 +1827,7 @@ async fn retire_resources(state: &AppState, resource_ids: &[i64]) -> AppResult<u
     Ok(done)
 }
 
-/// 引擎登记簿状态变更（`PUT /admin/services/:kind/:name/state`），按服务归属路由。
+/// Engine registry state change (`PUT /admin/services/:kind/:name/state`), routed by service ownership.
 async fn set_layer_state(state: &AppState, kind: &str, name: &str, st: &str) -> AppResult<Value> {
     let engine = engine::resolve_for_service(state, kind, name).await;
     upstream_json_engine(
@@ -1842,13 +1842,13 @@ async fn set_layer_state(state: &AppState, kind: &str, name: &str, st: &str) -> 
 }
 
 // =====================================================================
-// 发布 / 修改发布信息
+// Publish / modify publish info
 // =====================================================================
 
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct PublishBody {
-    /// 待发布资源；修改发布信息时以账本行关联的资源为准，此字段可省略。
+    /// Resource to publish; when modifying publish info, the ledger row's resource is authoritative, this field can be omitted.
     #[serde(default)]
     pub resource_id: i64,
     pub layer_name: String,
@@ -1862,17 +1862,17 @@ pub struct PublishBody {
     pub service_types: Vec<String>,
     #[serde(default)]
     pub remark: String,
-    /// 瓦片网格模式：`ogc`（标准 LOD）/ `tdt`（天地图 LOD）/ `custom`（Conf.xml）。
-    /// 空字符串 = 不指定，沿用引擎默认（WebMercatorQuad）。
+    /// Tile grid mode: `ogc` (standard LOD) / `tdt` (Tianditu LOD) / `custom` (Conf.xml).
+    /// Empty string = unspecified, use engine default (WebMercatorQuad).
     #[serde(default)]
     pub grid_mode: String,
-    /// 网格快照（`custom` 必填，其余模式可由后端按预设生成）。结构见
-    /// [`resolve_publish_grid`] 的返回说明。
+    /// Grid snapshot (required for `custom`; other modes can be generated by backend from presets).
+    /// See [`resolve_publish_grid`] for return shape.
     #[serde(default)]
     pub grid: Option<Value>,
 }
 
-/// 源 CRS：只接受 `EPSG:<code>`，与服务平面 `Layer.src_crs` 口径一致。
+/// Source CRS: accepts `EPSG:<code>` only, consistent with service-level `Layer.src_crs`.
 fn validate_crs(s: &str) -> AppResult<String> {
     let v = s.trim();
     let digits = v.strip_prefix("EPSG:").or_else(|| v.strip_prefix("epsg:"));
@@ -1886,7 +1886,7 @@ fn validate_crs(s: &str) -> AppResult<String> {
     }
 }
 
-/// 四至：允许缺省（发布后可由引擎侧计算），给出则必须是 4 个有限值且 minX<maxX。
+/// Bbox: optional (engine can compute after publish). If given, must be 4 finite values with minX<maxX.
 fn normalize_bbox(b: Option<&Vec<f64>>) -> AppResult<Option<Vec<f64>>> {
     let Some(v) = b else { return Ok(None) };
     if v.len() != 4 {
@@ -1900,7 +1900,7 @@ fn normalize_bbox(b: Option<&Vec<f64>>) -> AppResult<Option<Vec<f64>>> {
     Ok(Some(v.clone()))
 }
 
-/// 从发现快照里取 bbox（引擎返回 null 时保持 None）。
+/// Extract bbox from discovery snapshot (keeps None when engine returns null).
 fn bbox_of(e: &Value) -> Option<Vec<f64>> {
     let a = e.get("bbox").and_then(|v| v.as_array())?;
     if a.len() != 4 {
@@ -1914,11 +1914,11 @@ fn bbox_of(e: &Value) -> Option<Vec<f64>> {
     }
 }
 
-/// 由资源 + Store 指针重建 rust-gisserver 的服务文档（`POST /admin/services` 负载）。
+/// Rebuild rust-gisserver service doc from resource + Store pointer (payload for `POST /admin/services`).
 ///
-/// 三种形状：3D Tiles → `<TilesetService>`（root/entry）；PostGIS →
-/// `source.type=postgis` 的连接与表定位；其余 → `source.type=<kind>` + 文件路径。
-/// 纯函数：不碰网络、不读库，便于单测覆盖到每个 kind。
+/// Three shapes: 3D Tiles → `<TilesetService>` (root/entry); PostGIS →
+/// `source.type=postgis` conn & table locator; others → `source.type=<kind>` + file path.
+/// Pure function: no network, no DB read — easy to unit-test every kind.
 fn build_service_body(
     res: &ResourceRow,
     store: &StoreRow,
@@ -1936,9 +1936,9 @@ fn build_service_body(
         "title": if title.trim().is_empty() { res.name.clone() } else { title.trim().to_string() },
     });
     if kind == "3dtiles" {
-        // Root 必须是**目录**（数据集根），不是 tileset.json 文件。
-        // discover 可能返回目录路径（含 tileset.json 的父目录），也可能直接返回文件路径，
-        // 这里统一归一：如果 source 指向 tileset.json 文件，则取其父目录作为 root。
+        // Root must be a **directory** (dataset root), NOT a tileset.json file.
+        // discover may return a dir path (parent dir containing tileset.json) or a file path directly;
+        // we normalize here: if source points to tileset.json, take its parent dir as root.
         let source_path = std::path::PathBuf::from(res.source.trim());
         let root_path = if source_path
             .file_name()
@@ -1962,7 +1962,7 @@ fn build_service_body(
             }
             d
         };
-        // source = schema.table（geometry_columns 发现时写入）。
+        // source = schema.table (written at geometry_columns discovery).
         let (sch, tbl) = match res.source.split_once('.') {
             Some((s, t)) => (s.to_string(), t.to_string()),
             None => (store.pg_schema.clone(), res.source.clone()),
@@ -1996,8 +1996,8 @@ fn build_service_body(
     if let Some(b) = bbox {
         body["extent"] = json!(b);
     }
-    // 瓦片网格：`grids` 引用网格 id；非预设网格（天地图 / Conf.xml）同时下发
-    // `custom_grids`，引擎落盘后热重载即可按该网格出瓦片与预览。
+    // Tile grid: `grids` references grid id; non-preset grids (Tianditu / Conf.xml) also send
+    // `custom_grids`; engine writes and hot-reloads, then tiles and previews use that grid.
     if kind != "3dtiles" {
         if let Some(g) = grid {
             if let Some(id) = g.get("id").and_then(Value::as_str).filter(|s| !s.is_empty()) {
@@ -2014,7 +2014,7 @@ fn build_service_body(
     Ok(body)
 }
 
-/// 载入资源及其 Store（发布与修改共用；资源必须未被软删）。
+/// Load resource + its Store (shared by publish and modify; resource must not be soft-deleted).
 async fn load_resource_with_store(
     state: &AppState,
     resource_id: i64,
@@ -2039,9 +2039,9 @@ async fn load_resource_with_store(
     Ok((res, store))
 }
 
-/// ArcGIS 缓存的原生网格快照：发现时从 `Conf.xml` 读出 CRS / 瓦片尺寸 / 原点 /
-/// LOD 阶梯，发布（或修改）时固化进 `sys_published_layer.grid`。运行时引擎仍以
-/// 缓存自带的 `Conf.xml` 为准，这里只做账本记录与前端展示/核对。
+/// ArcGIS cache native grid snapshot: read CRS / tile size / origin / from `Conf.xml` at discover time,
+/// LOD levels, solidified into `sys_published_layer.grid` at publish (or modify) time. Engine runtime still uses
+/// the cache's own `Conf.xml`; we only do ledger record + front-end display/verification here.
 fn native_grid(res: &ResourceRow) -> Option<Value> {
     if res.data_type != "arcgis" {
         return None;
@@ -2068,7 +2068,7 @@ fn native_grid(res: &ResourceRow) -> Option<Value> {
     }))
 }
 
-/// 从 `EPSG:4490` 取数字码；非标准写法返回 `None`。
+/// Extract numeric code from `EPSG:4490`; non-standard formats return `None`.
 fn epsg_code(crs: &str) -> Option<u32> {
     crs.trim()
         .strip_prefix("EPSG:")
@@ -2076,7 +2076,7 @@ fn epsg_code(crs: &str) -> Option<u32> {
         .and_then(|s| s.trim().parse().ok())
 }
 
-/// OGC 0.28 mm/像素规则下的比例尺分母（仅供账本/前端展示，引擎以 resolution 为准）。
+/// Scale denominator under OGC 0.28 mm/pixel rule (for ledger/front-end display only; engine uses resolution).
 fn ogc_scale(resolution: f64, crs: &str) -> f64 {
     let mpu = if epsg_code(crs) == Some(3857) {
         1.0
@@ -2086,7 +2086,7 @@ fn ogc_scale(resolution: f64, crs: &str) -> f64 {
     resolution * mpu / 0.00028
 }
 
-/// 生成 `levels: [{level, scale, resolution}]` 展示阶梯。
+/// Build `levels: [{level, scale, resolution}]` display steps.
 fn grid_level_rows(levels: &[u32], resolutions: &[f64], scales: &[f64], crs: &str) -> Vec<Value> {
     levels
         .iter()
@@ -2103,8 +2103,8 @@ fn grid_level_rows(levels: &[u32], resolutions: &[f64], scales: &[f64], crs: &st
         .collect()
 }
 
-/// 标准预设网格（WebMercatorQuad / WorldCRS84Quad / CGCS2000Quad）的账本快照。
-/// 预设由引擎内置解析，`grid_def` 恒为 null。
+/// Ledger snapshot for standard preset grids (WebMercatorQuad / WorldCRS84Quad / CGCS2000Quad).
+/// Presets are parsed by engine internally; `grid_def` is always null.
 fn preset_grid_snapshot(id: &str, crs: &str) -> Value {
     let (origin, extent, levels, resolutions): (Vec<f64>, Vec<f64>, Vec<u32>, Vec<f64>) =
         if id == "WebMercatorQuad" {
@@ -2143,8 +2143,8 @@ fn preset_grid_snapshot(id: &str, crs: &str) -> Value {
     })
 }
 
-/// 天地图 LOD（EPSG:4490 经纬度）：原点 [-180,90]，256px，1–18 级，
-/// 分辨率 0.703125 / 2^(level-1)。属自定义网格（引擎 `custom_grids`）。
+/// Tianditu LOD (EPSG:4490 lat/lon): origin [-180,90], 256px, levels 1–18,
+/// resolution 0.703125 / 2^(level-1). Treated as custom grid (engine `custom_grids`).
 fn tianditu_grid_snapshot() -> Value {
     let levels: Vec<u32> = (1..=18).collect();
     let resolutions: Vec<f64> = (0..18).map(|i| 0.703125 / (1u64 << i) as f64).collect();
@@ -2178,9 +2178,9 @@ fn tianditu_grid_snapshot() -> Value {
     })
 }
 
-/// 自定义网格（ArcGIS `Conf.xml` 解析结果）→ 账本快照 + `grid_def`（供引擎
-/// `custom_grids` 重建）。`src_crs` 与 XML 的 CRS 必须一致——不一致时报错，
-/// 提示先转换坐标系，避免瓦片寻址与数据坐标错位。
+/// Custom grid (ArcGIS `Conf.xml` parse result) → ledger snapshot + `grid_def` (for engine
+/// `custom_grids` rebuild). `src_crs` must match XML's CRS — mismatch → error,
+/// hint to convert CRS first; avoids tile-address vs data-coordinate misalignment.
 fn custom_grid_snapshot(layer_name: &str, src_crs: &str, g: &Value) -> AppResult<Value> {
     let def = g.get("grid_def").filter(|d| d.is_object()).unwrap_or(g);
     let crs = def
@@ -2263,14 +2263,14 @@ fn custom_grid_snapshot(layer_name: &str, src_crs: &str, g: &Value) -> AppResult
     }))
 }
 
-/// 按发布表单解析并校验网格选择，返回要固化到 `sys_published_layer.grid` 的快照。
+/// Parse and validate grid selection from publish form, return snapshot to solidify into `sys_published_layer.grid`.
 ///
-/// * ArcGIS 预切片缓存一律以 `Conf.xml` 原生网格为准（忽略表单）；
+/// * ArcGIS pre-sliced cache always uses `Conf.xml` native grid (form ignored);
 /// * `ogc`：3857→WebMercatorQuad、4326→WorldCRS84Quad、4490→CGCS2000Quad，
-///   其他（投影）坐标系拒绝；
-/// * `tdt`：仅 EPSG:4490；
-/// * `custom`：取表单携带的 Conf.xml 解析结果，CRS 必须与 `src_crs` 一致。
-/// 空模式返回 `None`，表示沿用引擎默认（WebMercatorQuad）。
+///   other (projected) CRS rejected;
+/// * `tdt`: EPSG:4490 only;
+/// * `custom`: use form-supplied Conf.xml parse result; CRS must match `src_crs`.
+/// Empty mode returns `None`, meaning use engine default (WebMercatorQuad).
 fn resolve_publish_grid(
     res: &ResourceRow,
     layer_name: &str,
@@ -2318,8 +2318,8 @@ fn resolve_publish_grid(
     }
 }
 
-/// 发布/改密的公共落库：upsert 已发布层 + 记录归属引擎。
-/// 参数即 `sys_published_layer` 的列，逐个传比再包一层结构体更直白，因此不合并。
+/// Common DB write for publish/modify: upsert published layer + record owning engine.
+/// Params are exactly `sys_published_layer` columns; passing them individually is clearer than wrapping in a struct, so we don't.
 #[allow(clippy::too_many_arguments)]
 async fn record_published(
     state: &AppState,
@@ -2366,7 +2366,7 @@ async fn record_published(
         .and_then(|r| r.get(0))
         .unwrap_or(0);
     drop(c);
-    // 归属引擎：登记走的是默认引擎，记下来供后续服务级操作按归属路由。
+    // Owning engine: registration uses default engine; record it so later service ops route by ownership.
     let (base, _) = engine::default_engine(state).await;
     if let Some(eid) = engine::engine_id_by_base(state, base.trim_end_matches('/')).await {
         engine::record_service_engine(state, kind, layer_name, &eid).await;
@@ -2374,10 +2374,10 @@ async fn record_published(
     Ok(json!({ "id": id, "layerName": layer_name, "kind": kind, "serviceTypes": service_types }))
 }
 
-/// `POST /map/catalog/publish` — 发现得到的 Resource → 地图服务。
+/// `POST /map/catalog/publish` — Discovered Resource → map service.
 ///
-/// 计划 §7.2：表单 → 依 `data_type` 取 `mapserver_kind` → 生成 `Layer`/`TilesetService`
-/// 文档 → `POST /admin/services`（引擎侧落 XML + 热重载）→ upsert `sys_published_layer`。
+/// Plan §7.2: form → `mapserver_kind` by `data_type` → build `Layer`/`TilesetService`
+/// doc → `POST /admin/services` (engine writes XML + hot-reload) → upsert `sys_published_layer`.
 pub async fn publish(
     State(state): State<Arc<AppState>>,
     Json(form): Json<PublishBody>,
@@ -2404,8 +2404,8 @@ pub async fn publish(
         .unwrap_or("")
         .trim()
         .to_string();
-    // 3dtiles / terrain 本身按 WGS 84/ECEF 规范渲染，不需要也不记录 EPSG，
-    // 发布时跳过 CRS / 四至 / 网格 的全部校验。
+    // 3dtiles / terrain render per WGS 84/ECEF spec, don't need or record EPSG;
+    // skip all CRS / bbox / grid validations at publish time.
     let is_3d = matches!(res.data_type.as_str(), "3dtiles" | "terrain");
     let src_crs_in = if res.data_type == "arcgis" && !native_crs.is_empty() {
         native_crs
@@ -2422,18 +2422,18 @@ pub async fn publish(
         )));
     }
     let src_crs = if is_3d {
-        // 3dtiles / terrain：不校验 CRS，直接允许空串
+        // 3dtiles / terrain: no CRS validation, allow empty string directly
         src_crs_in.trim().to_string()
     } else {
         validate_crs(&src_crs_in)?
     };
     let bbox = if is_3d {
-        // 3dtiles / terrain：不校验四至，直接 null
+        // 3dtiles / terrain: no bbox validation, null directly
         None
     } else {
         normalize_bbox(form.bbox.as_ref().or(res.bbox.as_ref()))?
     };
-    // 坐标系合理性拦截：坐标系名与坐标值范围明显不匹配（或坐标系缺失）时停止发布。
+    // CRS sanity block: stop publish when CRS name clearly mismatches coord range (or CRS missing).
     if !is_3d && crs_suspicious(&src_crs, bbox.as_ref()) {
         return Err(AppError::Msg(format!(
             "资源「{}」的坐标系（{}）与坐标值范围不匹配，疑似局部坐标或坐标系错误，已停止发布。\
@@ -2443,7 +2443,7 @@ pub async fn publish(
         )));
     }
     let title = form.title.trim().to_string();
-    // 网格：ArcGIS 以 Conf.xml 原生网格为准；其余按表单模式/自定义 XML 解析。
+    // Grid: ArcGIS uses Conf.xml native grid; others follow form mode / custom XML parse.
     let grid = resolve_publish_grid(
         &res,
         &layer_name,
@@ -2462,7 +2462,7 @@ pub async fn publish(
         grid.as_ref(),
     )?;
 
-    // 同名服务已在引擎侧存在时拒绝（避免覆盖别人的既有配置）。
+    // Reject when same-name service already exists on engine (avoids overwriting someone else's config).
     ensure_name_free(&state, &layer_name).await?;
 
     let data = upstream_json(
@@ -2500,8 +2500,8 @@ pub async fn publish(
     })))
 }
 
-/// 服务名占用检查：账本里有未删除的同名行就拒绝（垃圾箱里的同名行允许复用，
-/// 由 `record_published` 就地复活，与引擎侧「重新登记同名服务」保持一致）。
+/// Service-name collision check: reject if ledger has an undeleted same-name row (trash same-name rows can be reused,
+/// `record_published` revives them in-place, keeping consistent with engine 're-register same-name service').
 async fn ensure_name_free(state: &AppState, layer_name: &str) -> AppResult<()> {
     let c = conn(&state.pool).await?;
     let n: i64 = c
@@ -2521,7 +2521,7 @@ async fn ensure_name_free(state: &AppState, layer_name: &str) -> AppResult<()> {
     Ok(())
 }
 
-// ---- 已发布服务账本 ----
+// ---- Published service ledger ----
 
 #[derive(Debug, Clone)]
 struct PublishedRow {
@@ -2536,7 +2536,7 @@ struct PublishedRow {
     mapserver_kind: String,
     state: String,
     remark: String,
-    /// 发布时固化的原生网格快照（ArcGIS 缓存：CRS / 瓦片尺寸 / 原点 / LOD）。
+    /// Native grid snapshot solidified at publish time (ArcGIS cache: CRS / tile size / origin / LOD).
     grid: Option<Value>,
 }
 
@@ -2575,7 +2575,7 @@ fn row_to_published(r: &tokio_postgres::Row) -> PublishedRow {
 }
 
 fn published_json(p: &PublishedRow, extra: &Value) -> Value {
-    // geometry_type 从 extra.meta 里拿（sys_resource.meta.geometry_type）
+    // geometry_type comes from extra.meta (sys_resource.meta.geometry_type)
     let geom = extra
         .get("meta")
         .and_then(|m| m.get("geometry_type"))
@@ -2617,8 +2617,8 @@ fn published_extra(r: &tokio_postgres::Row) -> Value {
     })
 }
 
-/// `GET /map/catalog/published?workspaceId=&includeDeleted=1` — 已发布服务清单
-/// （工作区/Store/资源归属齐备，供分组视图与垃圾箱）。
+/// `GET /map/catalog/published?workspaceId=&includeDeleted=1` — Published service list
+/// (workspace/Store/resource ownership included, for grouped view and trash).
 pub async fn published_list(
     State(state): State<Arc<AppState>>,
     RawQuery(qs): RawQuery,
@@ -2632,7 +2632,7 @@ pub async fn published_list(
         where_clause.push_str(" AND p.state <> 'deleted'");
     }
     let c = conn(&state.pool).await?;
-    // 总数（不受分页影响）
+    // Total count (unaffected by pagination)
     let total: i64 = c
         .query(
             &format!("SELECT count(*) FROM sys_published_layer p WHERE {where_clause}"),
@@ -2643,7 +2643,7 @@ pub async fn published_list(
         .map(|r| r.get::<_, i64>(0))
         .unwrap_or(0);
     let mut sql = format!("{PUB_SELECT} WHERE {where_clause} ORDER BY p.workspace_id, p.layer_name");
-    // 后端分页：仅当显式传 page/pageSize 时切片（pageSize<=0 视为不分页，向下兼容）
+    // Server-side pagination: slice only when page/pageSize are explicitly passed (pageSize<=0 means no pagination, backward-compat)
     if size > 0 {
         let off = if page < 1 { 0 } else { (page - 1) * size };
         sql.push_str(&format!(" LIMIT {size} OFFSET {off}"));
@@ -2656,10 +2656,10 @@ pub async fn published_list(
     Ok(Resp::ok(json!({ "published": items, "total": total })))
 }
 
-/// `PUT /map/catalog/published/:id` — 修改发布信息（计划 §7.4）。
+/// `PUT /map/catalog/published/:id` — Modify publish info (plan §7.4).
 ///
-/// 重建同一资源的服务文档并覆盖登记（`POST /admin/services` 对同名文件是幂等
-/// 覆盖 + 热重载），因此改名走 `rename` 再覆盖，避免留下两份 XML。
+/// Rebuild same resource's service doc and overwrite registration (`POST /admin/services` is idempotent
+/// overwrite + hot-reload for same-name files), so rename uses `rename` then overwrite, avoiding two XML copies.
 pub async fn published_update(
     State(state): State<Arc<AppState>>,
     AxumPath(id): AxumPath<i64>,
@@ -2674,7 +2674,7 @@ pub async fn published_update(
     let caps = load_caps(&state).await?;
     let cap = caps.get(&res.data_type)?;
     let types = cap.resolve_service_types(&form.service_types)?;
-    // ArcGIS 缓存同样以 Conf.xml 的 CRS 为准，修改时也不接受表单覆盖。
+    // ArcGIS cache also uses Conf.xml's CRS; form override is not accepted on modify either.
     let native_crs = res
         .meta
         .get("crs")
@@ -2682,7 +2682,7 @@ pub async fn published_update(
         .unwrap_or("")
         .trim()
         .to_string();
-    // 仅 ArcGIS 缓存以 Conf.xml 的 CRS 为准（只读）；其他类型沿用发布向导的输入。
+    // Only ArcGIS cache uses Conf.xml's CRS (read-only); other types keep publish wizard input.
     let src_crs = validate_crs(if res.data_type == "arcgis" && !native_crs.is_empty() {
         &native_crs
     } else if form.src_crs.trim().is_empty() {
@@ -2702,8 +2702,8 @@ pub async fn published_update(
     } else {
         validate_ident(&form.layer_name, "服务名", 64)?
     };
-    // 网格：表单显式选择时按新值重建；未提交（仅改标题/备注等）沿用上次快照。
-    // ArcGIS 始终以 Conf.xml 的原生网格为准。
+    // Grid: rebuild by new value when form explicitly submits; otherwise (only title/remark changed) use last snapshot.
+    // ArcGIS always uses Conf.xml native grid.
     let grid = if form.grid_mode.trim().is_empty() && form.grid.is_none() {
         if res.data_type == "arcgis" {
             native_grid(&res)
@@ -2720,7 +2720,7 @@ pub async fn published_update(
         )?
     };
 
-    // 改名：先让引擎换名（同时保持配置文件内部标识一致），再按新名覆盖内容。
+    // Rename: first rename on engine (keeps internal config IDs consistent), then overwrite content by new name.
     if layer_name != p.layer_name {
         ensure_name_free(&state, &layer_name).await?;
         upstream_json(
@@ -2780,7 +2780,7 @@ pub async fn published_update(
     if n == 0 {
         return Err(AppError::Msg(format!("已发布服务不存在：{id}")));
     }
-    // 改名后归属登记要跟着新名走。
+    // After rename, ownership record must follow the new name.
     if layer_name != p.layer_name {
         let (base, _) = engine::default_engine(&state).await;
         if let Some(eid) = engine::engine_id_by_base(&state, base.trim_end_matches('/')).await {
@@ -2801,7 +2801,7 @@ pub async fn published_update(
     })))
 }
 
-/// 引擎请求失败时补一句本地上下文，便于运维直接定位是哪个资源/文件出了问题。
+/// When engine request fails, append local context so ops can directly tell which resource/file is the problem.
 fn enrich(e: &AppError, extra: &Value) -> AppError {
     let src = extra.get("source").and_then(|v| v.as_str()).unwrap_or("");
     AppError::Msg(format!("{e}（资源数据：{src}）"))
@@ -2822,10 +2822,10 @@ pub struct StateBody {
     pub state: String,
 }
 
-/// `PUT /map/catalog/published/:id/state` — 生命周期状态（active|stopped|paused|deleted）。
+/// `PUT /map/catalog/published/:id/state` — Lifecycle state (active|stopped|paused|deleted).
 ///
-/// 与 `/map/services/:kind/:name/state` 同源，但一并维护目录账本：置 `active`
-/// 时顺手把被软删的资源恢复回目录（垃圾箱「恢复」即此动作）。
+/// Same source as `/map/services/:kind/:name/state`, but also maintains the catalog ledger: setting to `active`
+/// also restores soft-deleted resources back to the catalog (this is what trash 'restore' does).
 pub async fn published_state(
     State(state): State<Arc<AppState>>,
     AxumPath(id): AxumPath<i64>,
@@ -2860,12 +2860,12 @@ pub async fn published_state(
     Ok(Resp::ok(json!({ "id": id, "layerName": p.layer_name, "state": st })))
 }
 
-/// `GET /map/catalog/published/:id/endpoints` — 单个已发布服务的协议端点（预览、一键复制）。
+/// `GET /map/catalog/published/:id/endpoints` — Protocol endpoints of one published service (preview, one-click copy).
 ///
-/// 端点 URL 全部由引擎给出（[`engine::aggregate_services`] 聚合各引擎
-/// `/admin/services`），rust-gisserver 只按服务名挑出对应条目，不自行拼接，
-/// 避免与「服务管理」页两处口径漂移。引擎目录里没有该服务（配置被外部删除、
-/// 或引擎换了目录）时返回 `found=false` + 原因，而不是报错。
+/// Endpoint URLs all come from engine ([`engine::aggregate_services`] aggregates across engines
+/// `/admin/services`); rust-gisserver only picks the matching entry by name, does not build URLs itself,
+/// to avoid drift with the 'service management' page. When the service is absent from engine catalog
+/// (config deleted externally, or engine changed catalog dir), returns `found=false` + reason, not an error.
 pub async fn published_endpoints(
     State(state): State<Arc<AppState>>,
     AxumPath(id): AxumPath<i64>,
@@ -2904,7 +2904,7 @@ pub async fn published_endpoints(
 }
 
 // =====================================================================
-// 小工具：查询串解析与编码（与 engine.rs 同口径，手写不加依赖）
+// Utilities: query-string parse & encode (same logic as engine.rs, hand-written — no extra deps)
 // =====================================================================
 
 fn query_pairs(qs: Option<&str>) -> Vec<(String, String)> {
@@ -2935,7 +2935,7 @@ pub(crate) fn query_flag(qs: Option<&str>, key: &str) -> bool {
         .unwrap_or(false)
 }
 
-/// 空串按 NULL 存（目录型 Store 没有 DSN，反之亦然）。
+/// Store empty string as NULL (dir-type Store has no DSN, and vice versa).
 fn opt_text(s: &str) -> Option<&str> {
     if s.is_empty() {
         None
@@ -2951,8 +2951,8 @@ fn arr_of(v: &Value, key: &str) -> Vec<Value> {
         .unwrap_or_default()
 }
 
-/// 最小 percent-encode：只保留 unreserved 字符，其余按 UTF-8 逐字节转 `%XX`。
-/// 目录路径里的 `\`、`:`、中文都必须编码后才能安全进查询串。
+/// Minimal percent-encode: keep unreserved chars only, everything else → `%XX` per UTF-8 byte.
+/// `\`, `:`, and Chinese in directory paths must be encoded for safe query-string transport.
 fn qs_encode(s: &str) -> String {
     let mut out = String::with_capacity(s.len());
     for b in s.as_bytes() {
@@ -2966,7 +2966,7 @@ fn qs_encode(s: &str) -> String {
     out
 }
 
-/// 最小 percent-decode（`+` 视空格，非法序列原样保留）。
+/// Minimal percent-decode (`+` → space, illegal sequences kept as-is).
 pub(crate) fn qs_decode(s: &str) -> String {
     let bytes = s.as_bytes();
     let mut out: Vec<u8> = Vec::with_capacity(bytes.len());
@@ -3085,9 +3085,9 @@ mod tests {
         assert_eq!(body["source"]["geometry_column"], json!("geom_wgs84"));
         assert_eq!(body["source"]["srid"], json!(4490));
         assert_eq!(body["source"]["dsn"], json!("postgres://u:p@h:5432/gis"));
-        // PostGIS 不写 extent：引擎启动时按 ST_Extent 计算。
+        // PostGIS does not write extent: engine computes via ST_Extent at startup.
         assert!(body.get("extent").is_none());
-        // 标题缺省回落资源名。
+        // Title falls back to resource name when empty.
         assert_eq!(body["title"], json!("demo"));
     }
 

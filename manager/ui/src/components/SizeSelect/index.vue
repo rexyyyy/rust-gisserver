@@ -16,15 +16,17 @@
 </template>
 
 <script setup lang="ts">
+import { useI18n } from 'vue-i18n';
+const { t } = useI18n();
 import { useAppStore } from '@/store/modules/app';
 
 const appStore = useAppStore();
 const size = computed(() => appStore.size);
 
 const sizeOptions = ref([
-  { label: '较大', value: 'large' },
-  { label: '默认', value: 'default' },
-  { label: '稍小', value: 'small' }
+  { label: t('misc.auto.larger'), value: 'large' },
+  { label: t('misc.auto.default'), value: 'default' },
+  { label: t('misc.auto.smaller'), value: 'small' }
 ]);
 
 const handleSetSize = (size: 'large' | 'default' | 'small') => {

@@ -5,42 +5,42 @@
         <el-card shadow="hover">
           <template #header>
             <div class="card-header">
-              <span>map-api 运行时状态</span>
+              <span>{{ $t('map.auto.mapApiRowsHourStatus') }}</span>
               <el-tag :type="comp.map_api_up ? 'success' : 'danger'" size="small">
-                {{ comp.map_api_up ? '在线' : '离线' }}
+                {{ comp.map_api_up ? $t('map.auto.text102') : $t('map.auto.text103') }}
               </el-tag>
             </div>
           </template>
           <el-descriptions :column="1" border v-loading="loading">
             <el-descriptions-item label="PostgreSQL">
               <el-tag :type="comp.pg_enabled ? 'success' : 'danger'" size="small">
-                {{ comp.pg_enabled ? '已启用' : '未启用' }}
+                {{ comp.pg_enabled ? $t('map.auto.enable2') : $t('map.auto.enable3') }}
               </el-tag>
             </el-descriptions-item>
-            <el-descriptions-item label="PROJ 投影">
+            <el-descriptions-item :label="$t('map.auto.proj3')">
               <el-tag :type="comp.proj_loaded ? 'success' : 'warning'" size="small">
-                {{ comp.proj_loaded ? '已加载' : '未加载(跨 CRS 不可用)' }}
+                {{ comp.proj_loaded ? $t('map.auto.text104') : $t('map.auto.crs10') }}
               </el-tag>
               <el-tooltip :content="comp.proj_loaded ? CRS_SUPPORT_HINT : PROJ_MISSING_HINT" placement="bottom">
                 <el-icon style="margin-left: 6px; vertical-align: middle"><question-filled /></el-icon>
               </el-tooltip>
             </el-descriptions-item>
-            <el-descriptions-item label="catalog 根目录">
+            <el-descriptions-item :label="$t('map.auto.catalogCatalog')">
               {{ comp.catalog_root || '—' }}
               <el-tag :type="comp.catalog_root_exists ? 'success' : 'danger'" size="small" style="margin-left: 8px">
-                {{ comp.catalog_root_exists ? '存在' : '缺失' }}
+                {{ comp.catalog_root_exists ? $t('map.auto.text119') : $t('map.auto.text120') }}
               </el-tag>
             </el-descriptions-item>
-            <el-descriptions-item label="瓦片集目录">
+            <el-descriptions-item :label="$t('map.auto.catalog8')">
               {{ comp.tilesets_dir || '—' }}
               <el-tag :type="comp.tilesets_dir_exists ? 'success' : 'danger'" size="small" style="margin-left: 8px">
-                {{ comp.tilesets_dir_exists ? '存在' : '缺失' }}
+                {{ comp.tilesets_dir_exists ? $t('map.auto.text119') : $t('map.auto.text120') }}
               </el-tag>
             </el-descriptions-item>
-            <el-descriptions-item label="在服图层">{{ comp.served_layers ?? '—' }}</el-descriptions-item>
-            <el-descriptions-item label="3D Tiles 服务">{{ comp.tilesets ?? '—' }}</el-descriptions-item>
-            <el-descriptions-item label="缓存容量(MiB)">{{ comp.cache_mib ?? '—' }}</el-descriptions-item>
-            <el-descriptions-item label="缓存 TTL(秒)">{{ comp.cache_ttl_secs ?? '—' }}</el-descriptions-item>
+            <el-descriptions-item :label="$t('map.auto.inServiceLayer')">{{ comp.served_layers ?? '—' }}</el-descriptions-item>
+            <el-descriptions-item :label="$t('map.auto.n3dTiles')">{{ comp.tilesets ?? '—' }}</el-descriptions-item>
+            <el-descriptions-item :label="$t('map.auto.cacheMiB2')">{{ comp.cache_mib ?? '—' }}</el-descriptions-item>
+            <el-descriptions-item :label="$t('map.auto.cacheTTLSecond')">{{ comp.cache_ttl_secs ?? '—' }}</el-descriptions-item>
           </el-descriptions>
         </el-card>
       </el-col>
@@ -49,33 +49,33 @@
         <el-card shadow="hover">
           <template #header>
             <div class="card-header">
-              <span>manager 运行配置</span>
-              <el-tag type="info" size="small">只读</el-tag>
+              <span>{{ $t('map.auto.managerRows') }}</span>
+              <el-tag type="info" size="small">{{ $t('map.auto.text141') }}</el-tag>
             </div>
           </template>
           <el-descriptions :column="1" border v-loading="loading">
-            <el-descriptions-item label="监听地址">{{ rt.server_addr || '—' }}</el-descriptions-item>
-            <el-descriptions-item label="API 前缀">{{ rt.base_api || '—' }}</el-descriptions-item>
-            <el-descriptions-item label="CORS 白名单">
+            <el-descriptions-item :label="$t('map.auto.address')">{{ rt.server_addr || '—' }}</el-descriptions-item>
+            <el-descriptions-item :label="$t('map.auto.api')">{{ rt.base_api || '—' }}</el-descriptions-item>
+            <el-descriptions-item :label="$t('map.auto.cors')">
               {{ (rt.cors_origins && rt.cors_origins.length) ? rt.cors_origins.join(', ') : '—' }}
             </el-descriptions-item>
-            <el-descriptions-item label="数据库连接(掩码)">
+            <el-descriptions-item :label="$t('map.auto.text142')">
               {{ rt.database_url || '—' }}
             </el-descriptions-item>
-            <el-descriptions-item label="连接池上限">{{ rt.pool_max ?? '—' }}</el-descriptions-item>
-            <el-descriptions-item label="map-api 基地址">{{ rt.mapsvc_base_url || '—' }}</el-descriptions-item>
-            <el-descriptions-item label="共享密钥">
+            <el-descriptions-item :label="$t('map.auto.text143')">{{ rt.pool_max ?? '—' }}</el-descriptions-item>
+            <el-descriptions-item :label="$t('map.auto.mapApiAddress')">{{ rt.mapsvc_base_url || '—' }}</el-descriptions-item>
+            <el-descriptions-item :label="$t('map.auto.text144')">
               <el-tag :type="rt.mapsvc_token_configured ? 'success' : 'info'" size="small">
-                {{ rt.mapsvc_token_configured ? '已配置' : '未配置(留空)' }}
+                {{ rt.mapsvc_token_configured ? $t('map.auto.text145') : $t('map.auto.text146') }}
               </el-tag>
             </el-descriptions-item>
-            <el-descriptions-item label="Token 有效期(分)">{{ rt.jwt_expire_minutes ?? '—' }}</el-descriptions-item>
-            <el-descriptions-item label="登录验证码">
+            <el-descriptions-item :label="$t('map.auto.tokenMinute')">{{ rt.jwt_expire_minutes ?? '—' }}</el-descriptions-item>
+            <el-descriptions-item :label="$t('map.auto.text147')">
               <el-tag :type="rt.captcha_enabled ? 'success' : 'warning'" size="small">
-                {{ rt.captcha_enabled ? '启用' : '关闭' }}
+                {{ rt.captcha_enabled ? $t('map.auto.enable') : $t('map.auto.close') }}
               </el-tag>
             </el-descriptions-item>
-            <el-descriptions-item label="头像存储目录">{{ rt.avatar_dir || '—' }}</el-descriptions-item>
+            <el-descriptions-item :label="$t('map.auto.catalog9')">{{ rt.avatar_dir || '—' }}</el-descriptions-item>
           </el-descriptions>
         </el-card>
       </el-col>
@@ -85,8 +85,8 @@
       type="info"
       :closable="false"
       style="margin-top: 16px"
-      title="说明"
-      description="当前页面为只读展示。manager 与 map-api 的连接地址、数据库连接、密钥等仍由后端配置文件（config/manager.xml、config/mapserver.xml）管理，暂未提供在线编辑。"
+      :title="$t('map.auto.text20')"
+      :description="$t('map.auto.managerMapApiOfAddressConfigManagerXmlConf')"
     />
   </div>
 </template>

@@ -378,6 +378,9 @@ pub fn router(state: Arc<AppState>) -> Router {
             state.clone(),
             crate::admin::usage::track,
         ))
+        // Localize JSON messages for en_US. Must sit INSIDE CompressionLayer
+        // so the body is still uncompressed; binary tiles pass through.
+        .layer(axum::middleware::from_fn(crate::i18n::i18n_response))
         // Compress text-ish responses only (see `NoRecompress`).
         .layer(CompressionLayer::new().compress_when(NoRecompress))
         // Cesium 等浏览器客户端跨域访问 3D Tiles 时需要 CORS

@@ -1,3 +1,4 @@
+import i18n from '@/lang';
 // 日期格式化
 export function parseTime(time: any, pattern?: string) {
   if (arguments.length === 0 || !time) {
@@ -34,7 +35,7 @@ export function parseTime(time: any, pattern?: string) {
     let value = formatObj[key];
     // Note: getDay() returns 0 on Sunday
     if (key === 'a') {
-      return ['日', '一', '二', '三', '四', '五', '六'][value];
+      return [i18n.global.t('misc.auto.day'), i18n.global.t('misc.auto.one'), i18n.global.t('misc.auto.two'), i18n.global.t('misc.auto.three'), i18n.global.t('misc.auto.four'), i18n.global.t('misc.auto.five'), i18n.global.t('misc.auto.six')][value];
     }
     if (result.length > 0 && value < 10) {
       value = '0' + value;

@@ -1,6 +1,6 @@
 <template>
   <!-- 发布 / 修改发布信息 向导：服务协议的可选项一律取自引擎能力矩阵 -->
-  <el-dialog v-model="visible" :title="isEdit ? '修改发布信息' : '发布为地图服务'" width="640px" append-to-body>
+  <el-dialog v-model="visible" :title="isEdit ? $t('map.auto.editinfo') : $t('map.auto.text31')" width="640px" append-to-body>
     <el-form ref="formRef" :model="form" :rules="rules" label-width="110px">
       <el-alert
         v-if="form.crsAlert"
@@ -11,19 +11,19 @@
         :closable="false"
         class="mb-[10px]"
       />
-      <el-form-item label="数据图层">
+      <el-form-item :label="$t('map.auto.dataLayer')">
         <span class="text-xs">{{ form.resourceName }}（{{ form.dataType }}）</span>
       </el-form-item>
-      <el-form-item label="服务名" prop="layerName">
-        <el-input v-model="form.layerName" placeholder="全局唯一，字母/数字/-/_，不能含点号" />
+      <el-form-item :label="$t('map.auto.serviceName')" prop="layerName">
+        <el-input v-model="form.layerName" :placeholder="$t('map.auto.one2')" />
         <span class="text-xs text-gray-400">
-          引擎按扁平唯一名落配置文件；点号会被当成扩展名截断，因此入口就禁止。
+          {{ $t('map.auto.byone') }}
         </span>
       </el-form-item>
-      <el-form-item label="标题" prop="title">
-        <el-input v-model="form.title" placeholder="留空则用资源名" />
+      <el-form-item :label="$t('map.auto.title')" prop="title">
+        <el-input v-model="form.title" :placeholder="$t('map.auto.text32')" />
       </el-form-item>
-      <el-form-item v-if="!form.is3dtiles" label="源坐标系" prop="srcCrs">
+      <el-form-item v-if="!form.is3dtiles" :label="$t('map.auto.crs')" prop="srcCrs">
         <el-select
           v-model="form.srcCrs"
           filterable
@@ -31,7 +31,7 @@
           default-first-option
           clearable
           :disabled="!!nativeGrid"
-          placeholder="从坐标系树选择，或手动输入 EPSG 编码"
+          :placeholder="$t('map.auto.crsEPSGCode')"
           style="width: 100%"
         >
           <el-option-group v-for="g in crsGroups" :key="g.label" :label="g.label">
@@ -41,66 +41,66 @@
         <span class="text-xs text-gray-400">
           {{
             nativeGrid
-              ? '由缓存 Conf.xml 的原生网格决定，发布时以该定义为准，不接受表单覆盖。'
-              : '须与数据实际坐标一致（WGS84 系的地理坐标/投影、CGCS2000 系的地理坐标与高斯投影）；选错会被服务端拦截。'
+              ? $t('map.auto.cacheConfXmlOfHour')
+              : $t('map.auto.oneWGS84OfCGCS2000Of')
           }}
         </span>
       </el-form-item>
-      <el-form-item v-if="!form.is3dtiles && !nativeGrid" label="瓦片网格">
+      <el-form-item v-if="!form.is3dtiles && !nativeGrid" :label="$t('map.auto.text33')">
         <div class="w-full">
           <el-radio-group v-model="form.gridMode">
-            <el-radio v-if="standardAllowed" value="ogc">OGC 标准 LOD（{{ ogcGridId }}）</el-radio>
-            <el-radio v-if="crsCode === 4490" value="tdt">天地图 LOD（4490，1–18 级）</el-radio>
-            <el-radio v-if="!standardAllowed" value="">WebMercatorQuad（服务端重投影）</el-radio>
-            <el-radio value="custom">自定义 LOD（选择 Conf.xml）</el-radio>
+            <el-radio v-if="standardAllowed" value="ogc">OGC {{ $t('map.auto.text34') }}LOD（{{ ogcGridId }}）</el-radio>
+            <el-radio v-if="crsCode === 4490" value="tdt">{{ $t('map.auto.lod4490118') }}</el-radio>
+            <el-radio v-if="!standardAllowed" value="">{{ $t('map.auto.webmercatorquad') }}</el-radio>
+            <el-radio value="custom">{{ $t('map.auto.lodConfXml') }}</el-radio>
           </el-radio-group>
           <div class="text-xs text-gray-400">
             <template v-if="!standardAllowed">
-              当前为投影坐标系，只能选择「自定义 LOD」；如需标准 LOD 请先转换为 EPSG:4326/4490/3857。
+              {{ $t('map.auto.projectedCrsLodHint') }}
             </template>
             <template v-else-if="crsCode === 4490">
-              4490 可选 OGC 标准 LOD、天地图 LOD 或自定义 LOD。
+              4490 {{ $t('map.auto.text167') }}OGC {{ $t('map.auto.text34') }}LOD、{{ $t('map.auto.text168') }}LOD {{ $t('map.auto.text35') }}LOD。
             </template>
-            <template v-else>该坐标系可选 OGC 标准 LOD（{{ ogcGridId }}）或自定义 LOD。</template>
+            <template v-else>{{ $t('map.auto.crs2') }}OGC {{ $t('map.auto.text34') }}LOD（{{ ogcGridId }}）{{ $t('map.auto.text35') }}LOD。</template>
           </div>
 
           <div v-if="form.gridMode === 'custom'" class="mt-2">
             <div class="flex items-center gap-2">
-              <el-input v-model="xmlPath" placeholder="Conf.xml 绝对路径，或点右侧选择" />
-              <el-button @click="tileDlgVisible = true">选择 XML</el-button>
-              <el-button :loading="parsingXml" @click="parseXml">解析</el-button>
+              <el-input v-model="xmlPath" :placeholder="$t('map.auto.confXml')" />
+              <el-button @click="tileDlgVisible = true">{{ $t('map.auto.xml') }}</el-button>
+              <el-button :loading="parsingXml" @click="parseXml">{{ $t('map.auto.parse') }}</el-button>
             </div>
             <el-alert v-if="xmlError" :title="xmlError" type="error" :closable="false" show-icon class="mt-1" />
             <div v-if="customGrid" class="text-xs mt-1">
-              {{ customGrid.crs }} · 瓦片 {{ customGrid.tile_px || customGrid.tile_cols || '—' }} px · 原点
-              [{{ (customGrid.origin || []).join(', ') }}] · 层级
-              {{ customGrid.min_zoom ?? '—' }}–{{ customGrid.max_zoom ?? '—' }}（{{ customGrid.levels.length }} 级）
+              {{ customGrid.crs }} · {{ $t('map.auto.text169') }}{{ customGrid.tile_px || customGrid.tile_cols || '—' }} px · {{ $t('map.auto.text170') }}
+              [{{ (customGrid.origin || []).join(', ') }}] · {{ $t('map.auto.text171') }}
+              {{ customGrid.min_zoom ?? '—' }}–{{ customGrid.max_zoom ?? '—' }}（{{ customGrid.levels.length }} {{ $t('map.auto.text172') }}
               <el-table :data="customGrid.levels" size="small" border max-height="140" class="mt-1">
-                <el-table-column prop="level" label="级别" width="70" align="center" />
-                <el-table-column prop="scale" label="比例尺" align="right" />
-                <el-table-column prop="resolution" label="分辨率（地图单位/像素）" align="right" />
+                <el-table-column prop="level" :label="$t('map.auto.level')" width="70" align="center" />
+                <el-table-column prop="scale" :label="$t('map.auto.scale')" align="right" />
+                <el-table-column prop="resolution" :label="$t('map.auto.resolutionMapUnitsPixel')" align="right" />
               </el-table>
             </div>
           </div>
         </div>
       </el-form-item>
-      <el-form-item v-if="nativeGrid" label="原生网格">
+      <el-form-item v-if="nativeGrid" :label="$t('map.auto.text36')">
         <div class="w-full">
           <div class="text-xs">
-            {{ nativeGrid.crs || '（未识别 CRS）' }} · 瓦片 {{ tileText }} · DPI {{ nativeGrid.dpi ?? '—' }} ·
-            层级 {{ nativeGrid.min_zoom ?? '—' }}–{{ nativeGrid.max_zoom ?? '—' }}（{{ nativeGrid.levels.length }} 级）
+            {{ nativeGrid.crs || $t('map.auto.detectCRS') }} · {{ $t('map.auto.text169') }}{{ tileText }} · DPI {{ nativeGrid.dpi ?? '—' }} ·
+            {{ $t('map.auto.text171') }}{{ nativeGrid.min_zoom ?? '—' }}–{{ nativeGrid.max_zoom ?? '—' }}（{{ nativeGrid.levels.length }} {{ $t('map.auto.text172') }}
           </div>
           <div class="text-xs text-gray-400">
-            原点 [{{ (nativeGrid.origin || []).join(', ') }}] · 来自缓存 Conf.xml，发布时固化到已发布服务账本
+            {{ $t('map.auto.text170') }}[{{ (nativeGrid.origin || []).join(', ') }}] · {{ $t('map.auto.cache5') }}Conf.xml，{{ $t('map.auto.hourpublishedServices') }}
           </div>
           <el-table v-if="nativeGrid.levels.length" :data="nativeGrid.levels" size="small" border max-height="150" class="mt-1">
-            <el-table-column prop="level" label="级别" width="70" align="center" />
-            <el-table-column prop="scale" label="比例尺" align="right" />
-            <el-table-column prop="resolution" label="分辨率（地图单位/像素）" align="right" />
+            <el-table-column prop="level" :label="$t('map.auto.level')" width="70" align="center" />
+            <el-table-column prop="scale" :label="$t('map.auto.scale')" align="right" />
+            <el-table-column prop="resolution" :label="$t('map.auto.resolutionMapUnitsPixel')" align="right" />
           </el-table>
         </div>
       </el-form-item>
-      <el-form-item v-if="!form.is3dtiles" label="四至" prop="bbox">
+      <el-form-item v-if="!form.is3dtiles" :label="$t('map.auto.four')" prop="bbox">
         <div class="flex items-center gap-1">
           <el-input-number v-model="box.minx" :controls="false" :precision="6" placeholder="minx" style="width: 120px" />
           <el-input-number v-model="box.miny" :controls="false" :precision="6" placeholder="miny" style="width: 120px" />
@@ -108,11 +108,11 @@
           <el-input-number v-model="box.maxy" :controls="false" :precision="6" placeholder="maxy" style="width: 120px" />
         </div>
         <span v-if="form.bboxRequired" class="text-xs text-warning">
-          探测不到四至，请填写，否则前端地图定位不到该图层。
+          {{ $t('map.auto.fourPleaseFillInNoLayer') }}
         </span>
-        <span v-else class="text-xs text-gray-400">可留空由引擎按源数据计算；填写需满足 min &lt; max。</span>
+        <span v-else class="text-xs text-gray-400">{{ $t('map.auto.byMinLtMax') }}</span>
       </el-form-item>
-      <el-form-item label="服务协议" prop="serviceTypes">
+      <el-form-item :label="$t('map.auto.protocol3')" prop="serviceTypes">
         <el-checkbox-group v-model="form.serviceTypes">
           <el-checkbox v-for="t in cap?.service_types || []" :key="t" :value="t" :label="t">
             {{ protoLabel(t) }}
@@ -120,7 +120,7 @@
         </el-checkbox-group>
         <span v-if="cap?.note" class="text-xs text-gray-400">{{ cap.note }}</span>
       </el-form-item>
-      <el-form-item label="备注" prop="remark">
+      <el-form-item :label="$t('map.auto.remark')" prop="remark">
         <el-input v-model="form.remark" type="textarea" :rows="2" />
       </el-form-item>
     </el-form>
@@ -129,13 +129,15 @@
     <TileConfigDialog v-model="tileDlgVisible" :workspace-id="workspaceId" @confirm="onTileParsed" />
 
     <template #footer>
-      <el-button @click="visible = false">取消</el-button>
-      <el-button type="primary" :loading="saving" @click="save">{{ isEdit ? '保存并重载' : '发布' }}</el-button>
+      <el-button @click="visible = false">{{ $t('map.auto.cancel') }}</el-button>
+      <el-button type="primary" :loading="saving" @click="save">{{ isEdit ? $t('map.auto.save3') : $t('map.auto.text37') }}</el-button>
     </template>
   </el-dialog>
 </template>
 
 <script setup lang="ts">
+import { useI18n } from 'vue-i18n';
+const { t } = useI18n();
 import { getCrsTree, parseTileGrid, publishService, updatePublished } from '@/api/map/catalog';
 import {
   CatalogCaps,
@@ -257,7 +259,7 @@ const toGridSnapshot = (r: TileGridParseResp): NativeGrid => {
 const applyParsedGrid = (r: TileGridParseResp) => {
   if (epsgOf(r.crs) !== crsCode.value) {
     customGrid.value = null;
-    xmlError.value = `瓦片配置坐标系 ${r.crs} 与源坐标系 ${form.srcCrs} 不一致，请先转换坐标系后再选择该 XML`;
+    xmlError.value = `${t('map.auto.crs3')}${r.crs}${t('map.auto.crs4')}${form.srcCrs}${t('map.auto.oneCRSXML')}`;
     return;
   }
   xmlError.value = '';
@@ -268,7 +270,7 @@ const applyParsedGrid = (r: TileGridParseResp) => {
 const parseXml = async () => {
   const path = xmlPath.value.trim();
   if (!path) {
-    xmlError.value = '请选择或填写 Conf.xml 路径';
+    xmlError.value = t('map.auto.selectOrEnterTheConfXmlPath');
     return;
   }
   parsingXml.value = true;
@@ -278,7 +280,7 @@ const parseXml = async () => {
     applyParsedGrid(res.data);
   } catch (e: any) {
     customGrid.value = null;
-    xmlError.value = e?.message || '解析失败';
+    xmlError.value = e?.message || t('map.auto.parseFailed');
   } finally {
     parsingXml.value = false;
   }
@@ -298,7 +300,7 @@ watch(
       form.gridMode = 'ogc';
     }
     if (customGrid.value && epsgOf(customGrid.value.crs) !== code) {
-      xmlError.value = `瓦片配置坐标系 ${customGrid.value.crs} 与源坐标系 ${v} 不一致，请重新选择 XML`;
+      xmlError.value = `${t('map.auto.crs3')}${customGrid.value.crs}${t('map.auto.crs4')}${v}${t('map.auto.oneXML')}`;
       customGrid.value = null;
     }
   }
@@ -328,7 +330,7 @@ const crsGroups = computed<{ label: string; options: { label: string; value: str
   const walk = (nodes: CrsTreeNode[], path: string[]) => {
     for (const n of nodes) {
       if (n.code) {
-        const label = path.join(' / ') || '其他坐标系';
+        const label = path.join(' / ') || t('map.auto.crs5');
         let g = groups.find((x) => x.label === label);
         if (!g) {
           g = { label, options: [] };
@@ -354,19 +356,19 @@ onMounted(loadCrsTree);
 
 const rules = {
   layerName: [
-    { required: true, message: '服务名不能为空', trigger: 'blur' },
-    { pattern: /^[A-Za-z0-9_-]{1,64}$/, message: '仅字母、数字、下划线与短横线，不能含点号', trigger: 'blur' }
+    { required: true, message: t('map.auto.serviceNameisRequired'), trigger: 'blur' },
+    { pattern: /^[A-Za-z0-9_-]{1,64}$/, message: t('map.auto.text38'), trigger: 'blur' }
   ],
   srcCrs: [
     {
       validator: (_r: any, v: string, cb: (e?: Error) => void) => {
         const val = (v || '').trim();
         if (!val) {
-          if (form.crsRequired) cb(new Error('该数据坐标系缺失或可疑，请先选择正确坐标系'));
+          if (form.crsRequired) cb(new Error(t('map.auto.crsCRS')));
           else cb();
           return;
         }
-        if (!/^EPSG:\d+$/i.test(val)) cb(new Error('形如 EPSG:4326'));
+        if (!/^EPSG:\d+$/i.test(val)) cb(new Error(t('map.auto.epsg4326')));
         else cb();
       },
       trigger: 'change'
@@ -375,7 +377,7 @@ const rules = {
   serviceTypes: [
     {
       validator: (_r: any, _v: string[], cb: (e?: Error) => void) => {
-        if (!form.serviceTypes.length) cb(new Error('至少勾选一种服务协议'));
+        if (!form.serviceTypes.length) cb(new Error(t('map.auto.oneprotocol')));
         else cb();
       },
       trigger: 'change'
@@ -394,9 +396,9 @@ const collectBox = (): { err: string; value: number[] | null } => {
   const v = [box.minx, box.miny, box.maxx, box.maxy];
   const filled = v.filter((x) => x !== undefined && x !== null).length;
   if (filled === 0) return { err: '', value: null };
-  if (filled < 4) return { err: '四至需四项齐全，或全部留空由引擎按源数据计算', value: null };
+  if (filled < 4) return { err: t('map.auto.fourfourAllBy'), value: null };
   const [minx, miny, maxx, maxy] = v as number[];
-  if (!(minx < maxx && miny < maxy)) return { err: '四至无效：需满足 minx < maxx 且 miny < maxy', value: null };
+  if (!(minx < maxx && miny < maxy)) return { err: t('map.auto.fourMinxMaxxMinyMaxy'), value: null };
   return { err: '', value: [minx, miny, maxx, maxy] };
 };
 
@@ -430,10 +432,10 @@ const open = (row: ResourceVO, wsId = 0) => {
     gridMode: is3d ? '' : grid ? 'native' : [4326, 3857, 4490].includes(code) ? 'ogc' : '',
     crsRequired: suspicious,
     crsAlert: suspicious,
-    crsAlertTitle: !row.srcCrs ? '数据未声明坐标系' : '坐标系与坐标值范围不匹配',
+    crsAlertTitle: !row.srcCrs ? t('map.auto.crs6') : t('map.auto.crs7'),
     crsAlertDesc: !row.srcCrs
-      ? '该数据源未声明坐标系。请先用 GIS 软件赋予正确坐标系后重新导入，或在下方坐标系树中选择一个（WGS84 系的地理/投影坐标、CGCS2000 系的地理坐标与高斯投影）。'
-      : `该数据声明为 ${row.srcCrs}，但其坐标值范围与该坐标系的合理范围明显不符（疑似局部坐标或坐标系写错）。请核实后在下方选择正确坐标系；无法配准时请勿发布。`
+      ? t('map.auto.crsGISCRSImportCRSOneWGS84OfCGCS2000Of')
+      : `${t('map.auto.text39')}${row.srcCrs}${t('map.auto.crsofCRSCRSHour')}`
   });
   resetBox(row.bbox);
   visible.value = true;
@@ -497,11 +499,11 @@ const save = async () => {
   // 自定义 LOD 必须已解析且坐标系与源坐标系一致
   if (!form.is3dtiles && form.gridMode === 'custom') {
     if (!customGrid.value) {
-      proxy?.$modal.msgError('自定义 LOD 需先选择并解析瓦片配置 XML');
+      proxy?.$modal.msgError(t('map.auto.lodParseXML'));
       return;
     }
     if (epsgOf(customGrid.value.crs) !== crsCode.value) {
-      proxy?.$modal.msgError('瓦片配置坐标系与源坐标系不一致，请先转换坐标系或重新选择 XML');
+      proxy?.$modal.msgError(t('map.auto.crscrsoneCRSXML'));
       return;
     }
   }
@@ -521,7 +523,7 @@ const save = async () => {
   try {
     if (isEdit.value) await updatePublished(form.publishedId, body);
     else await publishService(body);
-    proxy?.$modal.msgSuccess(isEdit.value ? '已更新并重载' : '已发布');
+    proxy?.$modal.msgSuccess(isEdit.value ? t('map.auto.updated') : t('map.auto.text40'));
     visible.value = false;
     emit('saved');
   } finally {

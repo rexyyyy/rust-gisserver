@@ -2,8 +2,8 @@
 REM rust-gisserver manager UI build script
 REM Usage: build_ui.bat [dev|prod]
 REM
-REM 目录按脚本自身位置解析；node/pnpm 优先用 PATH 里的，找不到才回退到
-REM 下方登记的工作机 node 目录（换机器时改这一处即可）。
+REM Paths resolve from the script location; prefer node/pnpm on PATH, otherwise fall back to
+REM the registered local node directory below (edit this one spot when changing machines).
 setlocal
 
 set "NODE="

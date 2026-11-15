@@ -61,7 +61,7 @@ export const constantRoutes: RouteRecordRaw[] = [
         path: '/index',
         component: () => import('@/views/index.vue'),
         name: 'Index',
-        meta: { title: '首页', icon: 'dashboard', affix: true }
+        meta: { title: 'misc.auto.home', icon: 'dashboard', affix: true }
       }
     ]
   },
@@ -75,7 +75,7 @@ export const constantRoutes: RouteRecordRaw[] = [
         path: 'profile',
         component: () => import('@/views/system/user/profile/index.vue'),
         name: 'Profile',
-        meta: { title: '个人中心', icon: 'user' }
+        meta: { title: 'misc.auto.text16', icon: 'user' }
       }
     ]
   }

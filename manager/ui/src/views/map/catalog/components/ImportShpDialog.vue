@@ -1,16 +1,16 @@
 <template>
-  <el-dialog v-model="visible" title="导入 SHP 到 PostGIS" width="780px" append-to-body @open="onOpen">
+  <el-dialog v-model="visible" :title="$t('map.auto.importSHPIntoPostGIS')" width="780px" append-to-body @open="onOpen">
     <el-alert type="info" :closable="false" show-icon class="mb-[10px]">
       <template #title>
-        从工作空间数据根目录选择 <b>.shp</b> 矢量文件，由 map-api 调用 shp2pgsql 导入数据源
-        <b>{{ store?.name }}</b> 的 <b>{{ store?.pgSchema || 'public' }}</b> 模式。
+        {{ $t('map.auto.catalog10') }}<b>.shp</b> {{ $t('map.auto.vector2') }}map-api {{ $t('map.auto.text161') }}shp2pgsql {{ $t('map.auto.importData') }}
+        <b>{{ store?.name }}</b>{{ $t('map.auto.of') }}<b>{{ store?.pgSchema || 'public' }}</b> {{ $t('map.auto.text162') }}
       </template>
     </el-alert>
 
     <!-- 目录导航 -->
     <div class="flex items-center gap-2 mb-[8px]">
-      <el-button size="small" icon="Back" :disabled="!canGoUp" @click="goUp">上一级</el-button>
-      <span class="text-xs text-[#888] truncate" :title="curPath">{{ relPath || root || '未配置数据根目录' }}</span>
+      <el-button size="small" icon="Back" :disabled="!canGoUp" @click="goUp">{{ $t('map.auto.parent') }}</el-button>
+      <span class="text-xs text-[#888] truncate" :title="curPath">{{ relPath || root || $t('map.auto.dataRootIsNotConfigured') }}</span>
     </div>
 
     <!-- 目录 + .shp 列表（其它文件不显示） -->
@@ -23,29 +23,29 @@
       highlight-current-row
       @row-click="onRowClick"
     >
-      <el-table-column label="名称" min-width="300" :show-overflow-tooltip="true">
+      <el-table-column :label="$t('map.auto.name')" min-width="300" :show-overflow-tooltip="true">
         <template #default="{ row }">
-          <span :class="row.is_dir ? 'text-[#2f6fd0]' : ''">{{ row.is_dir ? '[目录] ' + row.name : row.name }}</span>
+          <span :class="row.is_dir ? 'text-[#2f6fd0]' : ''">{{ row.is_dir ? $t('map.auto.dir') + row.name : row.name }}</span>
         </template>
       </el-table-column>
-      <el-table-column label="类型" width="90" align="center">
+      <el-table-column :label="$t('map.auto.type')" width="90" align="center">
         <template #default="{ row }">
-          <el-tag size="small" effect="plain" :type="row.is_dir ? 'info' : 'success'">{{ row.is_dir ? '目录' : 'SHP' }}</el-tag>
+          <el-tag size="small" effect="plain" :type="row.is_dir ? 'info' : 'success'">{{ row.is_dir ? $t('map.auto.catalog2') : 'SHP' }}</el-tag>
         </template>
       </el-table-column>
-      <el-table-column label="大小" width="110" align="right">
+      <el-table-column :label="$t('map.auto.size')" width="110" align="right">
         <template #default="{ row }">{{ row.is_dir ? '—' : fmtSize(row.size) }}</template>
       </el-table-column>
     </el-table>
 
     <!-- 已选文件 + 数据图层名 -->
     <div class="mt-[12px] grid grid-cols-[80px_1fr] gap-y-3 gap-x-2 items-center">
-      <span class="text-sm">已选文件</span>
-      <el-input :model-value="selectedName" readonly placeholder="在上表中选择 .shp 文件" />
-      <span class="text-sm">数据图层名</span>
+      <span class="text-sm">{{ $t('map.auto.selectedFile') }}</span>
+      <el-input :model-value="selectedName" readonly :placeholder="$t('map.auto.selectAShpFileInTheTableAbove')" />
+      <span class="text-sm">{{ $t('map.auto.dataLayerName') }}</span>
       <div>
-        <el-input v-model="tableName" maxlength="63" placeholder="小写字母/数字/下划线，字母或下划线开头" />
-        <div class="text-xs text-[#999] mt-1">导入后在 PostGIS 中生成同名表，坐标系由 .prj 自动识别</div>
+        <el-input v-model="tableName" maxlength="63" :placeholder="$t('map.auto.lowercaseLettersDigitsOrUnderscoreMustStar')" />
+        <div class="text-xs text-[#999] mt-1">{{ $t('map.auto.aTableWithTheSameNameIsCreatedInPostGISThe') }}</div>
       </div>
     </div>
 
@@ -64,13 +64,15 @@
     </div>
 
     <template #footer>
-      <el-button :disabled="importing" @click="visible = false">取消</el-button>
-      <el-button type="primary" :loading="importing" :disabled="!selectedPath" @click="handleImport">导入</el-button>
+      <el-button :disabled="importing" @click="visible = false">{{ $t('map.auto.cancel') }}</el-button>
+      <el-button type="primary" :loading="importing" :disabled="!selectedPath" @click="handleImport">{{ $t('map.auto.import') }}</el-button>
     </template>
   </el-dialog>
 </template>
 
 <script setup lang="ts">
+import { useI18n } from 'vue-i18n';
+const { t } = useI18n();
 import { getCurrentInstance, ComponentInternalInstance, computed, ref } from 'vue';
 import { importStoreShpStream, listWorkspaceDirs } from '@/api/map/catalog';
 import type { DirEntry, ImportShpProgress, ImportShpResp, StoreVO } from '@/api/map/catalog/types';
@@ -140,7 +142,7 @@ const load = async (path?: string) => {
       .filter((e) => e.is_dir || e.name.toLowerCase().endsWith('.shp'))
       .sort((a, b) => (a.is_dir === b.is_dir ? a.name.localeCompare(b.name) : a.is_dir ? -1 : 1));
   } catch (e: any) {
-    proxy?.$modal.msgError(e?.message || '目录读取失败');
+    proxy?.$modal.msgError(e?.message || t('map.auto.failedToReadDirectory'));
   } finally {
     loading.value = false;
   }
@@ -199,7 +201,7 @@ const fmtMs = (ms: number) => {
   const s = ms / 1000;
   if (s < 60) return `${s.toFixed(1)} s`;
   const m = Math.floor(s / 60);
-  return `${m} 分 ${Math.round(s % 60)} 秒`;
+  return `${m}${t('map.auto.minute')}${Math.round(s % 60)}${t('map.auto.second2')}`;
 };
 
 const handleImport = async () => {
@@ -207,7 +209,7 @@ const handleImport = async () => {
   importing.value = true;
   progressError.value = false;
   doneEvent.value = null;
-  progressText.value = '正在连接导入服务…';
+  progressText.value = t('map.auto.connectingToTheImportService');
   try {
     await importStoreShpStream(
       props.store.id,
@@ -217,28 +219,28 @@ const handleImport = async () => {
       },
       (e) => {
         if (e.stage === 'start') {
-          progressText.value = `开始导入 ${e.table}（SRID ${e.srid}${e.sridDetected ? '' : '，.prj 未识别按 4326'}）…`;
+          progressText.value = `${t('map.auto.startingImport')}${e.table} (SRID ${e.srid}${e.sridDetected ? '' : t('map.auto.prjDetectBy4326')})...`;
         } else if (e.stage === 'copy') {
-          progressText.value = `正在写入数据：已 ${e.rows ?? 0} 行，耗时 ${fmtMs(e.elapsedMs ?? 0)}`;
+          progressText.value = `${t('map.auto.writingDataRowsWrittenElapsed')}${e.rows ?? 0}${t('map.auto.rowsElapsed')}${fmtMs(e.elapsedMs ?? 0)}`;
         } else if (e.stage === 'done' && e.ok) {
           doneEvent.value = e;
-          progressText.value = `导入完成：${e.schema}.${e.table}，${e.features} 个要素，SRID ${e.srid}，耗时 ${fmtMs(e.elapsedMs ?? 0)}`;
+          progressText.value = `${t('map.auto.importDone')}${e.schema}.${e.table}, ${e.features}${t('map.auto.featuresSRID')}${e.srid}${t('map.auto.elapsed')}${fmtMs(e.elapsedMs ?? 0)}`;
         } else if (e.stage === 'done' || e.stage === 'error') {
           progressError.value = true;
-          progressText.value = e.error || '导入失败';
+          progressText.value = e.error || t('map.auto.importFailed');
         }
       }
     );
     const d = doneEvent.value;
-    if (!d) throw new Error(progressError.value ? progressText.value : '导入未完成：连接意外中断');
+    if (!d) throw new Error(progressError.value ? progressText.value : t('map.auto.importIncompleteConnectionLost'));
     proxy?.$modal.msgSuccess(
-      `导入完成：${d.schema}.${d.table}，${d.features} 个要素，SRID ${d.srid}${d.sridDetected ? '' : '（.prj 未识别，按 4326 处理）'}`
+      `${t('map.auto.importDone')}${d.schema}.${d.table}, ${d.features}${t('map.auto.featuresSRID')}${d.srid}${d.sridDetected ? '' : t('map.auto.prjDetectBy43262')}`
     );
     emit('imported', d as ImportShpResp);
     visible.value = false;
   } catch (e: any) {
     progressError.value = true;
-    progressText.value = e?.message || '导入失败';
+    progressText.value = e?.message || t('map.auto.importFailed');
     proxy?.$modal.msgError(progressText.value);
   } finally {
     importing.value = false;

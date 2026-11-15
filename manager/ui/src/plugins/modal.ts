@@ -1,3 +1,4 @@
+import i18n from '@/lang';
 import { MessageBoxData } from 'element-plus';
 import { LoadingInstance } from 'element-plus/es/components/loading/src/loading';
 let loadingInstance: LoadingInstance;
@@ -20,19 +21,19 @@ export default {
   },
   // 弹出提示
   alert(content: any) {
-    ElMessageBox.alert(content, '系统提示');
+    ElMessageBox.alert(content, i18n.global.t('misc.auto.systemMessage'));
   },
   // 错误提示
   alertError(content: any) {
-    ElMessageBox.alert(content, '系统提示', { type: 'error' });
+    ElMessageBox.alert(content, i18n.global.t('misc.auto.systemMessage'), { type: 'error' });
   },
   // 成功提示
   alertSuccess(content: any) {
-    ElMessageBox.alert(content, '系统提示', { type: 'success' });
+    ElMessageBox.alert(content, i18n.global.t('misc.auto.systemMessage'), { type: 'success' });
   },
   // 警告提示
   alertWarning(content: any) {
-    ElMessageBox.alert(content, '系统提示', { type: 'warning' });
+    ElMessageBox.alert(content, i18n.global.t('misc.auto.systemMessage'), { type: 'warning' });
   },
   // 通知提示
   notify(content: any) {
@@ -52,17 +53,17 @@ export default {
   },
   // 确认窗体
   confirm(content: any): Promise<MessageBoxData> {
-    return ElMessageBox.confirm(content, '系统提示', {
-      confirmButtonText: '确定',
-      cancelButtonText: '取消',
+    return ElMessageBox.confirm(content, i18n.global.t('misc.auto.systemMessage'), {
+      confirmButtonText: i18n.global.t('misc.auto.ok'),
+      cancelButtonText: i18n.global.t('misc.auto.cancel'),
       type: 'warning'
     });
   },
   // 提交内容
   prompt(content: any) {
-    return ElMessageBox.prompt(content, '系统提示', {
-      confirmButtonText: '确定',
-      cancelButtonText: '取消',
+    return ElMessageBox.prompt(content, i18n.global.t('misc.auto.systemMessage'), {
+      confirmButtonText: i18n.global.t('misc.auto.ok'),
+      cancelButtonText: i18n.global.t('misc.auto.cancel'),
       type: 'warning'
     });
   },

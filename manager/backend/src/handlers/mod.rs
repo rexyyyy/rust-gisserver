@@ -84,6 +84,9 @@ pub fn router(state: Arc<AppState>) -> Router {
         .route("/health", get(health))
         .fallback(api_not_found)
         .layer(axum::middleware::from_fn_with_state(state.clone(), auth_mw))
+        // Localize JSON messages for en_US. Outermost API layer so 401
+        // bodies produced by auth_mw are translated too (see src/i18n.rs).
+        .layer(axum::middleware::from_fn(crate::i18n::i18n_response))
         .with_state(state.clone());
 
     let mut app = Router::new()

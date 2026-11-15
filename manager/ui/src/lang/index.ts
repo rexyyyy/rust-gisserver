@@ -1,20 +1,13 @@
-// 自定义国际化配置
+// Vue I18n setup. Message catalogs live in ./messages.ts.
 import { createI18n } from 'vue-i18n';
 
 import { LanguageEnum } from '@/enums/LanguageEnum';
-import zh_CN from '@/lang/zh_CN';
-import en_US from '@/lang/en_US';
+import { messages } from './messages';
 
-/**
- * 获取当前语言
- * @returns zh-cn|en ...
- */
+/** Resolve the persisted UI language, defaulting to Simplified Chinese. */
 export const getLanguage = (): LanguageEnum => {
   const language = useStorage<LanguageEnum>('language', LanguageEnum.zh_CN);
-  if (language.value) {
-    return language.value;
-  }
-  return LanguageEnum.zh_CN;
+  return language.value || LanguageEnum.zh_CN;
 };
 
 const i18n = createI18n({
@@ -22,12 +15,10 @@ const i18n = createI18n({
   allowComposition: true,
   legacy: false,
   locale: getLanguage(),
-  messages: {
-    zh_CN: zh_CN,
-    en_US: en_US
-  }
+  fallbackLocale: 'zh_CN',
+  messages
 });
 
 export default i18n;
 
-export type LanguageType = typeof zh_CN;
+export type LanguageType = typeof messages.zh_CN;

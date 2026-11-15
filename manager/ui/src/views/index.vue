@@ -2,15 +2,15 @@
   <div class="app-container home-dashboard">
     <!-- 标题行 -->
     <div class="dash-header">
-      <span class="dash-title">地图服务总览</span>
+      <span class="dash-title">{{ $t('misc.auto.text21') }}</span>
       <span class="dash-sub">
-        <template v-if="registryMode">登记簿 {{ registryMode === 'pg' ? 'PostgreSQL' : '文件 sidecar' }} ·</template>
+        <template v-if="registryMode">{{ $t('misc.auto.text22') }}{{ registryMode === 'pg' ? 'PostgreSQL' : $t('misc.auto.sidecar') }} ·</template>
         map-api
         <el-tag :type="comp.map_api_up ? 'success' : 'danger'" size="small" effect="dark">
-          {{ comp.map_api_up ? '在线' : '离线' }}
+          {{ comp.map_api_up ? $t('misc.auto.text23') : $t('misc.auto.text24') }}
         </el-tag>
       </span>
-      <el-button text type="primary" icon="Refresh" @click="loadAll">刷新</el-button>
+      <el-button text type="primary" icon="Refresh" @click="loadAll">{{ $t('misc.auto.refresh') }}</el-button>
     </div>
 
     <!-- ① 核心指标卡：点击跳转对应菜单 -->
@@ -32,13 +32,13 @@
     <!-- ② 服务统计 / 访问计数 -->
     <el-row :gutter="12" class="mt-3">
       <el-col :xs="24" :lg="12">
-        <el-card shadow="never" header="服务统计（类型 × 状态）">
+        <el-card shadow="never" :header="$t('misc.auto.typeStatus')">
           <el-table :data="kindRows" size="small" border max-height="240">
-            <el-table-column prop="kind" label="类型" width="110">
+            <el-table-column prop="kind" :label="$t('misc.auto.type')" width="110">
               <template #default="s">{{ kindLabel(s.row.kind) }}</template>
             </el-table-column>
-            <el-table-column prop="count" label="数量" width="70" align="center" />
-            <el-table-column label="状态分布" min-width="150">
+            <el-table-column prop="count" :label="$t('misc.auto.text25')" width="70" align="center" />
+            <el-table-column :label="$t('misc.auto.statusminute')" min-width="150">
               <template #default="s">
                 <el-tag
                   v-for="(n, st) in s.row.states"
@@ -57,24 +57,24 @@
         <el-card shadow="never">
           <template #header>
             <div class="card-header">
-              <span>访问计数（Top 5）</span>
+              <span>{{ $t('misc.auto.top5') }}</span>
               <el-select v-model="period" size="small" style="width: 130px" @change="loadUsage">
-                <el-option label="近 24 小时" value="day" />
-                <el-option label="近 7 天" value="week" />
-                <el-option label="近 30 天" value="month" />
-                <el-option label="近一年" value="year" />
+                <el-option :label="$t('misc.auto.n24Hour')" value="day" />
+                <el-option :label="$t('misc.auto.n7')" value="week" />
+                <el-option :label="$t('misc.auto.n30')" value="month" />
+                <el-option :label="$t('misc.auto.oneyear')" value="year" />
               </el-select>
             </div>
           </template>
           <div class="text-2xl font-bold mb-2">
-            {{ totalHits }} <span class="text-xs font-normal text-gray-400">次请求</span>
+            {{ totalHits }} <span class="text-xs font-normal text-gray-400">{{ $t('misc.auto.text26') }}</span>
           </div>
           <el-table :data="topRows" size="small" border max-height="190">
-            <el-table-column prop="name" label="服务" min-width="120" show-overflow-tooltip />
-            <el-table-column label="类型" width="90">
+            <el-table-column prop="name" :label="$t('misc.auto.text27')" min-width="120" show-overflow-tooltip />
+            <el-table-column :label="$t('misc.auto.type')" width="90">
               <template #default="s">{{ kindLabel(s.row.kind) }}</template>
             </el-table-column>
-            <el-table-column prop="hits" label="命中" width="80" align="center" sortable />
+            <el-table-column prop="hits" :label="$t('misc.auto.text28')" width="80" align="center" sortable />
           </el-table>
         </el-card>
       </el-col>
@@ -83,54 +83,54 @@
     <!-- ③ 访问日志 / 样式库 · 组件探测 · 缓存 / 垃圾箱 -->
     <el-row :gutter="12" class="mt-3">
       <el-col :xs="24" :lg="8">
-        <el-card shadow="never" header="访问日志 / 样式库">
+        <el-card shadow="never" :header="$t('misc.auto.dayStyle')">
           <el-descriptions :column="1" border size="small">
-            <el-descriptions-item label="累计请求">
+            <el-descriptions-item :label="$t('misc.auto.text29')">
               <el-link type="primary" :underline="false" @click="go('/map/log')">{{ logStats.total }}</el-link>
             </el-descriptions-item>
-            <el-descriptions-item label="客户端 4xx">
+            <el-descriptions-item :label="$t('misc.auto.client4xx')">
               <span :style="logStats.client_4xx ? 'color:#e6a23c' : ''">{{ logStats.client_4xx }}</span>
             </el-descriptions-item>
-            <el-descriptions-item label="服务端 5xx">
+            <el-descriptions-item :label="$t('misc.auto.n5xx')">
               <span :style="logStats.server_5xx ? 'color:#f56c6c' : ''">{{ logStats.server_5xx }}</span>
             </el-descriptions-item>
-            <el-descriptions-item label="样式库">
-              <el-link type="primary" :underline="false" @click="go('/map/style')">{{ styleCount }} 个</el-link>
+            <el-descriptions-item :label="$t('misc.auto.style')">
+              <el-link type="primary" :underline="false" @click="go('/map/style')">{{ styleCount }} {{ $t('misc.auto.text30') }}</el-link>
             </el-descriptions-item>
           </el-descriptions>
         </el-card>
       </el-col>
 
       <el-col :xs="24" :lg="8">
-        <el-card shadow="never" header="组件探测（map-api 运行环境）">
+        <el-card shadow="never" :header="$t('misc.auto.mapApiRows')">
           <el-descriptions :column="1" border size="small">
             <el-descriptions-item label="PostGIS">
-              <el-tag :type="comp.pg_enabled ? 'success' : 'info'" size="small">{{ comp.pg_enabled ? '已启用' : '未启用' }}</el-tag>
+              <el-tag :type="comp.pg_enabled ? 'success' : 'info'" size="small">{{ comp.pg_enabled ? $t('misc.auto.enable') : $t('misc.auto.enable2') }}</el-tag>
             </el-descriptions-item>
-            <el-descriptions-item label="PROJ 重投影">
-              <el-tag :type="comp.proj_loaded ? 'success' : 'info'" size="small">{{ comp.proj_loaded ? '已加载' : '未加载' }}</el-tag>
+            <el-descriptions-item :label="$t('misc.auto.proj')">
+              <el-tag :type="comp.proj_loaded ? 'success' : 'info'" size="small">{{ comp.proj_loaded ? $t('misc.auto.text31') : $t('misc.auto.text32') }}</el-tag>
               <el-tooltip :content="comp.proj_loaded ? CRS_SUPPORT_HINT : PROJ_MISSING_HINT" placement="bottom">
                 <el-icon style="margin-left: 6px; vertical-align: middle"><question-filled /></el-icon>
               </el-tooltip>
             </el-descriptions-item>
-            <el-descriptions-item label="在服图层">{{ comp.served_layers }}</el-descriptions-item>
-            <el-descriptions-item label="缓存上限">{{ comp.cache_mib }} MiB / TTL {{ comp.cache_ttl_secs }} 秒</el-descriptions-item>
+            <el-descriptions-item :label="$t('misc.auto.inServiceLayer')">{{ comp.served_layers }}</el-descriptions-item>
+            <el-descriptions-item :label="$t('misc.auto.cache')">{{ comp.cache_mib }} MiB / TTL {{ comp.cache_ttl_secs }} {{ $t('misc.auto.second') }}</el-descriptions-item>
           </el-descriptions>
         </el-card>
       </el-col>
 
       <el-col :xs="24" :lg="8">
-        <el-card shadow="never" header="缓存 / 垃圾箱">
+        <el-card shadow="never" :header="$t('misc.auto.cache2')">
           <el-descriptions :column="1" border size="small">
-            <el-descriptions-item label="缓存条目">
+            <el-descriptions-item :label="$t('misc.auto.cache3')">
               <el-link type="primary" :underline="false" @click="go('/map/cache')">{{ cacheEntries }}</el-link>
             </el-descriptions-item>
-            <el-descriptions-item label="缓存占用">{{ cacheBytesText }}</el-descriptions-item>
-            <el-descriptions-item label="服务垃圾箱">
-              <el-link type="primary" :underline="false" @click="go('/map/trash')">{{ deletedCount }} 个待恢复</el-link>
+            <el-descriptions-item :label="$t('misc.auto.cache4')">{{ cacheBytesText }}</el-descriptions-item>
+            <el-descriptions-item :label="$t('misc.auto.text33')">
+              <el-link type="primary" :underline="false" @click="go('/map/trash')">{{ deletedCount }} {{ $t('misc.auto.text34') }}</el-link>
             </el-descriptions-item>
-            <el-descriptions-item label="参数设置">
-              <el-link type="primary" :underline="false" @click="go('/map/settings')">运行配置</el-link>
+            <el-descriptions-item :label="$t('misc.auto.config')">
+              <el-link type="primary" :underline="false" @click="go('/map/settings')">{{ $t('misc.auto.rows') }}</el-link>
             </el-descriptions-item>
           </el-descriptions>
         </el-card>
@@ -143,23 +143,23 @@
         <el-card shadow="never">
           <template #header>
             <div class="card-header">
-              <span>服务引擎（在线 / 服务数）</span>
-              <el-link type="primary" :underline="false" @click="go('/map/engine')">引擎管理</el-link>
+              <span>{{ $t('misc.auto.text35') }}</span>
+              <el-link type="primary" :underline="false" @click="go('/map/engine')">{{ $t('misc.auto.text36') }}</el-link>
             </div>
           </template>
           <el-table :data="engineRows" size="small" border max-height="220">
-            <el-table-column prop="engineName" label="引擎" min-width="130" show-overflow-tooltip />
-            <el-table-column label="在线" width="80" align="center">
+            <el-table-column prop="engineName" :label="$t('misc.auto.text37')" min-width="130" show-overflow-tooltip />
+            <el-table-column :label="$t('misc.auto.text23')" width="80" align="center">
               <template #default="s">
                 <el-tag :type="s.row.up ? 'success' : 'danger'" size="small" effect="dark">
-                  {{ s.row.up ? '在线' : '离线' }}
+                  {{ s.row.up ? $t('misc.auto.text23') : $t('misc.auto.text24') }}
                 </el-tag>
               </template>
             </el-table-column>
-            <el-table-column prop="count" label="服务数" width="80" align="center" />
-            <el-table-column label="角色" width="90" align="center">
+            <el-table-column prop="count" :label="$t('misc.auto.text38')" width="80" align="center" />
+            <el-table-column :label="$t('misc.auto.role')" width="90" align="center">
               <template #default="s">
-                <el-tag v-if="s.row.isDefault" size="small" type="warning" effect="plain">默认</el-tag>
+                <el-tag v-if="s.row.isDefault" size="small" type="warning" effect="plain">{{ $t('misc.auto.default') }}</el-tag>
                 <span v-else>—</span>
               </template>
             </el-table-column>
@@ -171,6 +171,8 @@
 </template>
 
 <script setup name="Index" lang="ts">
+import { useI18n } from 'vue-i18n';
+const { t } = useI18n();
 import { ref, computed, onMounted } from 'vue';
 import { useRouter } from 'vue-router';
 // ArrowRight 由全局注册的 Element Plus Icons 提供
@@ -270,42 +272,42 @@ const engineRows = computed(() => {
 // ---------- 指标卡 ----------
 const statCards = computed(() => [
   {
-    title: '登记服务',
+    title: t('misc.auto.text39'),
     value: services.value.filter((s) => s.state !== 'deleted').length,
-    foot: `在服 ${servingCount.value} · 在用 ${activeCount.value}`,
+    foot: `${t('misc.auto.inService')}${servingCount.value}${t('misc.auto.text40')}${activeCount.value}`,
     path: '/map/service',
     color: '#0092C8'
   },
   {
-    title: '访问请求（近24h）',
+    title: t('misc.auto.n24h'),
     value: totalHits.value,
-    foot: '点击进入运营仪表盘',
+    foot: t('misc.auto.text41'),
     path: '/map/dashboard'
   },
   {
     title: '3D Tiles',
     value: tilesServing.value,
     sub: ` / ${tiles3d.value.length}`,
-    foot: '在服 / 总数',
+    foot: t('misc.auto.inService2'),
     path: '/map/tiles'
   },
   {
-    title: '服务引擎',
+    title: t('misc.auto.text42'),
     value: engineStats.value.filter((e) => e.up).length,
     sub: ` / ${engineRows.value.length}`,
-    foot: '在线 / 已登记',
+    foot: t('misc.auto.text43'),
     path: '/map/engine'
   },
   {
-    title: '缓存占用',
+    title: t('misc.auto.cache4'),
     value: cacheBytesText.value,
-    foot: `${cacheEntries.value} 条 · 点击管理`,
+    foot: `${cacheEntries.value}${t('misc.auto.text44')}`,
     path: '/map/cache'
   },
   {
-    title: '服务垃圾箱',
+    title: t('misc.auto.text33'),
     value: deletedCount.value,
-    foot: deletedCount.value ? '有待恢复服务' : '暂无待恢复服务',
+    foot: deletedCount.value ? t('misc.auto.text45') : t('misc.auto.text46'),
     path: '/map/trash',
     color: deletedCount.value ? '#e6a23c' : undefined
   }
@@ -314,20 +316,20 @@ const statCards = computed(() => [
 // ---------- 分类/状态标签 ----------
 const kindLabel = (k: string) => {
   const map: Record<string, string> = {
-    xyz: 'XYZ瓦片',
-    tms: 'TMS瓦片',
-    cog: 'COG栅格',
-    vector: '矢量',
+    xyz: t('misc.auto.xyz'),
+    tms: t('misc.auto.tms'),
+    cog: t('misc.auto.cogRaster'),
+    vector: t('misc.auto.vector'),
     postgis: 'PostGIS',
     mbtiles: 'MBTiles',
     pmtiles: 'PMTiles',
-    arcgis: 'ArcGIS瓦片',
+    arcgis: t('misc.auto.arcgisTiles'),
     '3dtiles': '3D Tiles'
   };
   return map[k] || k;
 };
 const stateLabel = (s: string) => {
-  const map: Record<string, string> = { active: '在用', stopped: '停止', paused: '暂停', deleted: '删除' };
+  const map: Record<string, string> = { active: t('misc.auto.text47'), stopped: t('misc.auto.text48'), paused: t('misc.auto.text49'), deleted: t('misc.auto.delete') };
   return map[s] || s;
 };
 
@@ -346,8 +348,7 @@ const kindRows = computed(() => {
 // ---------- 数据加载（各项独立容错，失败显示为空不阻塞首页） ----------
 async function loadServices() {
   try {
-    const { data } = await listServices();
-    const info: any = data.data || data;
+    const info: any = await listServices();
     services.value = info.services || [];
     engineStats.value = info.engines || [];
     registryMode.value = info.registry_mode || '';
@@ -359,8 +360,7 @@ async function loadServices() {
 
 async function loadComponents() {
   try {
-    const { data } = await getComponents();
-    comp.value = (data.data || data) as ComponentsResp;
+    comp.value = (await getComponents()) as unknown as ComponentsResp;
   } catch {
     /* map-api 离线时保持默认 */
   }
@@ -368,8 +368,7 @@ async function loadComponents() {
 
 async function loadUsage() {
   try {
-    const { data } = await usage({ period: period.value, group_by: 'name' });
-    const u: any = data.data || data;
+    const u: any = await usage({ period: period.value, group_by: 'name' });
     totalHits.value = (u.rows || []).reduce((a: number, r: UsageRow) => a + (r.hits || 0), 0);
     topRows.value = [...(u.rows || [])]
       .sort((a: UsageRow, b: UsageRow) => (b.hits || 0) - (a.hits || 0))
@@ -382,8 +381,7 @@ async function loadUsage() {
 
 async function loadLogs() {
   try {
-    const { data } = await listAccessLogs({ limit: 1 });
-    const r: any = data.data || data;
+    const r: any = await listAccessLogs({ limit: 1 });
     logStats.value = {
       total: r.total || 0,
       client_4xx: r.errors?.client_4xx || 0,
@@ -396,8 +394,7 @@ async function loadLogs() {
 
 async function loadStyles() {
   try {
-    const { data } = await listStyles();
-    const r: any = data.data || data;
+    const r: any = await listStyles();
     styleCount.value = r.count ?? (r.styles || []).length;
   } catch {
     styleCount.value = 0;
@@ -406,8 +403,7 @@ async function loadStyles() {
 
 async function loadCache() {
   try {
-    const { data } = await cacheStats();
-    cache.value = (data.data || data) as CacheStatsResp;
+    cache.value = (await cacheStats()) as unknown as CacheStatsResp;
   } catch {
     cache.value = null;
   }
@@ -415,8 +411,7 @@ async function loadCache() {
 
 async function loadEngines() {
   try {
-    const { data } = await listEngines();
-    const r: any = data.data || data;
+    const r: any = await listEngines();
     engineList.value = r.engines || [];
   } catch {
     engineList.value = [];

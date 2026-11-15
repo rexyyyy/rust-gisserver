@@ -2,7 +2,8 @@ export default {
   // 路由国际化
   route: {
     dashboard: 'Dashboard',
-    document: 'Document'
+    document: 'Document',
+    personalCenter: 'Personal Center'
   },
   // 登录页面国际化
   login: {

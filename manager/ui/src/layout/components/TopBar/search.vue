@@ -7,7 +7,7 @@
           v-model="state.menuQuery"
           class="layout-search-dialog__autocomplete"
           :fetch-suggestions="menuSearch"
-          placeholder="搜索"
+          :placeholder="$t('misc.auto.search')"
           :fit-input-width="true"
           @select="onHandleSelect"
         >

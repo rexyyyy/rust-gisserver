@@ -1,5 +1,5 @@
 import request from '@/utils/request';
-import { EngineBody, EngineHealth, EngineListResp } from './types';
+import { EngineBody, EngineHealth, EngineListResp, ServiceEngineResp, EngineEventListResp, EngineDetailResp } from './types';
 import { AxiosPromise } from 'axios';
 
 // 引擎清单

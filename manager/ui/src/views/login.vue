@@ -50,7 +50,7 @@
     </el-form>
     <!--  底部  -->
     <div class="el-login-footer">
-      <span>Copyright © 2018-2026 疯狂的狮子Li All Rights Reserved.</span>
+      <span>{{ $t('misc.auto.copyright20182026OfLiAllRightsReserved') }}</span>
     </div>
   </div>
 </template>

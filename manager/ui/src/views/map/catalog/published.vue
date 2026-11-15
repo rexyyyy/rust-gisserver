@@ -3,26 +3,26 @@
     <!-- 红线提示：账本与引擎配置同源，生命周期只动引擎登记簿 -->
     <el-alert type="info" :closable="false" show-icon class="mb-[10px]">
       <template #title>
-        已发布服务是发布动作的<b>账本</b>：实体配置落在 rust-gisserver 的 XML 里，
-        启停 / 暂停 / 删除只改引擎登记簿并热重载，不物理删除配置文件。
+        {{ $t('map.auto.publishedLedgerHint') }}
+        {{ $t('map.auto.text181')}} / {{ $t('map.auto.text43') }} / {{ $t('map.auto.deleteDelete') }}
       </template>
     </el-alert>
 
     <el-card shadow="hover">
       <CatalogToolbar>
         <template #filters>
-          <el-select v-model="wsId" placeholder="全部工作空间" clearable style="width: 210px" @change="load">
+          <el-select v-model="wsId" :placeholder="$t('map.auto.all')" clearable style="width: 210px" @change="load">
             <el-option v-for="w in workspaces" :key="w.id" :label="`${w.name}${w.title ? ' — ' + w.title : ''}`" :value="w.id" />
           </el-select>
           <el-select v-model="pubDataType" style="width: 170px">
-            <el-option label="全部数据类型" value="" />
+            <el-option :label="$t('map.auto.alldataType')" value="" />
             <el-option v-for="d in dataTypeOptions" :key="d" :label="d" :value="d" />
           </el-select>
-          <el-checkbox v-model="includeDeleted" @change="load">显示已删除</el-checkbox>
+          <el-checkbox v-model="includeDeleted" @change="load">{{ $t('map.auto.showdelete') }}</el-checkbox>
         </template>
         <template #actions>
-          <el-button icon="Refresh" @click="reloadAll">刷新</el-button>
-          <router-link to="/data/resource" class="link-type">去发布数据图层</router-link>
+          <el-button icon="Refresh" @click="reloadAll">{{ $t('map.auto.refresh') }}</el-button>
+          <router-link to="/data/resource" class="link-type">{{ $t('map.auto.dataLayer2') }}</router-link>
         </template>
       </CatalogToolbar>
 
@@ -34,26 +34,26 @@
       </el-radio-group>
 
       <el-table v-loading="loading" border :data="view" size="small" style="width: 100%">
-        <el-table-column label="服务名" prop="layerName" min-width="190" :show-overflow-tooltip="true">
+        <el-table-column :label="$t('map.auto.serviceName')" prop="layerName" min-width="190" :show-overflow-tooltip="true">
           <template #default="{ row }">
             <span>{{ row.layerName }}</span>
             <el-tooltip v-if="nativeGridInfo(row)" :content="nativeGridTip(row, nativeGridInfo(row)!)" placement="top" :show-after="200">
-              <el-tag type="warning" effect="plain" size="small" class="ml-1">自定义坐标/网格</el-tag>
+              <el-tag type="warning" effect="plain" size="small" class="ml-1">{{ $t('map.auto.customCRSGrid') }}</el-tag>
             </el-tooltip>
           </template>
         </el-table-column>
-        <el-table-column label="标题" prop="title" min-width="130" :show-overflow-tooltip="true" />
-        <el-table-column label="工作空间" align="center" width="100">
+        <el-table-column :label="$t('map.auto.title')" prop="title" min-width="130" :show-overflow-tooltip="true" />
+        <el-table-column :label="$t('map.auto.text51')" align="center" width="100">
           <template #default="{ row }">
             <router-link to="/data/workspace" class="link-type">{{ row.workspaceName || wsName(row.workspaceId) }}</router-link>
           </template>
         </el-table-column>
-        <el-table-column label="数据类型" align="center" width="120">
+        <el-table-column :label="$t('map.auto.dataType')" align="center" width="120">
           <template #default="{ row }">
             <el-tag effect="plain" size="small">{{ dataTypeOf(row) }}</el-tag>
           </template>
         </el-table-column>
-        <el-table-column label="来源" align="center" min-width="170" :show-overflow-tooltip="true">
+        <el-table-column :label="$t('map.auto.text54')" align="center" min-width="170" :show-overflow-tooltip="true">
           <template #default="{ row }">
             <router-link v-if="storeOf(row)" :to="`/data/resource?storeId=${storeOf(row)}`" class="link-type text-xs">
               {{ [row.storeName, row.resourceName].filter(Boolean).join(' / ') || '—' }}
@@ -61,25 +61,25 @@
             <span v-else class="text-xs">{{ [row.storeName, row.resourceName].filter(Boolean).join(' / ') || '—' }}</span>
           </template>
         </el-table-column>
-        <el-table-column label="协议" align="center" min-width="170">
+        <el-table-column :label="$t('map.auto.protocol5')" align="center" min-width="170">
           <template #default="{ row }">
             <el-tag v-for="t in row.serviceTypes" :key="t" size="small" effect="plain" class="mr-1">
               {{ protoLabel(t) }}
             </el-tag>
           </template>
         </el-table-column>
-        <el-table-column label="坐标系" align="center" prop="srcCrs" width="100" />
-        <el-table-column label="四至" align="center" width="150">
+        <el-table-column :label="$t('map.auto.crs8')" align="center" prop="srcCrs" width="100" />
+        <el-table-column :label="$t('map.auto.four')" align="center" width="150">
           <template #default="{ row }">
             <span class="text-xs">{{ bboxText(row.bbox) }}</span>
           </template>
         </el-table-column>
-        <el-table-column label="状态" align="center" width="80">
+        <el-table-column :label="$t('map.auto.status')" align="center" width="80">
           <template #default="{ row }">
             <el-tag :type="stateTag(row.state)" size="small" effect="dark">{{ stateLabel(row.state) }}</el-tag>
           </template>
         </el-table-column>
-        <el-table-column label="操作" align="center" width="320" fixed="right">
+        <el-table-column :label="$t('map.auto.actions')" align="center" width="320" fixed="right">
           <template #default="{ row }">
             <el-button
               v-hasPermi="['map:catalog:publish']"
@@ -89,9 +89,9 @@
               :disabled="row.state === 'deleted'"
               @click="pubRef?.openEdit(row)"
             >
-              修改
+              {{ $t('map.auto.edit') }}
             </el-button>
-            <el-button link type="success" icon="View" @click="pvRef?.open(row)">预览</el-button>
+            <el-button link type="success" icon="View" @click="pvRef?.open(row)">{{ $t('map.auto.preview3') }}</el-button>
             <el-button
               v-hasPermi="['map:catalog:publish']"
               link
@@ -100,7 +100,7 @@
               :disabled="row.state === 'active'"
               @click="handleState(row, 'active')"
             >
-              {{ row.state === 'deleted' ? '恢复' : '启动' }}
+              {{ row.state === 'deleted' ? $t('map.auto.text55') : $t('map.auto.text56') }}
             </el-button>
             <el-button
               v-hasPermi="['map:catalog:publish']"
@@ -110,7 +110,7 @@
               :disabled="row.state !== 'active'"
               @click="handleState(row, 'paused')"
             >
-              暂停
+              {{ $t('map.auto.text43') }}
             </el-button>
             <el-button
               v-hasPermi="['map:catalog:publish']"
@@ -120,7 +120,7 @@
               :disabled="row.state === 'stopped' || row.state === 'deleted'"
               @click="handleState(row, 'stopped')"
             >
-              停止
+              {{ $t('map.auto.text42') }}
             </el-button>
             <el-button
               v-hasPermi="['map:catalog:publish']"
@@ -130,14 +130,14 @@
               :disabled="row.state === 'deleted'"
               @click="handleState(row, 'deleted')"
             >
-              删除
+              {{ $t('map.auto.delete6') }}
             </el-button>
           </template>
         </el-table-column>
       </el-table>
       <div class="mt-2 text-xs text-gray-400">
-        当前分组 {{ view.length }} 个服务（共 {{ total }} 个）。「停止」与「暂停」都不再对外提供（引擎登记簿
-        state≠active 即摘除），只是管理态标签不同；「删除」进垃圾箱但保留配置文件，勾「显示已删除」后可在此恢复。
+        {{ $t('map.auto.minute2') }}{{ view.length }} {{ $t('map.auto.text182') }}{{ total }} {{ $t('map.auto.text183') }}
+        state≠active {{ $t('map.auto.yesDeleteShowDelete') }}
       </div>
       <div class="mt-3 flex justify-end">
         <el-pagination
@@ -157,6 +157,8 @@
 </template>
 
 <script setup name="MapCatalogPublished" lang="ts">
+import { useI18n } from 'vue-i18n';
+const { t } = useI18n();
 import { listPublished, listStores, listWorkspaces, setPublishedState } from '@/api/map/catalog';
 import { PublishedVO, StoreVO, WorkspaceVO } from '@/api/map/catalog/types';
 import CatalogToolbar from './components/CatalogToolbar.vue';
@@ -216,7 +218,7 @@ const protoOrder = computed<string[]>(() => {
 
 const protoTabs = computed(() => {
   const list = liveRows.value;
-  const tabs: { value: string; label: string; count: number }[] = [{ value: '', label: '全部', count: list.length }];
+  const tabs: { value: string; label: string; count: number }[] = [{ value: '', label: t('map.auto.all2'), count: list.length }];
   for (const t of protoOrder.value) {
     const count = list.filter((p) => (p.serviceTypes || []).includes(t)).length;
     if (count) tabs.push({ value: t, label: protoLabel(t), count });
@@ -261,14 +263,14 @@ const loadStores = async () => {
 
 const handleState = async (row: PublishedVO, state: string) => {
   const tip: Record<string, string> = {
-    active: `确认启动/恢复服务「${row.layerName}」？引擎将重新纳入该服务并对外提供。`,
-    stopped: `确认停止服务「${row.layerName}」？配置文件保留，仅停止对外提供。`,
-    paused: `确认暂停服务「${row.layerName}」？与停止同样不再对外提供，只是管理态标记不同。`,
-    deleted: `确认删除服务「${row.layerName}」？引擎停止提供并进垃圾箱（配置不物理删除）。`
+    active: `${t('map.auto.confirm')}${row.layerName}${t('map.auto.text57')}`,
+    stopped: `${t('map.auto.confirm2')}${row.layerName}${t('map.auto.text58')}`,
+    paused: `${t('map.auto.confirm3')}${row.layerName}${t('map.auto.yes')}`,
+    deleted: `${t('map.auto.confirmDeleteService')}${row.layerName}${t('map.auto.delete2')}`
   };
-  await proxy?.$modal.confirm(tip[state] || `确认将「${row.layerName}」置为 ${state}？`);
+  await proxy?.$modal.confirm(tip[state] || `${t('map.auto.confirm4')}${row.layerName}${t('map.auto.text59')}${state}?`);
   await setPublishedState(row.id, state);
-  proxy?.$modal.msgSuccess('已更新');
+  proxy?.$modal.msgSuccess(t('map.auto.updated2'));
   await reloadAll();
 };
 

@@ -1,3 +1,4 @@
+import i18n from '@/lang';
 /**
  * 坐标系（CRS）能力口径与写法工具。
  *
@@ -16,22 +17,22 @@
 
 /** 三层能力全量说明，用于表单/详情里的悬浮提示。 */
 export const CRS_SUPPORT_HINT =
-  '坐标系三层能力：① 内置 EPSG:4326 / CRS:84 / EPSG:3857（自写 Web Mercator，不依赖 PROJ）；' +
-  '② 请求 CRS 与源 CRS 相同时走恒等直出，CGCS2000（EPSG:4490）与高斯-克吕格分带图层无 PROJ 也能出图；' +
-  '③ 跨 CRS 互转需运行时 PROJ ≥ 8（环境变量 PROJ_DLL / PROJ_DATA）。';
+  i18n.global.t('misc.auto.threeTierCRSSupport1BuiltInEPSG4326CRS84EP') +
+  i18n.global.t('misc.auto.n2WhenRequestCRSEqualsSourceCRSTilesPassThr') +
+  i18n.global.t('misc.auto.n3CrossCRSConversionRequiresPROJ8AtRuntimeE');
 
 /** PROJ 未加载时的真实影响，用于运行状态标签。 */
 export const PROJ_MISSING_HINT =
-  'PROJ 未加载：跨 CRS 互转不可用（这类请求回 400，不是 500）；' + '内置 4326 / CRS:84 / 3857 与「请求 CRS == 源 CRS」的原生产物直出不受影响。';
+  i18n.global.t('misc.auto.projNotLoadedCrossCRSConversionIsUnavailab') + i18n.global.t('misc.auto.builtIn4326CRS843857AndNativeOutputWhenReq');
 
 /** 源坐标系输入框占位：常见 datum 都给例子，别只写 4326 让人以为不支持别的。 */
-export const SRC_CRS_PLACEHOLDER = 'EPSG:4326 / EPSG:4490（CGCS2000）/ EPSG:4543（3°带）…（可选，缺省 4326）';
+export const SRC_CRS_PLACEHOLDER = i18n.global.t('misc.auto.epsg4326EPSG4490CGCS2000EPSG45433DegreeZon');
 
 /** 图层配置里可填的地理系与投影带族（与服务端 is_supported 同源，供校验/提示用）。 */
 export const CRS_FAMILY_HINT =
-  '可用坐标系：地理系 EPSG:4326 / 4490（CGCS2000）/ 4214（西安 80）/ 4258；' +
-  '投影带 EPSG:4491–4554（CGCS2000/北京 54/西安 80 的 3°、6° 高斯-克吕格）、4800–4999、' +
-  '32648–32660（WGS84 UTM 48N–60N）；短名、URN（urn:ogc:def:crs:EPSG::4490）与 ' +
+  i18n.global.t('misc.auto.availableCRSGeographicEPSG43264490CGCS2000') +
+  i18n.global.t('misc.auto.projectedZonesEPSG44914554CGCS2000Beijing5') +
+  i18n.global.t('misc.auto.n3264832660WGS84UTM48N60NShortNamesURNUrnOg') +
   'def-URI（http://www.opengis.net/def/crs/EPSG/0/4490）写法同等接受。';
 
 /** 地理系（度）CRS 码：范围数值可直接当经纬度用。 */

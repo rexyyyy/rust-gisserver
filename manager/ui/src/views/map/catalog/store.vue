@@ -3,60 +3,60 @@
     <!-- 红线提示：数据源只是指针，不落地数据 -->
     <el-alert type="info" :closable="false" show-icon class="mb-[10px]">
       <template #title>
-        数据源只登记<b>指针</b>：目录路径或 PostGIS 连接串。「只读发现」仅扫描文件头 / 归档元数据 /
-        geometry_columns，不导入数据、不复制文件、不重投影落库。
+        {{ $t('map.auto.storeAlertHint') }}
+        {{ $t('map.auto.importData4') }}
       </template>
     </el-alert>
 
     <el-card shadow="hover">
       <CatalogToolbar>
         <template #filters>
-          <el-select v-model="wsId" placeholder="全部工作空间" clearable style="width: 210px" @change="load">
+          <el-select v-model="wsId" :placeholder="$t('map.auto.all')" clearable style="width: 210px" @change="load">
             <el-option v-for="w in workspaces" :key="w.id" :label="`${w.name}${w.title ? ' — ' + w.title : ''}`" :value="w.id" />
           </el-select>
-          <el-select v-model="discoverDepth" style="width: 120px" title="目录型数据源「只读发现」的递归层深">
-            <el-option v-for="d in [1, 2, 3, 4]" :key="d" :label="`发现深度 ${d}`" :value="d" />
+          <el-select v-model="discoverDepth" style="width: 120px" :title="$t('map.auto.catalogOf2')">
+            <el-option v-for="d in [1, 2, 3, 4]" :key="d" :label="`${t('map.auto.text62')}${d}`" :value="d" />
           </el-select>
-          <el-checkbox v-model="includeDeleted" @change="load">显示已删除</el-checkbox>
+          <el-checkbox v-model="includeDeleted" @change="load">{{ $t('map.auto.showdelete') }}</el-checkbox>
         </template>
         <template #actions>
-          <el-button icon="Refresh" @click="load">刷新</el-button>
-          <el-button v-hasPermi="['map:catalog:edit']" type="primary" plain icon="Plus" @click="openAdd">新建数据源</el-button>
+          <el-button icon="Refresh" @click="load">{{ $t('map.auto.refresh') }}</el-button>
+          <el-button v-hasPermi="['map:catalog:edit']" type="primary" plain icon="Plus" @click="openAdd">{{ $t('map.auto.text76') }}</el-button>
         </template>
       </CatalogToolbar>
 
       <el-table v-loading="loading" border :data="rows" size="small" style="width: 100%">
-        <el-table-column label="名称" prop="name" min-width="140" :show-overflow-tooltip="true" />
-        <el-table-column label="工作空间" align="center" width="100">
+        <el-table-column :label="$t('map.auto.name')" prop="name" min-width="140" :show-overflow-tooltip="true" />
+        <el-table-column :label="$t('map.auto.text51')" align="center" width="100">
           <template #default="{ row }">
             <router-link :to="`/data/workspace`" class="link-type">{{ wsName(row.workspaceId) }}</router-link>
           </template>
         </el-table-column>
-        <el-table-column label="类型" align="center" width="120">
+        <el-table-column :label="$t('map.auto.type')" align="center" width="120">
           <template #default="{ row }">
             <el-tag effect="plain" size="small">{{ row.storeType }}</el-tag>
           </template>
         </el-table-column>
-        <el-table-column label="数据定位" min-width="230" :show-overflow-tooltip="true">
+        <el-table-column :label="$t('map.auto.text70')" min-width="230" :show-overflow-tooltip="true">
           <template #default="{ row }">
-            <span class="text-xs">{{ row.isPostgis ? row.pgDsnMasked || '未登记连接串' : row.basePath }}</span>
+            <span class="text-xs">{{ row.isPostgis ? row.pgDsnMasked || $t('map.auto.text64') : row.basePath }}</span>
           </template>
         </el-table-column>
-        <el-table-column label="图层" align="center" width="80">
+        <el-table-column :label="$t('map.auto.layer2')" align="center" width="80">
           <template #default="{ row }">
             <router-link :to="`/data/resource?storeId=${row.id}`" class="link-type">{{ row.resourceCount }}</router-link>
           </template>
         </el-table-column>
-        <el-table-column label="可发布" align="center" width="80" prop="publishableCount" />
-        <el-table-column label="状态" align="center" width="80">
+        <el-table-column :label="$t('map.auto.text49')" align="center" width="80" prop="publishableCount" />
+        <el-table-column :label="$t('map.auto.status')" align="center" width="80">
           <template #default="{ row }">
             <el-tag :type="row.delFlag === 1 ? 'danger' : 'success'" size="small" effect="dark">
-              {{ row.delFlag === 1 ? '已删' : '正常' }}
+              {{ row.delFlag === 1 ? $t('map.auto.text44') : $t('map.auto.normal') }}
             </el-tag>
           </template>
         </el-table-column>
-        <el-table-column label="备注" prop="remark" min-width="160" :show-overflow-tooltip="true" />
-        <el-table-column label="操作" align="center" width="400" fixed="right">
+        <el-table-column :label="$t('map.auto.remark')" prop="remark" min-width="160" :show-overflow-tooltip="true" />
+        <el-table-column :label="$t('map.auto.actions')" align="center" width="400" fixed="right">
           <template #default="{ row }">
             <el-button
               v-hasPermi="['map:catalog:edit']"
@@ -66,7 +66,7 @@
               :disabled="row.delFlag === 1"
               @click="openEdit(row)"
             >
-              编辑
+              {{ $t('map.auto.text99') }}
             </el-button>
             <el-button
               v-hasPermi="['map:catalog:edit']"
@@ -77,7 +77,7 @@
               :loading="busy.row === row.id && busy.kind === 'connect'"
               @click="handleTestConn(row)"
             >
-              测试连接
+              {{ $t('map.auto.text188') }}
             </el-button>
             <el-button
               v-hasPermi="['map:catalog:publish']"
@@ -88,7 +88,7 @@
               :loading="busy.row === row.id && busy.kind === 'discover'"
               @click="handleDiscover(row)"
             >
-              只读发现
+              {{ $t('map.auto.text185') }}
             </el-button>
             <el-button
               v-if="row.isPostgis"
@@ -99,10 +99,10 @@
               :disabled="row.delFlag === 1"
               @click="openImport(row)"
             >
-              导入shp
+              {{ $t('map.auto.import') }}shp
             </el-button>
             <el-button v-if="row.delFlag === 1" v-hasPermi="['map:catalog:edit']" link type="success" icon="RefreshLeft" @click="handleRestore(row)">
-              恢复
+              {{ $t('map.auto.text55') }}
             </el-button>
             <el-button
               v-else
@@ -112,14 +112,13 @@
               icon="Delete"
               @click="handleRemove(row)"
             >
-              删除
+              {{ $t('map.auto.delete6') }}
             </el-button>
           </template>
         </el-table-column>
       </el-table>
       <div class="mt-2 text-xs text-gray-400">
-        共 {{ total }} 个数据源。「删除」只把指针与其下数据图层标记进垃圾箱，数据文件 / 库表本身不动；恢复指针后，
-        被级联的数据图层与已发布服务还需到「数据图层」「已发布服务」页逐个恢复。目录型改动定位后需重新发现才刷新账本。
+        {{ $t('map.auto.storeCountHint', { n: total }) }}
       </div>
       <div class="mt-3 flex justify-end">
         <el-pagination
@@ -134,11 +133,11 @@
     </el-card>
 
     <!-- 新建数据源：三栏布局 -->
-    <el-dialog v-model="addDlg.visible" title="新建数据源" width="900px" append-to-body>
+    <el-dialog v-model="addDlg.visible" :title="$t('map.auto.text76')" width="900px" append-to-body>
       <div class="store-add-layout">
         <!-- 上部：选择工作空间 -->
         <div class="store-add-top">
-          <el-select v-model="addDlg.workspaceId" placeholder="选择工作空间" style="width: 300px" @change="onAddWsChange">
+          <el-select v-model="addDlg.workspaceId" :placeholder="$t('map.auto.text77')" style="width: 300px" @change="onAddWsChange">
             <el-option
               v-for="w in workspaces"
               :key="w.id"
@@ -162,10 +161,10 @@
           <!-- 右侧：编辑表单 -->
           <div class="store-add-right">
             <el-form ref="addFormRef" :model="addForm" :rules="addRules" label-width="100px">
-              <el-form-item label="名称" prop="name">
-                <el-input v-model="addForm.name" placeholder="字母/数字/-/_（如 wuhan_cog）" />
+              <el-form-item :label="$t('map.auto.name')" prop="name">
+                <el-input v-model="addForm.name" :placeholder="$t('map.auto.wuhanCog')" />
               </el-form-item>
-              <el-form-item label="类型" prop="storeType">
+              <el-form-item :label="$t('map.auto.type')" prop="storeType">
                 <el-select v-model="addForm.storeType" style="width: 100%" @change="onAddTypeChange">
                   <el-option v-for="t in storeTypeOptions" :key="t.value" :label="t.label" :value="t.value" />
                 </el-select>
@@ -177,31 +176,31 @@
                   {{ dirDetectHint }}
                 </span>
               </el-form-item>
-              <el-form-item v-if="!isAddPgStore" label="目录" prop="basePath">
-                <el-input v-model="addForm.basePath" readonly placeholder="从左侧目录树选择" />
-                <span class="text-xs text-gray-400">点击左侧目录逐级展开；识别到已知图层数据后停止展开并自动填入类型</span>
+              <el-form-item v-if="!isAddPgStore" :label="$t('map.auto.catalog2')" prop="basePath">
+                <el-input v-model="addForm.basePath" readonly :placeholder="$t('map.auto.catalog4')" />
+                <span class="text-xs text-gray-400">{{ $t('map.auto.catalogDetectLayerType') }}</span>
               </el-form-item>
               <!-- PostGIS 连接参数 -->
               <template v-else>
-                <el-form-item label="主机" prop="pgHost">
-                  <el-input v-model="addForm.pgHost" placeholder="如 127.0.0.1" />
+                <el-form-item :label="$t('map.auto.host')" prop="pgHost">
+                  <el-input v-model="addForm.pgHost" :placeholder="$t('map.auto.n127001')" />
                 </el-form-item>
-                <el-form-item label="端口" prop="pgPort">
+                <el-form-item :label="$t('map.auto.text78')" prop="pgPort">
                   <el-input-number v-model="addForm.pgPort" :min="1" :max="65535" controls-position="right" style="width: 100%" />
                 </el-form-item>
-                <el-form-item label="用户名" prop="pgUsername">
+                <el-form-item :label="$t('map.auto.user')" prop="pgUsername">
                   <el-input v-model="addForm.pgUsername" placeholder="postgres" />
                 </el-form-item>
-                <el-form-item label="密码" prop="pgPassword">
-                  <el-input v-model="addForm.pgPassword" type="password" show-password placeholder="数据库密码" />
+                <el-form-item :label="$t('map.auto.text79')" prop="pgPassword">
+                  <el-input v-model="addForm.pgPassword" type="password" show-password :placeholder="$t('map.auto.text80')" />
                 </el-form-item>
-                <el-form-item label="数据库" prop="pgDatabase">
-                  <el-input v-model="addForm.pgDatabase" placeholder="如 gis" />
+                <el-form-item :label="$t('map.auto.text81')" prop="pgDatabase">
+                  <el-input v-model="addForm.pgDatabase" :placeholder="$t('map.auto.gis')" />
                 </el-form-item>
                 <el-form-item label="Schema">
-                  <el-input v-model="addForm.pgSchema" placeholder="public（默认）" />
+                  <el-input v-model="addForm.pgSchema" :placeholder="$t('map.auto.publicDefault')" />
                 </el-form-item>
-                <el-form-item label="连接测试">
+                <el-form-item :label="$t('map.auto.text82')">
                   <el-button
                     type="primary"
                     plain
@@ -210,25 +209,25 @@
                     :disabled="!pgFormReady"
                     @click="testPgConnection"
                   >
-                    测试连接
+                    {{ $t('map.auto.text188') }}
                   </el-button>
                   <span v-if="addDlg.testResult" class="text-xs ml-2" :class="addDlg.testResult.ok ? 'text-green-600' : 'text-red-500'">
                     {{ addDlg.testResult.detail }}
                   </span>
                 </el-form-item>
               </template>
-              <el-form-item v-if="!isAddPgStore" label="可发布">
+              <el-form-item v-if="!isAddPgStore" :label="$t('map.auto.text49')">
                 <el-tag v-if="selectedDirInfo?.storeType" :type="canPublish ? 'success' : 'info'" size="small">
-                  {{ canPublish ? '可发布' : '不可发布' }}
+                  {{ canPublish ? $t('map.auto.text49') : $t('map.auto.text83') }}
                 </el-tag>
-                <span v-else class="text-xs text-gray-400">请选择目录</span>
+                <span v-else class="text-xs text-gray-400">{{ $t('map.auto.pleaseSelectCatalog') }}</span>
               </el-form-item>
-              <el-form-item v-if="!isAddPgStore && publishableServices.length" label="服务类型">
+              <el-form-item v-if="!isAddPgStore && publishableServices.length" :label="$t('map.auto.type2')">
                 <el-checkbox-group v-model="addForm.serviceTypes" size="small">
                   <el-checkbox v-for="s in publishableServices" :key="s" :label="s" :value="s">{{ s.toUpperCase() }}</el-checkbox>
                 </el-checkbox-group>
               </el-form-item>
-              <el-form-item label="备注" prop="remark">
+              <el-form-item :label="$t('map.auto.remark')" prop="remark">
                 <el-input v-model="addForm.remark" type="textarea" :rows="2" />
               </el-form-item>
             </el-form>
@@ -237,52 +236,52 @@
       </div>
 
       <template #footer>
-        <el-button @click="addDlg.visible = false">取消</el-button>
-        <el-button type="primary" :loading="addDlg.saving" @click="saveAdd">确定</el-button>
+        <el-button @click="addDlg.visible = false">{{ $t('map.auto.cancel') }}</el-button>
+        <el-button type="primary" :loading="addDlg.saving" @click="saveAdd">{{ $t('map.auto.ok') }}</el-button>
       </template>
     </el-dialog>
 
     <!-- 编辑数据源（保持原有对话框） -->
-    <el-dialog v-model="editDlg.visible" title="编辑数据源" width="580px" append-to-body>
+    <el-dialog v-model="editDlg.visible" :title="$t('map.auto.text84')" width="580px" append-to-body>
       <el-form ref="editFormRef" :model="editForm" :rules="editRules" label-width="110px">
-        <el-form-item label="工作空间" prop="workspaceId">
+        <el-form-item :label="$t('map.auto.text51')" prop="workspaceId">
           <el-select v-model="editForm.workspaceId" style="width: 100%">
             <el-option v-for="w in workspaces" :key="w.id" :label="`${w.name}${w.title ? ' — ' + w.title : ''}`" :value="w.id" />
           </el-select>
         </el-form-item>
-        <el-form-item label="名称" prop="name">
-          <el-input v-model="editForm.name" placeholder="字母/数字/-/_（如 wuhan_cog）" />
+        <el-form-item :label="$t('map.auto.name')" prop="name">
+          <el-input v-model="editForm.name" :placeholder="$t('map.auto.wuhanCog')" />
         </el-form-item>
-        <el-form-item label="类型" prop="storeType">
+        <el-form-item :label="$t('map.auto.type')" prop="storeType">
           <el-select v-model="editForm.storeType" style="width: 100%" @change="onEditTypeChange">
             <el-option v-for="t in storeTypeOptions" :key="t.value" :label="t.label" :value="t.value" />
           </el-select>
         </el-form-item>
-        <el-form-item v-if="!isEditPgStore" label="目录" prop="basePath">
-          <el-input v-model="editForm.basePath" placeholder="引擎 data_root 之内的目录，如 D:/data/cog" />
-          <span class="text-xs text-gray-400">只读扫描该目录，{{ editExtHint }}。数据不入库、不复制。</span>
+        <el-form-item v-if="!isEditPgStore" :label="$t('map.auto.catalog2')" prop="basePath">
+          <el-input v-model="editForm.basePath" :placeholder="$t('map.auto.dataRootOfCatalogDDataCog')" />
+          <span class="text-xs text-gray-400">{{ $t('map.auto.catalog5') }}{{ editExtHint }}。{{ $t('map.auto.text85') }}</span>
         </el-form-item>
         <template v-else>
-          <el-form-item label="连接串" prop="pgDsn">
+          <el-form-item :label="$t('map.auto.text86')" prop="pgDsn">
             <el-input
               v-model="editForm.pgDsn"
               type="password"
               show-password
-              :placeholder="editForm.pgDsnConfigured ? '已配置，留空保持不变' : 'postgres://user:pass@host:5432/db'"
+              :placeholder="editForm.pgDsnConfigured ? $t('map.auto.text87') : 'postgres://user:pass@host:5432/db'"
             />
-            <span class="text-xs text-gray-400">服务端原样保存，只用于转发引擎做只读发现；对外一律掩码显示。</span>
+            <span class="text-xs text-gray-400">{{ $t('map.auto.saveOneShow') }}</span>
           </el-form-item>
           <el-form-item label="Schema" prop="pgSchema">
             <el-input v-model="editForm.pgSchema" placeholder="public" />
           </el-form-item>
         </template>
-        <el-form-item label="备注" prop="remark">
+        <el-form-item :label="$t('map.auto.remark')" prop="remark">
           <el-input v-model="editForm.remark" type="textarea" :rows="2" />
         </el-form-item>
       </el-form>
       <template #footer>
-        <el-button @click="editDlg.visible = false">取消</el-button>
-        <el-button type="primary" :loading="editDlg.saving" @click="saveEdit">确定</el-button>
+        <el-button @click="editDlg.visible = false">{{ $t('map.auto.cancel') }}</el-button>
+        <el-button type="primary" :loading="editDlg.saving" @click="saveEdit">{{ $t('map.auto.ok') }}</el-button>
       </template>
     </el-dialog>
 
@@ -297,6 +296,8 @@
 </template>
 
 <script setup name="MapCatalogStore" lang="ts">
+import { useI18n } from 'vue-i18n';
+const { t } = useI18n();
 import {
   addStore,
   deleteStore,
@@ -362,13 +363,13 @@ const loadWorkspaces = async () => {
 
 // ================= 类型清单 =================
 const storeTypeOptions = computed(() => {
-  const dir = (caps.value?.store_types || []).map((t) => ({
-    value: t.store_type,
-    label: `${t.store_type}${t.extensions?.length ? '（' + t.extensions.join('/') + '）' : ''}${
-      t.store_type === 'arcgis_dir' ? '（ArcGIS 缓存目录）' : t.store_type === 'mvt_dir' ? '（MVT 瓦片目录）' : ''
+  const dir = (caps.value?.store_types || []).map((st) => ({
+    value: st.store_type,
+    label: `${st.store_type}${st.extensions?.length ? '（' + st.extensions.join('/') + '）' : ''}${
+      st.store_type === 'arcgis_dir' ? t('map.auto.arcgisCacheCatalog') : st.store_type === 'mvt_dir' ? t('map.auto.mvtCatalog') : ''
     }`
   }));
-  return [...dir, { value: 'postgis', label: 'postgis（PostGIS 库表）' }];
+  return [...dir, { value: 'postgis', label: t('map.auto.postgisPostGIS') }];
 });
 
 // 数据类型 → 发布能力（来自 discover.rs data_type_caps）
@@ -441,8 +442,8 @@ const dirDetectHint = computed(() => {
   const info = selectedDirInfo.value;
   if (!info?.label) return '';
   return info.storeType
-    ? `已识别：${info.label} → ${info.storeType}`
-    : `已识别：${info.label}，当前引擎暂不支持登记为数据源类型`;
+    ? `${t('map.auto.detected')}${info.label} → ${info.storeType}`
+    : `${t('map.auto.detected')}${info.label}${t('map.auto.theCurrentEngineCannotRegisterThisDataSour')}`;
 });
 
 const selectedWsDataRoot = computed(() => {
@@ -465,14 +466,14 @@ const publishableServices = computed(() => {
 
 const addRules = {
   name: [
-    { required: true, message: '名称不能为空', trigger: 'blur' },
-    { pattern: /^[A-Za-z0-9_-]{1,128}$/, message: '仅字母、数字、下划线与短横线', trigger: 'blur' }
+    { required: true, message: t('map.auto.nameisRequired'), trigger: 'blur' },
+    { pattern: /^[A-Za-z0-9_-]{1,128}$/, message: t('map.auto.text88'), trigger: 'blur' }
   ],
-  storeType: [{ required: true, message: '请选择类型', trigger: 'change' }],
+  storeType: [{ required: true, message: t('map.auto.pleaseSelectType'), trigger: 'change' }],
   basePath: [
     {
       validator: (_r: any, v: string, cb: (e?: Error) => void) => {
-        if (!isAddPgStore.value && !v?.trim()) cb(new Error('请从左侧选择目录'));
+        if (!isAddPgStore.value && !v?.trim()) cb(new Error(t('map.auto.catalog6')));
         else cb();
       },
       trigger: 'change'
@@ -481,7 +482,7 @@ const addRules = {
   pgHost: [
     {
       validator: (_r: any, v: string, cb: (e?: Error) => void) => {
-        if (isAddPgStore.value && !v?.trim()) cb(new Error('主机不能为空'));
+        if (isAddPgStore.value && !v?.trim()) cb(new Error(t('map.auto.hostisRequired')));
         else cb();
       },
       trigger: 'blur'
@@ -490,7 +491,7 @@ const addRules = {
   pgUsername: [
     {
       validator: (_r: any, v: string, cb: (e?: Error) => void) => {
-        if (isAddPgStore.value && !v?.trim()) cb(new Error('用户名不能为空'));
+        if (isAddPgStore.value && !v?.trim()) cb(new Error(t('map.auto.userisRequired')));
         else cb();
       },
       trigger: 'blur'
@@ -499,7 +500,7 @@ const addRules = {
   pgPassword: [
     {
       validator: (_r: any, v: string, cb: (e?: Error) => void) => {
-        if (isAddPgStore.value && !v) cb(new Error('密码不能为空'));
+        if (isAddPgStore.value && !v) cb(new Error(t('map.auto.isRequired')));
         else cb();
       },
       trigger: 'blur'
@@ -508,7 +509,7 @@ const addRules = {
   pgDatabase: [
     {
       validator: (_r: any, v: string, cb: (e?: Error) => void) => {
-        if (isAddPgStore.value && !v?.trim()) cb(new Error('数据库名不能为空'));
+        if (isAddPgStore.value && !v?.trim()) cb(new Error(t('map.auto.isRequired2')));
         else cb();
       },
       trigger: 'blur'
@@ -544,9 +545,9 @@ const testPgConnection = async () => {
       password: addForm.pgPassword,
       database: addForm.pgDatabase.trim()
     });
-    addDlg.testResult = { ok: !!res.data.ok, detail: res.data.detail || '连接成功' };
+    addDlg.testResult = { ok: !!res.data.ok, detail: res.data.detail || t('map.auto.success') };
   } catch (e: any) {
-    addDlg.testResult = { ok: false, detail: e?.message || '连接测试请求失败' };
+    addDlg.testResult = { ok: false, detail: e?.message || t('map.auto.failed') };
   } finally {
     addDlg.testing = false;
   }
@@ -624,7 +625,7 @@ const saveAdd = async () => {
       remark: addForm.remark
     };
     await addStore(body);
-    proxy?.$modal.msgSuccess('已创建');
+    proxy?.$modal.msgSuccess(t('map.auto.text89'));
     addDlg.visible = false;
     await load();
   } finally {
@@ -650,16 +651,16 @@ const editForm = reactive<StoreBody & { id: number; pgDsnConfigured: boolean }>(
 const isEditPgStore = computed(() => editForm.storeType === 'postgis');
 
 const editRules = {
-  workspaceId: [{ required: true, message: '请选择工作空间', trigger: 'change' }],
+  workspaceId: [{ required: true, message: t('map.auto.pleaseSelect2'), trigger: 'change' }],
   name: [
-    { required: true, message: '名称不能为空', trigger: 'blur' },
-    { pattern: /^[A-Za-z0-9_-]{1,128}$/, message: '仅字母、数字、下划线与短横线', trigger: 'blur' }
+    { required: true, message: t('map.auto.nameisRequired'), trigger: 'blur' },
+    { pattern: /^[A-Za-z0-9_-]{1,128}$/, message: t('map.auto.text88'), trigger: 'blur' }
   ],
-  storeType: [{ required: true, message: '请选择类型', trigger: 'change' }],
+  storeType: [{ required: true, message: t('map.auto.pleaseSelectType'), trigger: 'change' }],
   basePath: [
     {
       validator: (_r: any, v: string, cb: (e?: Error) => void) => {
-        if (!isEditPgStore.value && !v?.trim()) cb(new Error('目录型数据源必须填写目录'));
+        if (!isEditPgStore.value && !v?.trim()) cb(new Error(t('map.auto.catalogcatalog')));
         else cb();
       },
       trigger: 'blur'
@@ -669,7 +670,7 @@ const editRules = {
     {
       validator: (_r: any, v: string, cb: (e?: Error) => void) => {
         if (!isEditPgStore.value) return cb();
-        if (!v?.trim() && !editForm.pgDsnConfigured) return cb(new Error('PostGIS 数据源必须填写连接串'));
+        if (!v?.trim() && !editForm.pgDsnConfigured) return cb(new Error(t('map.auto.postgis')));
         if (v?.trim() && !/^postgres(ql)?:\/\//.test(v.trim())) return cb(new Error('须为 postgres:// 或 postgresql:// 连接串'));
         cb();
       },
@@ -680,7 +681,7 @@ const editRules = {
 
 const editExtHint = computed(() => {
   const hit = caps.value?.store_types.find((t) => t.store_type === editForm.storeType);
-  return hit?.extensions?.length ? `按扩展名 ${hit.extensions.join('/')} 识别` : '按数据集目录识别';
+  return hit?.extensions?.length ? `${t('map.auto.byExtension')}${hit.extensions.join('/')}${t('map.auto.detect')}` : t('map.auto.detectByDatasetDirectory');
 });
 
 const onEditTypeChange = () => {
@@ -711,7 +712,7 @@ const saveEdit = async () => {
   try {
     const { id, pgDsnConfigured, ...body } = editForm;
     await updateStore(id, body);
-    proxy?.$modal.msgSuccess('已保存（指针变更需重新发现）');
+    proxy?.$modal.msgSuccess(t('map.auto.save4'));
     editDlg.visible = false;
     await load();
   } finally {
@@ -724,8 +725,8 @@ const handleTestConn = async (s: StoreVO) => {
   busy.value = { row: s.id, kind: 'connect' };
   try {
     const res = await testStoreConnection(s.id);
-    if (res.data.ok) proxy?.$modal.msgSuccess(res.data.detail || '连接正常');
-    else proxy?.$modal.msgWarning(res.data.detail || '不可达');
+    if (res.data.ok) proxy?.$modal.msgSuccess(res.data.detail || t('map.auto.normal2'));
+    else proxy?.$modal.msgWarning(res.data.detail || t('map.auto.text90'));
   } finally {
     busy.value = { row: 0, kind: '' };
   }
@@ -735,7 +736,7 @@ const handleDiscover = async (s: StoreVO) => {
   busy.value = { row: s.id, kind: 'discover' };
   try {
     const res = await discoverStore(s.id, s.isPostgis ? { schema: s.pgSchema } : { depth: discoverDepth.value });
-    proxy?.$modal.msgSuccess(`发现 ${res.data.discovered} 个实体，刷新账本 ${res.data.stored} 条`);
+    proxy?.$modal.msgSuccess(`${t('map.auto.text73')}${res.data.discovered}${t('map.auto.refresh3')}${res.data.stored}${t('map.auto.text74')}`);
     await load();
   } finally {
     busy.value = { row: 0, kind: '' };
@@ -744,17 +745,17 @@ const handleDiscover = async (s: StoreVO) => {
 
 const handleRemove = async (s: StoreVO) => {
   await proxy?.$modal.confirm(
-    `确认删除数据源「${s.name}」？其下 ${s.resourceCount} 个数据图层将进垃圾箱，已发布服务随之停止（配置保留）。数据${s.isPostgis ? '库表' : '文件'}本身不受影响。`
+    `${t('map.auto.confirmdelete')}${s.name}${t('map.auto.text93')}${s.resourceCount}${t('map.auto.dataLayerPublishedServices')}${s.isPostgis ? t('map.auto.text91') : t('map.auto.text92')}${t('map.auto.text94')}`
   );
   const res = await deleteStore(s.id);
-  proxy?.$modal.msgSuccess(`已删除，级联进垃圾箱 ${res.data?.resources ?? 0} 个图层`);
+  proxy?.$modal.msgSuccess(`${t('map.auto.delete5')}${res.data?.resources ?? 0}${t('map.auto.layer3')}`);
   await load();
 };
 
 const handleRestore = async (s: StoreVO) => {
-  await proxy?.$modal.confirm(`确认恢复数据源「${s.name}」？其下数据图层与已发布服务需在各自页面逐个恢复。`);
+  await proxy?.$modal.confirm(`${t('map.auto.confirm5')}${s.name}${t('map.auto.dataLayerPublishedServices2')}`);
   await restoreStore(s.id);
-  proxy?.$modal.msgSuccess('已恢复');
+  proxy?.$modal.msgSuccess(t('map.auto.text75'));
   await load();
 };
 
@@ -769,7 +770,7 @@ const openImport = (s: StoreVO) => {
 };
 
 const onShpImported = async (r: ImportShpResp) => {
-  proxy?.$modal.msgSuccess(`已导入 ${r.schema}.${r.table}（${r.features} 个要素，SRID ${r.srid}）`);
+  proxy?.$modal.msgSuccess(`${t('map.auto.imported')}${r.schema}.${r.table} (${r.features}${t('map.auto.featuresSRID')}${r.srid})`);
   const s = importDlg.store;
   if (!s) {
     await load();

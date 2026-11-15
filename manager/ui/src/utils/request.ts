@@ -4,10 +4,10 @@ import { getToken } from '@/utils/auth';
 import { tansParams, blobValidate } from '@/utils/ruoyi';
 import cache from '@/plugins/cache';
 import { HttpStatus } from '@/enums/RespEnum';
-import { errorCode } from '@/utils/errorCode';
+import { getErrorCode } from '@/utils/errorCode';
 import { LoadingInstance } from 'element-plus/es/components/loading/src/loading';
 import FileSaver from 'file-saver';
-import { getLanguage } from '@/lang';
+import i18n, { getLanguage } from '@/lang';
 import { encryptBase64, encryptWithAes, generateAesKey, decryptWithAes, decryptBase64 } from '@/utils/crypto';
 import { encrypt, decrypt } from '@/utils/jsencrypt';
 import router from '@/router';
@@ -38,8 +38,10 @@ const service = axios.create({
 // 请求拦截器
 service.interceptors.request.use(
   (config: InternalAxiosRequestConfig) => {
-    // 对应国际化资源文件后缀
+    // Content-Language mirrors the persisted UI locale for downstream consumers.
     config.headers['Content-Language'] = getLanguage();
+    // Backend picks user-facing messages from this header (see docs/i18n-and-comment-style.md).
+    config.headers['X-Language'] = getLanguage();
 
     const isToken = config.headers?.isToken === false;
     // 是否需要防止数据重复提交
@@ -73,7 +75,7 @@ service.interceptors.request.use(
         const s_time = sessionObj.time; // 请求时间
         const interval = 500; // 间隔时间(ms)，小于此时间视为重复提交
         if (s_data === requestObj.data && requestObj.time - s_time < interval && s_url === requestObj.url) {
-          const message = '数据正在处理，请勿重复提交';
+          const message = i18n.global.t('misc.auto.submit');
           console.warn(`[${s_url}]: ` + message);
           return Promise.reject(new Error(message));
         } else {
@@ -123,6 +125,7 @@ service.interceptors.response.use(
     // 未设置状态码则默认成功状态
     const code = res.data.code || HttpStatus.SUCCESS;
     // 获取错误信息
+    const errorCode = getErrorCode();
     const msg = errorCode[code] || res.data.msg || errorCode['default'];
     // 二进制数据则直接返回
     if (res.request.responseType === 'blob' || res.request.responseType === 'arraybuffer') {
@@ -132,9 +135,9 @@ service.interceptors.response.use(
       // prettier-ignore
       if (!isRelogin.show) {
         isRelogin.show = true;
-        ElMessageBox.confirm('登录状态已过期，您可以继续留在该页面，或者重新登录', '系统提示', {
-          confirmButtonText: '重新登录',
-          cancelButtonText: '取消',
+        ElMessageBox.confirm(i18n.global.t('misc.auto.loginStatus'), i18n.global.t('misc.auto.systemMessage'), {
+          confirmButtonText: i18n.global.t('misc.auto.text18'),
+          cancelButtonText: i18n.global.t('misc.auto.cancel'),
           type: 'warning'
         }).then(() => {
           isRelogin.show = false;
@@ -150,7 +153,7 @@ service.interceptors.response.use(
           isRelogin.show = false;
         });
       }
-      return Promise.reject('无效的会话，或者会话已过期，请重新登录。');
+      return Promise.reject(i18n.global.t('misc.auto.of'));
     } else if (code === HttpStatus.SERVER_ERROR) {
       ElMessage({ message: msg, type: 'error' });
       return Promise.reject(new Error(msg));
@@ -167,11 +170,11 @@ service.interceptors.response.use(
   (error: any) => {
     let { message } = error;
     if (message == 'Network Error') {
-      message = '后端接口连接异常';
+      message = i18n.global.t('misc.auto.text19');
     } else if (message.includes('timeout')) {
-      message = '系统接口请求超时';
+      message = i18n.global.t('misc.auto.systemhour');
     } else if (message.includes('Request failed with status code')) {
-      message = '系统接口' + message.substr(message.length - 3) + '异常';
+      message = i18n.global.t('misc.auto.system3') + message.substr(message.length - 3) + i18n.global.t('misc.auto.text20');
     }
     ElMessage({ message: message, type: 'error', duration: 5 * 1000 });
     return Promise.reject(error);
@@ -179,7 +182,7 @@ service.interceptors.response.use(
 );
 // 通用下载方法
 export function download(url: string, params: any, fileName: string) {
-  downloadLoadingInstance = ElLoading.service({ text: '正在下载数据，请稍候', background: 'rgba(0, 0, 0, 0.7)' });
+  downloadLoadingInstance = ElLoading.service({ text: i18n.global.t('misc.auto.downloadingDataPleaseWait'), background: 'rgba(0, 0, 0, 0.7)' });
   // prettier-ignore
   return service.post(url, params, {
       transformRequest: [
@@ -198,13 +201,14 @@ export function download(url: string, params: any, fileName: string) {
         const blob = new Blob([resp]);
         const resText = await blob.text();
         const rspObj = JSON.parse(resText);
+        const errorCode = getErrorCode();
         const errMsg = errorCode[rspObj.code] || rspObj.msg || errorCode['default'];
         ElMessage.error(errMsg);
       }
       downloadLoadingInstance.close();
     }).catch((r: any) => {
       console.error(r);
-      ElMessage.error('下载文件出现错误，请联系管理员！');
+      ElMessage.error(i18n.global.t('misc.auto.failedToDownloadTheFilePleaseContactTheAdm'));
       downloadLoadingInstance.close();
     });
 }

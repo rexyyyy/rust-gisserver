@@ -9,6 +9,7 @@ import { useUserStore } from '@/store/modules/user';
 import { useSettingsStore } from '@/store/modules/settings';
 import { usePermissionStore } from '@/store/modules/permission';
 import { ElMessage } from 'element-plus/es';
+import i18n from '@/lang';
 
 NProgress.configure({ showSpinner: false });
 const whiteList = ['/login', '/register', '/social-callback', '/register*', '/register/*'];
@@ -20,7 +21,7 @@ const isWhiteList = (path: string) => {
 router.beforeEach(async (to, from, next) => {
   NProgress.start();
   if (getToken()) {
-    to.meta.title && useSettingsStore().setTitle(to.meta.title as string);
+    to.meta.title && useSettingsStore().setTitle(i18n.global.t(to.meta.title as string));
     /* has token*/
     if (to.path === '/login') {
       next({ path: '/' });

@@ -1,6 +1,6 @@
 <template>
   <el-config-provider :locale="appStore.locale" :size="appStore.size">
-    <router-view />
+    <router-view :key="appStore.language" />
   </el-config-provider>
 </template>
 

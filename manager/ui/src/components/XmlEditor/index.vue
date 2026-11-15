@@ -9,6 +9,8 @@
 </template>
 
 <script setup lang="ts">
+import { useI18n } from 'vue-i18n';
+const { t } = useI18n();
 /**
  * CodeMirror 6 XML 编辑器。
  *
@@ -172,7 +174,7 @@ watch(
  * 返回 null 表示通过，否则返回可读的错误描述。
  */
 const checkXml = (text: string): string | null => {
-  if (!text || !text.trim()) return '内容为空';
+  if (!text || !text.trim()) return t('misc.auto.emptyContent');
   try {
     const doc = new DOMParser().parseFromString(text, 'application/xml');
     const err = doc.querySelector('parsererror');
@@ -184,11 +186,11 @@ const checkXml = (text: string): string | null => {
     }
     // DOMParser 对良构 XML 也会在根节点下插入 parsererror，需再确认根元素存在
     if (!doc.documentElement || doc.documentElement.nodeName === 'parsererror') {
-      return 'XML 结构不完整或存在未闭合标签';
+      return t('misc.auto.xmlIsIncompleteOrHasUnclosedTags');
     }
     return null;
   } catch (e: any) {
-    return 'XML 解析失败：' + (e?.message || String(e));
+    return t('misc.auto.xmlParseFailed') + (e?.message || String(e));
   }
 };
 

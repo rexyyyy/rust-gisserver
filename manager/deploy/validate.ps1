@@ -1,13 +1,13 @@
 # ============================================================================
-# P0-4 三仓联通链路自检 —— deploy/validate.ps1
+# P0-4 cross-service connectivity self-check -- deploy/validate.ps1
 #
-# 探活 + 功能 + data_root 对齐检查，独立于容器/本地（用 -Base 参数切目标）。
-# 任意 FAIL -> 退出码 1（供 start.ps1 / CI 判定）。
+# Liveness + functional + data_root alignment checks; works for containers and local (-Base selects target).
+# Any FAIL -> exit code 1 (consumed by start.ps1 / CI).
 #
-# 用法：
-#   pwsh -File validate.ps1                       # 默认探本机 8080/6180/5434
-#   pwsh -File validate.ps1 -CheckDataRoot        # 附带校验 data_root（默认 ./data）及 TESTDATA_ROOT
-#   pwsh -File validate.ps1 -AdminToken 'xxx'     # map-api 配了 admin.token 时
+# Usage:
+#   pwsh -File validate.ps1                       # default: local 8080/6180/5434
+#   pwsh -File validate.ps1 -CheckDataRoot        # also verify data_root (default ./data) and TESTDATA_ROOT
+#   pwsh -File validate.ps1 -AdminToken 'xxx'     # when map-api has admin.token configured
 # ============================================================================
 param(
     [string]$MapApiBase = 'http://localhost:8080',
@@ -26,7 +26,7 @@ function Add($name, $status, $detail) {
 $headers = @{}
 if ($AdminToken) { $headers['X-Admin-Token'] = $AdminToken }
 
-# 存活探测：拿到任意 HTTP 状态码即证明服务在；连不上/超时 = FAIL
+# Liveness: any HTTP status proves the service is up; connection failure/timeout = FAIL
 function Probe($name, $url) {
     try {
         $r = Invoke-WebRequest -UseBasicParsing -Uri $url -Headers $headers -TimeoutSec 10
@@ -40,20 +40,20 @@ function Probe($name, $url) {
     return $null
 }
 
-# 1) PostGIS 端口连通
+# 1) PostGIS port reachability
 $ok = Test-NetConnection -ComputerName $DbHost -Port $DbPort -InformationLevel Quiet -WarningAction SilentlyContinue
 Add 'PostGIS TCP' ($(if ($ok) { 'PASS' } else { 'FAIL' })) "$DbHost`:$DbPort"
 
 # 2) map-api /health
 $null = Probe 'map-api /health' "$MapApiBase/health"
 
-# 3) map-api WMS GetCapabilities（数据面功能）
+# 3) map-api WMS GetCapabilities (data plane)
 $cap = Probe 'map-api WMS GetCapabilities' "$MapApiBase/wms?service=WMS&version=1.3.0&request=GetCapabilities"
 if ($cap -and $cap.Content -match 'WMS_Capabilities|ServiceMetadata') {
     $results[-1].Detail = 'capabilities 正常'
 }
 
-# 4) map-api /admin/components（管理面 + data_root 展示）
+# 4) map-api /admin/components (admin plane + data_root display)
 $ac = Probe 'map-api /admin/components' "$MapApiBase/admin/components"
 if ($ac) {
     try {
@@ -63,11 +63,11 @@ if ($ac) {
     } catch { }
 }
 
-# 5) manager 根（静态托管同端口，拿到任意响应即在）
+# 5) manager root (static hosting on the same port; any response means it is up)
 $null = Probe 'manager /' "$ManagerBase/"
 
-# 6) 本地 data_root 目录存在性（可选）
-#    config/mapserver.xml 用 ${DATA_ROOT:-data}：未设置时取部署目录下 ./data。
+# 6) Local data_root directory existence (optional)
+#    config/mapserver.xml uses ${DATA_ROOT:-data}; unset falls back to ./data under the deploy dir.
 if ($CheckDataRoot) {
     $dr = [Environment]::GetEnvironmentVariable('DATA_ROOT')
     if ([string]::IsNullOrWhiteSpace($dr)) { $dr = Join-Path $PSScriptRoot 'data' }

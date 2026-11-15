@@ -1,14 +1,14 @@
-# COG 瓦片耗时基准：区分「服务端现算慢」与「浏览器侧排队慢」。
+# COG tile latency benchmark: separate server-side render cost from browser-side queueing.
 #
 #   pwsh -NoProfile -File tools\cog_bench.ps1 -Z 20 -Span 3 -Purge
 #
-# -Purge 先清空服务端全部缓存（含解码瓦 + 出图结果，L1/L2），因此第一行
-# COLD 是真正的「现算」耗时；第二行 HOT 走缓存。COLD parallel8 用一批从没
-# 请求过的瓦（窗口平移 400 格）测并发吞吐。
+# -Purge clears every server cache (decoded tiles + rendered output, L1/L2), so the first
+# COLD row is a true cold render; HOT is served from cache. COLD parallel8 uses tiles never
+# requested before (window shifted by 400 cells) to measure concurrent throughput.
 #
-# 参考量级（wh = 6.4GB BigTIFF，EPSG:4326 源 + WebMercatorQuad 重投影）：
-#   release  冷瓦 26~45ms / 热瓦 3~7ms
-#   debug    冷瓦 135~1073ms      -> 测性能务必用 release 构建
+# Reference magnitudes (wh = 6.4 GB BigTIFF, EPSG:4326 source + WebMercatorQuad reprojection):
+#   release  cold 26~45 ms / hot 3~7 ms
+#   debug    cold 135~1073 ms  -> always benchmark a release build
 param(
   [string]$Base = 'http://127.0.0.1:8080',
   [string]$Layer = 'wh',
@@ -20,7 +20,7 @@ $ErrorActionPreference = 'Stop'
 $HALF = 20037508.3427892
 $R = 6378137.0
 
-# 取样窗口中心：102.65E, 25.23N（落在 wh 图层范围内）
+# Sample window centre: 102.65E, 25.23N (inside the wh layer extent)
 function Tile-List([int]$z, [int]$span, [int]$off) {
   $size = 2.0 * $HALF / [Math]::Pow(2, $z)
   $cx = 102.65 * $HALF / 180.0
@@ -59,7 +59,7 @@ if ($Purge) {
 Run-Serial $cold 'COLD serial'
 Run-Serial $cold 'HOT  serial'
 
-# 另取一扇从未请求过的窗口，测并发
+# Take another never-requested window to measure concurrency
 $fresh = Tile-List $Z $Span 400
 $sw = [Diagnostics.Stopwatch]::StartNew()
 $sum = $fresh | ForEach-Object -Parallel {

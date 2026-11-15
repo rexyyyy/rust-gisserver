@@ -1,5 +1,5 @@
-# 重编 map-api（release），产物落在仓库 target\release，供复制到 install 目录替换。
-# 环境设置与 build_mapapi.ps1 一致，但 CARGO_TARGET_DIR 用仓库默认（安装版 exe 来源口径）。
+# Rebuild map-api (release); output goes to target\release for copying into the install dir.
+# Same env setup as build_mapapi.ps1, but CARGO_TARGET_DIR stays at the repo default (source of installed exe).
 $msvc  = "C:\Program Files\Microsoft Visual Studio\2022\Community\VC\Tools\MSVC\14.44.35207"
 $sdk   = "C:\Program Files (x86)\Windows Kits\10"
 $sdkv  = "10.0.26100.0"

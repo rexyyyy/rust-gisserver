@@ -1,6 +1,6 @@
 $ErrorActionPreference = 'Continue'
-# 本地快速回归构建：在 PATH 已具备 MSVC 时只做 cargo build；否则注入登记的 VS/SDK 环境。
-# 目录与日志都按脚本自身位置解析，不绑定绝对路径 / 盘符。
+# Quick regression build: use MSVC on PATH if present, otherwise inject the registered VS/SDK env.
+# Paths and logs resolve from the script location; no absolute paths or drive letters.
 $vs  = "C:\Program Files\Microsoft Visual Studio\2022\Community\VC\Tools\MSVC\14.44.35207"
 $sdk = "C:\Program Files (x86)\Windows Kits\10"
 $sdkver = "10.0.26100.0"

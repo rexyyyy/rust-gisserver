@@ -1,6 +1,6 @@
 <template>
   <div class="dir-tree">
-    <div v-if="!dataRoot" class="text-xs text-gray-400 p-2">请先选择工作空间并配置数据根路径</div>
+    <div v-if="!dataRoot" class="text-xs text-gray-400 p-2">{{ $t('map.auto.text25') }}</div>
     <template v-else>
       <div class="dir-tree__root text-xs text-gray-400 px-1 pb-1" :title="dataRoot">{{ dataRoot }}</div>
       <el-tree
@@ -40,6 +40,8 @@
 </template>
 
 <script setup lang="ts">
+import { useI18n } from 'vue-i18n';
+const { t } = useI18n();
 // Folder / Document 由全局注册的 Element Plus Icons 提供
 import { listWorkspaceDirs } from '@/api/map/catalog';
 import { DirEntry } from '@/api/map/catalog/types';
@@ -117,16 +119,16 @@ const detectByEntries = (entries: DirEntry[]): DetectResult | null => {
 
   // ArcGIS 缓存：_alllayers 目录 + Conf.xml / conf.cdi
   if (dirs.includes('_alllayers') && (files.includes('conf.xml') || files.includes('conf.cdi'))) {
-    return { label: 'ArcGIS 缓存', storeType: 'arcgis_dir' };
+    return { label: t('map.auto.arcgisCache'), storeType: 'arcgis_dir' };
   }
 
   // 成片的 MVT 瓦片（z/x/y.pbf）
-  if (files.some((f) => f.endsWith('.pbf'))) return { label: 'MVT 瓦片', storeType: 'mvt_dir' };
+  if (files.some((f) => f.endsWith('.pbf'))) return { label: t('map.auto.mvt'), storeType: 'mvt_dir' };
 
   if (files.some((f) => f.endsWith('.mbtiles'))) return { label: 'MBTiles', storeType: 'mbtiles_dir' };
   if (files.some((f) => f.endsWith('.pmtiles'))) return { label: 'PMTiles', storeType: 'pmtiles_dir' };
   if (files.some((f) => f.endsWith('.shp'))) return { label: 'Shapefile', storeType: 'shapefile_dir' };
-  if (files.some((f) => /\.tiff?$/.test(f))) return { label: 'COG 影像', storeType: 'cog_dir' };
+  if (files.some((f) => /\.tiff?$/.test(f))) return { label: t('map.auto.cog'), storeType: 'cog_dir' };
   if (files.some((f) => /\.(geojson|json)$/.test(f))) return { label: 'GeoJSON', storeType: 'geojson_dir' };
 
   return null;
@@ -136,11 +138,11 @@ const detectByEntries = (entries: DirEntry[]): DetectResult | null => {
 const detectDeep = async (path: string, entries: DirEntry[]): Promise<DetectResult | null> => {
   const dirs = entries.filter((e) => e.is_dir);
   // ArcGIS：父目录下只有 Layers/图层 子目录时，深入一层看是否是缓存本体
-  const layersDir = dirs.find((e) => ['layers', '图层'].includes(lower(e.name)));
+  const layersDir = dirs.find((e) => ['layers', t('map.auto.layer2')].includes(lower(e.name)));
   if (layersDir) {
     const sub = await listDir(joinPath(path, layersDir.name));
     const hit = detectByEntries(sub);
-    if (hit?.label === 'ArcGIS 缓存') return hit;
+    if (hit?.label === t('map.auto.arcgisCache')) return hit;
   }
 
   // MVT：z（纯数字）→ x（纯数字）→ *.pbf
@@ -149,13 +151,13 @@ const detectDeep = async (path: string, entries: DirEntry[]): Promise<DetectResu
   const zPath = joinPath(path, zoomDirs[0].name);
   const zEntries = await listDir(zPath);
   if (zEntries.some((e) => !e.is_dir && lower(e.name).endsWith('.pbf'))) {
-    return { label: 'MVT 瓦片', storeType: 'mvt_dir' };
+    return { label: t('map.auto.mvt'), storeType: 'mvt_dir' };
   }
   const xDir = zEntries.find((e) => e.is_dir && /^\d+$/.test(e.name));
   if (!xDir) return null;
   const xEntries = await listDir(joinPath(zPath, xDir.name));
   if (xEntries.some((e) => !e.is_dir && lower(e.name).endsWith('.pbf'))) {
-    return { label: 'MVT 瓦片', storeType: 'mvt_dir' };
+    return { label: t('map.auto.mvt'), storeType: 'mvt_dir' };
   }
   return null;
 };

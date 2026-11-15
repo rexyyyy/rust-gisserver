@@ -1,51 +1,51 @@
-//! XML ↔ JSON 桥接：把 XML 配置文件读成 `serde_json::Value`，从而**零改动**复用
-//! 既有的 serde 结构体（`Layer` / `GridDef` / `ServerConfig` / `PgSourceDef` /
+//! XML ↔ JSON bridge: read XML config as `serde_json::Value`, so existing serde structs
+//! (`Layer` / `GridDef` / `ServerConfig` / `PgSourceDef` /
 //! `Style`）。
 //!
-//! # XML 约定
+//! # XML conventions
 //!
-//! 1. **属性 → 同名键**：`<source type="cog" path="a.tif"/>` →
-//!    `{"type":"cog","path":"a.tif"}`。`source` 用的是内部标签枚举
-//!    （`#[serde(tag = "type")]`），因此天然匹配。
-//! 2. **标量文本 → 自动类型推断**：数字 / `true` / `false` / `null` / 字符串。
-//! 3. **带 `id` 属性的子元素 → 以 id 为键的映射**：
+//! 1. **Attributes → same-name keys**: `<source type="cog" path="a.tif"/>` →
+//!    `{"type":"cog","path":"a.tif"}`. `source` uses an internal tag enum
+//!    (`#[serde(tag = "type")]`), so it matches naturally.
+//! 2. **Scalar text → auto type inference**: number / `true` / `false` / `null` / string.
+//! 3. **Child elements with `id` attr → map keyed by id**:
 //!    `<custom_grids><item id="CGCS2000Geo">…</item></custom_grids>` →
-//!    `{"CGCS2000Geo": {…}}`（`id` 本身被剔除）。
-//! 4. **子元素全是 `<item>` → 数组**：`<grids><item>A</item><item>B</item></grids>`
-//!    → `["A","B"]`。`<item>` 是数组的**专用标记**——XML 里「数组」与「单键对象」
-//!    形状相同（都是一个父元素带若干同标签子元素），只有靠这个约定才能无歧义
-//!    地还原。数组字段（`grids` / `properties` / `resolutions` / `palette`）与元组
-//!    字段（`origin` / `extent`）都走这条：
+//!    `{"CGCS2000Geo": {...}}` (`id` itself is stripped).
+//! 4. **All children are `<item>` → array**: `<grids><item>A</item><item>B</item></grids>`
+//!    → `["A","B"]`. `<item>` is the **dedicated marker** for arrays — in XML, 'array'
+//!    and 'single-key object' look the same (parent + same-tag children); this convention
+//!    lets us restore them unambiguously. Array fields (`grids` / `properties` / `resolutions`
+//!    / `palette`) and tuple fields (`origin` / `extent`) all use this path:
 //!    `<origin><item>-180</item><item>90</item></origin>` → `[-180, 90]`。
-//! 5. **其余情况 → 以标签为键的对象**；同名子元素出现多次时合并为数组。
+//! 5. **Otherwise → object keyed by tag name**; repeated same-tag children become array.
 //!
-//! 反向（[`to_xml`]）沿用同一套约定，保证写出的 XML 能被 [`parse_to_value`]
-//! 原样读回（见模块内的往返测试）。
+//! The reverse ([`to_xml`]) follows the same rules, so XML written out can be
+//! read back identically (see round-trip tests in this module).
 //!
-//! 解析器是手写的：配置 XML 由服务端自己生成、只含元素/属性/文本，无命名空间、
-//! 无 DTD；不引入额外依赖。
+//! The parser is hand-written: config XML is server-generated with only elements, attrs,
+//! and text — no namespaces, no DTD; no extra dependencies.
 
 use serde_json::{Map, Value};
 
-/// 一个 XML 元素。
+/// An XML element.
 #[derive(Debug, Default, Clone)]
 pub struct Element {
-    /// 元素名（标签）。
+    /// Element name (tag).
     pub name: String,
-    /// 属性列表，保持文档顺序。
+    /// Attribute list, preserving document order.
     pub attrs: Vec<(String, String)>,
-    /// 子元素。
+    /// Child elements.
     pub children: Vec<Element>,
-    /// 文本内容（已解实体）。
+    /// Text content (entities decoded).
     pub text: String,
 }
 
-/// 解析 XML 文本，返回**根元素**对应的 JSON 值。
+/// Parse XML text, return JSON value for the **root element**.
 ///
-/// 失败时返回中文错误信息（文件路径由调用方补上）。
+/// On failure returns a Chinese error message (caller supplies file path).
 pub fn parse_to_value(text: &str) -> Result<Value, String> {
-    // 配置文件读入即做环境变量展开：口令 / data_root 等以 `${VAR}` 或
-    // `${VAR:-默认}` 写占位，明文不入库、也不烘焙进镜像（P0-3 / P0-4）。
+    // Expand env vars when reading config: passwords / data_root etc. use `${VAR}` or
+    // `${VAR:-default}` placeholders — plaintext never stored in DB or baked into images (P0-3 / P0-4).
     let expanded = expand_env(text);
     let mut p = Parser::new(&expanded);
     p.skip_misc()?;
@@ -57,16 +57,16 @@ pub fn parse_to_value(text: &str) -> Result<Value, String> {
     Ok(element_to_value(&root))
 }
 
-/// 校验 XML 语法（不解析语义）。返回 Ok 表示语法正确。
+/// Validate XML syntax (no semantic parsing). Returns Ok if syntax is correct.
 pub fn validate(text: &str) -> Result<(), String> {
     parse_to_value(text).map(|_| ())
 }
 
-/// 环境变量展开：把 `${NAME}` / `${NAME:-默认值}` 替换为对应环境变量。
+/// Expand env vars: replace `${NAME}` / `${NAME:-default}` with the env var value.
 ///
-/// - `${NAME}`：变量存在则替换为其值，否则替换为空串。
-/// - `${NAME:-默认}`：变量未设置时使用「默认」。
-/// - 变量名只允许 `[A-Za-z0-9_]`；`${}` 内含其它字符（如普通文本）原样保留。
+/// - `${NAME}`: replace with value if set, else empty string.
+/// - `${NAME:-default}`: use 'default' if var is unset.
+/// - Var name only allows `[A-Za-z0-9_]`; `${}` with other chars is kept as-is.
 ///
 /// 用于配置文件读入路径：DB 口令、JWT 密钥、data_root 等以占位书写，
 /// 明文既不入库也不烘焙进镜像，改由部署环境注入（P0-3 / P0-4）。
@@ -91,7 +91,7 @@ pub fn expand_env(text: &str) -> String {
                         Err(_) => out.push_str(default.unwrap_or("")),
                     }
                 } else {
-                    // 非法占位：原样回填 `${...}`
+                    // Invalid placeholder: write back `${...}` as-is
                     out.push_str("${");
                     out.push_str(inner);
                     out.push('}');
@@ -99,7 +99,7 @@ pub fn expand_env(text: &str) -> String {
                 rest = &after[end + 1..];
             }
             None => {
-                // 未闭合：原样保留剩余（含 `${` 前缀）
+                // Unclosed: keep remainder as-is (including `${` prefix)
                 out.push_str("${");
                 out.push_str(after);
                 return out;
@@ -110,14 +110,14 @@ pub fn expand_env(text: &str) -> String {
     out
 }
 
-/// XML 转义（文本 / 属性值通用）。
+/// XML escape (shared by text and attribute values).
 pub fn escape(s: &str) -> String {
     escape_text(s)
 }
 
-/// 把 JSON 值写成 XML 文本（沿用 [`parse_to_value`] 的约定）。
+/// Write JSON value as XML text (follows the same conventions as [`parse_to_value`]).
 ///
-/// `root` 为根元素名。
+/// `root` is the root element name.
 pub fn to_xml(value: &Value, root: &str) -> String {
     let mut out = String::new();
     out.push_str("<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n");
@@ -138,7 +138,7 @@ pub fn to_xml(value: &Value, root: &str) -> String {
     out
 }
 
-// ---------------------------------------------------------------- 解析器
+// ---------------------------------------------------------------- Parser
 
 struct Parser<'a> {
     s: &'a str,
@@ -173,7 +173,7 @@ impl<'a> Parser<'a> {
         self.s[from..].find(pat).map(|p| p + from)
     }
 
-    /// 跳过 XML 声明、注释、DOCTYPE、处理指令。
+    /// Skip XML declarations, comments, DOCTYPE, processing instructions.
     fn skip_misc(&mut self) -> Result<(), String> {
         loop {
             self.skip_ws();
@@ -205,7 +205,7 @@ impl<'a> Parser<'a> {
         }
     }
 
-    /// 解析一个元素（调用时 `self.i` 指向 `<`）。
+    /// Parse one element (`self.i` points to `<` on entry).
     fn parse_element(&mut self) -> Result<Element, String> {
         self.skip_ws();
         if self.i >= self.b.len() || self.b[self.i] != b'<' {
@@ -277,7 +277,7 @@ impl<'a> Parser<'a> {
             return Ok(el);
         }
 
-        // 元素内容
+        // Element content
         loop {
             if self.i >= self.b.len() {
                 return self.err(format!("元素 <{}> 未闭合", el.name));
@@ -350,7 +350,7 @@ fn is_name_char(c: u8) -> bool {
     c.is_ascii_alphanumeric() || matches!(c, b'_' | b'-' | b'.' | b':')
 }
 
-/// 解码 XML 实体（`&amp;` `&lt;` `&gt;` `&quot;` `&apos;` `&#NN;` `&#xNN;`）。
+/// Decode XML entities (`&amp;` `&lt;` `&gt;` `&quot;` `&apos;` `&#NN;` `&#xNN;`).
 fn decode_entities(s: &str) -> String {
     if !s.contains('&') {
         return s.to_string();
@@ -394,7 +394,7 @@ fn decode_entities(s: &str) -> String {
     out
 }
 
-// ---------------------------------------------------------------- 元素 → JSON
+// ---------------------------------------------------------------- Element → JSON
 
 fn element_to_value(el: &Element) -> Value {
     let mut obj = Map::new();
@@ -413,7 +413,7 @@ fn element_to_value(el: &Element) -> Value {
         return Value::Object(obj);
     }
 
-    // 规则 A：子元素都带 `id` 属性 → 以 id 为键的映射。
+    // Rule A: all children have `id` attr → map keyed by id.
     if el
         .children
         .iter()
@@ -427,7 +427,7 @@ fn element_to_value(el: &Element) -> Value {
                 .find(|(k, _)| k == "id")
                 .map(|(_, v)| v.clone())
                 .unwrap_or_default();
-            // `<item id="X">文本</item>` → 映射值就是文本本身；否则取元素对象（去掉 id）。
+            // `<item id="X">text</item>` → value is the text itself; else the element object (id stripped).
             let v = if c.children.is_empty() && c.attrs.len() == 1 {
                 coerce(c.text.trim())
             } else {
@@ -445,17 +445,17 @@ fn element_to_value(el: &Element) -> Value {
         return Value::Object(m);
     }
 
-    // 规则 B：子元素全是 `<item>` → 数组（通用列表标记）。
+    // Rule B: all children are `<item>` → array (generic list marker).
     //
-    // `<item>` 是数组的专用标记，用来区分「数组」与「单键对象」——两者在 XML 里
-    // 形状相同（都是一个父元素带若干同标签子元素），只有靠这个约定才能无歧义
-    // 地还原。例如 `<palette><item>…</item>×9</palette>` 是数组，而
-    // `<server><disk_cache/></server>` 是对象。
+    // `<item>` is the dedicated array marker, to distinguish 'array' from 'single-key object' —
+    // both look the same in XML (parent + same-tag children); only this convention lets us
+    // restore them unambiguously. E.g. `<palette><item>...</item>x9</palette>` is an array, while
+    // `<server><disk_cache/></server>` is an object.
     if el.children.iter().all(|c| c.name == "item") {
         return Value::Array(el.children.iter().map(element_to_value).collect());
     }
 
-    // 规则 C：以标签为键的对象；同名子元素多次出现合并为数组。
+    // Rule C: object keyed by tag name; repeated same-tag children merge into an array.
     let mut tags: Vec<&str> = Vec::new();
     for c in &el.children {
         if !tags.contains(&c.name.as_str()) {
@@ -474,7 +474,7 @@ fn element_to_value(el: &Element) -> Value {
     Value::Object(obj)
 }
 
-/// 标量文本 → JSON 值（数字 / 布尔 / null / 字符串）。
+/// Scalar text → JSON value (number / bool / null / string).
 fn coerce(s: &str) -> Value {
     let t = s.trim();
     if t.is_empty() {
@@ -521,9 +521,9 @@ fn write_value(out: &mut String, name: &str, value: &Value, level: usize) {
     }
 }
 
-/// 写一个对象元素：标量成员 → 属性；对象/数组成员 → 子元素。
+/// Write an object element: scalar members → attrs; object/array members → children.
 ///
-/// `extra_attrs` 额外附加的属性（如映射条目的 `id`）。
+/// `extra_attrs`: additional attrs (e.g. the `id` of a map entry).
 fn write_object(
     out: &mut String,
     name: &str,
@@ -564,11 +564,11 @@ fn write_object(
     out.push_str(&format!("</{name}>\n"));
 }
 
-/// 写一个对象成员（区分“映射”与“普通对象”两种形态）。
+/// Write an object member (distinguishes 'map' vs 'plain object' shapes).
 fn write_member(out: &mut String, name: &str, value: &Value, level: usize) {
     match value {
         Value::Object(map) => {
-            // 映射形态：值全是对象 → `<name><item id="key">…</item></name>`。
+            // Map shape: all values are objects → `<name><item id="key">...</item></name>`.
             if !map.is_empty()
                 && map
                     .values()
@@ -638,14 +638,14 @@ mod tests {
 
     #[test]
     fn 环境变量展开默认值与字面量() {
-        // 未设置的变量：${NAME} → 空，${NAME:-默认} → 默认
+        // Unset var: ${NAME} → empty, ${NAME:-default} → default
         assert_eq!(expand_env("a=${R_MGR_NO_SUCH_VAR_XYZ}b"), "a=b");
         assert_eq!(expand_env("h=${R_MGR_NO_SUCH_VAR_XYZ:-localhost}"), "h=localhost");
-        // 非法占位（名字含空格）原样保留
+        // Invalid placeholder (name with space) kept as-is
         assert_eq!(expand_env("keep $ {a} lit"), "keep $ {a} lit");
-        // 未闭合原样保留
+        // Unclosed: keep as-is
         assert_eq!(expand_env("tail ${OPEN"), "tail ${OPEN");
-        // parse_to_value 入口即展开：未设置的口令 → 空串
+        // parse_to_value expands on entry: unset password → empty string
         let v = parse_to_value(r#"<admin dsn="pg://${R_MGR_NO_SUCH_VAR_XYZ}@h/db"/>"#).unwrap();
         assert_eq!(v["dsn"], "pg://@h/db");
     }
@@ -712,17 +712,17 @@ mod tests {
         )
         .unwrap();
         assert_eq!(v["b"], "x & y");
-        // 元素同时有属性与文本时，文本放在 `value` 键下。
+        // When an element has both attrs and text, text goes under the `value` key.
         assert_eq!(v["value"], "t < u");
-        // 纯文本元素直接是标量。
+        // Plain text elements are scalars directly.
         let s = parse_to_value("<a>t &lt; u</a>").unwrap();
         assert_eq!(s.as_str().unwrap(), "t < u");
     }
 
     #[test]
     fn 数组的数组还原为二维数组() {
-        // 回归：`palette` 这类「数组的数组」必须还原成二维数组，
-        // 而不是 `{"item": [...]}`。
+        // Regression: 'array of arrays' like `palette` must restore as 2D array,
+        // not `{"item": [...]}`.
         let v = parse_to_value(
             r#"<palette><item><item>8</item><item>29</item><item>88</item></item><item><item>37</item><item>52</item><item>148</item></item></palette>"#,
         )
@@ -732,7 +732,7 @@ mod tests {
 
     #[test]
     fn 单个子元素的对象保持对象形态() {
-        // 回归：只有一个子元素且该子元素是对象时，不能退化成数组。
+        // Regression: single child that is an object must not degrade into an array.
         let v = parse_to_value(r#"<server host="0.0.0.0"><disk_cache dir="cache/foyer"/></server>"#)
             .unwrap();
         assert_eq!(v["host"], "0.0.0.0");
@@ -741,8 +741,8 @@ mod tests {
 
     #[test]
     fn 带属性的元素不会退化成数组() {
-        // 回归：元素自带属性时，其标量子元素必须以「键 → 值」保留，不能变成数组
-        // （否则 id/crs 这类属性会被悄悄丢掉）。
+        // Regression: when an element has its own attrs, scalar children must stay as 'key → value',
+        // not become arrays (else attrs like id/crs get silently dropped).
         let v = parse_to_value(r#"<item id="X" crs="EPSG:4490"><tile_px>256</tile_px></item>"#)
             .unwrap();
         assert_eq!(v["id"], "X");
@@ -783,7 +783,7 @@ mod tests {
 
     #[test]
     fn 空值与省略() {
-        // null 成员不写入 XML，读回时该键缺失（serde default 兜底）
+        // null members are not written to XML; on read-back the key is absent (serde default fills).
         let src = serde_json::json!({"a": 1, "b": null});
         let xml = to_xml(&src, "x");
         assert!(!xml.contains("b="));

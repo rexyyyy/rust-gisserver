@@ -49,6 +49,31 @@ psql -h localhost -p 5434 -U postgres -d mapserver-manager -f manager/backend/sq
 `system.sql` 覆盖系统管理与监控板块（建表 + 用户/角色/字典/参数/公告种子）；
 `map.sql` 覆盖地图服务与数据服务板块（引擎注册表、组织层四表、两个顶级目录的菜单）。
 
+### 英文初始数据（安装时二选一）
+
+`system.en_US.sql` / `map.en_US.sql` 由 `manager/tools/gen_i18n_sql.py` 依据
+`manager/tools/i18n_terms.json` 生成，只替换种子数据里的中文文本（菜单名、字典项、公告、
+组织名、`COMMENT ON` 对象说明），DDL、列顺序、行数与中文版完全一致。
+
+**必须与中文版二选一执行**，不允许在同一库先后跑两套：种子写入用 `on conflict do nothing`，
+后跑的一套会静默失效，菜单/字典仍停留在先安装的语言。
+
+```bash
+# 英文版（替代上面两条中文命令，不要两套都跑）
+psql -h localhost -p 5434 -U postgres -d mapserver-manager -f manager/backend/sql/system.en_US.sql
+psql -h localhost -p 5434 -U postgres -d mapserver-manager -f manager/backend/sql/map.en_US.sql
+```
+
+新增中文种子词条后需同步补 `i18n_terms.json` 并重新生成，禁止手工编辑生成物：
+
+```bash
+python manager/tools/gen_i18n_sql.py          # 重新生成
+python manager/tools/gen_i18n_sql.py --check  # 校验生成物是否最新（CI 用）
+```
+
+后端用户可见提示由请求头 `X-Language: zh_CN|en_US` 决定（缺省回落 `Accept-Language`，
+再缺省 `zh_CN`），前端 axios 拦截器统一注入；详见 `docs/i18n-and-comment-style.md`。
+
 ### 顶级菜单 ID 与顺序
 
 地图板块重排为「数据服务在前、地图服务在后」，顶级 ID 也随之收敛：

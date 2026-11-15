@@ -1,13 +1,18 @@
 import request from '@/utils/request';
 import {
   AccessLogResp,
+  BrowseResp,
   CachePurgeResp,
   CacheStatsResp,
   CheckResp,
+  ComponentsResp,
+  CreateServiceResp,
   MapServiceListResp,
   MapServiceVO,
   MapSvcHealth,
+  PgTestResp,
   ReloadReport,
+  RuntimeResp,
   ServiceConfigResp,
   ServiceConfigUpdateResp,
   StyleListResp,

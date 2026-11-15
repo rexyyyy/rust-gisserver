@@ -4,31 +4,31 @@
       <div v-show="showSearch" class="mb-[10px]">
         <el-card shadow="hover">
           <el-form ref="queryFormRef" :model="queryParams" :inline="true">
-            <el-form-item label="登录地址" prop="ipaddr">
-              <el-input v-model="queryParams.ipaddr" placeholder="请输入登录地址" clearable @keyup.enter="handleQuery" />
+            <el-form-item :label="$t('monitor.auto.loginIP')" prop="ipaddr">
+              <el-input v-model="queryParams.ipaddr" :placeholder="$t('monitor.auto.pleaseEnterLoginIP')" clearable @keyup.enter="handleQuery" />
             </el-form-item>
-            <el-form-item label="用户名称" prop="userName">
-              <el-input v-model="queryParams.userName" placeholder="请输入用户名称" clearable @keyup.enter="handleQuery" />
+            <el-form-item :label="$t('monitor.auto.userName')" prop="userName">
+              <el-input v-model="queryParams.userName" :placeholder="$t('monitor.auto.pleaseEnterUserName')" clearable @keyup.enter="handleQuery" />
             </el-form-item>
-            <el-form-item label="状态" prop="status">
-              <el-select v-model="queryParams.status" placeholder="登录状态" clearable>
+            <el-form-item :label="$t('monitor.auto.status')" prop="status">
+              <el-select v-model="queryParams.status" :placeholder="$t('monitor.auto.loginStatus')" clearable>
                 <el-option v-for="dict in sys_common_status" :key="dict.value" :label="dict.label" :value="dict.value" />
               </el-select>
             </el-form-item>
-            <el-form-item label="登录时间" style="width: 308px">
+            <el-form-item :label="$t('monitor.auto.loginTime')" style="width: 308px">
               <el-date-picker
                 v-model="dateRange"
                 value-format="YYYY-MM-DD HH:mm:ss"
                 type="daterange"
                 range-separator="-"
-                start-placeholder="开始日期"
-                end-placeholder="结束日期"
+                :start-placeholder="$t('monitor.auto.startDate')"
+                :end-placeholder="$t('monitor.auto.endDate')"
                 :default-time="[new Date(2000, 1, 1, 0, 0, 0), new Date(2000, 1, 1, 23, 59, 59)]"
               ></el-date-picker>
             </el-form-item>
             <el-form-item>
-              <el-button type="primary" icon="Search" @click="handleQuery">搜索</el-button>
-              <el-button icon="Refresh" @click="resetQuery">重置</el-button>
+              <el-button type="primary" icon="Search" @click="handleQuery">{{ $t('monitor.auto.search') }}</el-button>
+              <el-button icon="Refresh" @click="resetQuery">{{ $t('monitor.auto.reset') }}</el-button>
             </el-form-item>
           </el-form>
         </el-card>
@@ -40,19 +40,19 @@
         <el-row :gutter="10" class="mb8">
           <el-col :span="1.5">
             <el-button v-hasPermi="['monitor:logininfor:remove']" type="danger" plain icon="Delete" :disabled="multiple" @click="handleDelete()">
-              删除
+              {{ $t('monitor.auto.delete') }}
             </el-button>
           </el-col>
           <el-col :span="1.5">
-            <el-button v-hasPermi="['monitor:logininfor:remove']" type="danger" plain icon="Delete" @click="handleClean">清空</el-button>
+            <el-button v-hasPermi="['monitor:logininfor:remove']" type="danger" plain icon="Delete" @click="handleClean">{{ $t('monitor.auto.clear') }}</el-button>
           </el-col>
           <el-col :span="1.5">
             <el-button v-hasPermi="['monitor:logininfor:unlock']" type="primary" plain icon="Unlock" :disabled="single" @click="handleUnlock">
-              解锁
+              {{ $t('monitor.auto.text4') }}
             </el-button>
           </el-col>
           <el-col :span="1.5">
-            <el-button v-hasPermi="['monitor:logininfor:export']" type="warning" plain icon="Download" @click="handleExport">导出</el-button>
+            <el-button v-hasPermi="['monitor:logininfor:export']" type="warning" plain icon="Download" @click="handleExport">{{ $t('monitor.auto.export') }}</el-button>
           </el-col>
           <right-toolbar v-model:show-search="showSearch" @query-table="getList"></right-toolbar>
         </el-row>
@@ -68,32 +68,32 @@
         @sort-change="handleSortChange"
       >
         <el-table-column type="selection" width="55" align="center" />
-        <el-table-column label="访问编号" align="center" prop="infoId" />
+        <el-table-column :label="$t('monitor.auto.visitID')" align="center" prop="infoId" />
         <el-table-column
-          label="用户名称"
+          :label="$t('monitor.auto.userName')"
           align="center"
           prop="userName"
           :show-overflow-tooltip="true"
           sortable="custom"
           :sort-orders="['descending', 'ascending']"
         />
-        <el-table-column label="客户端" align="center" prop="clientKey" :show-overflow-tooltip="true" />
-        <el-table-column label="设备类型" align="center">
+        <el-table-column :label="$t('monitor.auto.client')" align="center" prop="clientKey" :show-overflow-tooltip="true" />
+        <el-table-column :label="$t('monitor.auto.deviceType')" align="center">
           <template #default="scope">
             <dict-tag :options="sys_device_type" :value="scope.row.deviceType" />
           </template>
         </el-table-column>
-        <el-table-column label="地址" align="center" prop="ipaddr" :show-overflow-tooltip="true" />
-        <el-table-column label="登录地点" align="center" prop="loginLocation" :show-overflow-tooltip="true" />
-        <el-table-column label="操作系统" align="center" prop="os" :show-overflow-tooltip="true" />
-        <el-table-column label="浏览器" align="center" prop="browser" :show-overflow-tooltip="true" />
-        <el-table-column label="登录状态" align="center" prop="status">
+        <el-table-column :label="$t('monitor.auto.address')" align="center" prop="ipaddr" :show-overflow-tooltip="true" />
+        <el-table-column :label="$t('monitor.auto.loginLocation')" align="center" prop="loginLocation" :show-overflow-tooltip="true" />
+        <el-table-column :label="$t('monitor.auto.os')" align="center" prop="os" :show-overflow-tooltip="true" />
+        <el-table-column :label="$t('monitor.auto.browser')" align="center" prop="browser" :show-overflow-tooltip="true" />
+        <el-table-column :label="$t('monitor.auto.loginStatus')" align="center" prop="status">
           <template #default="scope">
             <dict-tag :options="sys_common_status" :value="scope.row.status" />
           </template>
         </el-table-column>
-        <el-table-column label="描述" align="center" prop="msg" :show-overflow-tooltip="true" />
-        <el-table-column label="访问时间" align="center" prop="loginTime" sortable="custom" :sort-orders="['descending', 'ascending']" width="180">
+        <el-table-column :label="$t('monitor.auto.description')" align="center" prop="msg" :show-overflow-tooltip="true" />
+        <el-table-column :label="$t('monitor.auto.visitTime')" align="center" prop="loginTime" sortable="custom" :sort-orders="['descending', 'ascending']" width="180">
           <template #default="scope">
             <span>{{ proxy.parseTime(scope.row.loginTime) }}</span>
           </template>
@@ -106,6 +106,8 @@
 </template>
 
 <script setup name="Logininfor" lang="ts">
+import { useI18n } from 'vue-i18n';
+const { t } = useI18n();
 import { list, delLoginInfo, cleanLoginInfo, unlockLoginInfo } from '@/api/monitor/loginInfo';
 import { LoginInfoQuery, LoginInfoVO } from '@/api/monitor/loginInfo/types';
 
@@ -121,7 +123,7 @@ const single = ref(true);
 const multiple = ref(true);
 const selectName = ref<Array<string>>([]);
 const total = ref(0);
-const dateRange = ref<[DateModelType, DateModelType]>(['', '']);
+const dateRange = ref<any>(['', '']);
 const defaultSort = ref<any>({ prop: 'loginTime', order: 'descending' });
 
 const queryFormRef = ref<ElFormInstance>();
@@ -173,24 +175,24 @@ const handleSortChange = (column: any) => {
 /** 删除按钮操作 */
 const handleDelete = async (row?: LoginInfoVO) => {
   const infoIds = row?.infoId || ids.value;
-  await proxy?.$modal.confirm('是否确认删除访问编号为"' + infoIds + '"的数据项?');
+  await proxy?.$modal.confirm(t('monitor.auto.areYouSureToDeleteVisitID') + infoIds + t('monitor.auto.text'));
   await delLoginInfo(infoIds);
   await getList();
-  proxy?.$modal.msgSuccess('删除成功');
+  proxy?.$modal.msgSuccess(t('monitor.auto.deletedSuccessfully'));
 };
 /** 清空按钮操作 */
 const handleClean = async () => {
-  await proxy?.$modal.confirm('是否确认清空所有登录日志数据项?');
+  await proxy?.$modal.confirm(t('monitor.auto.areYouSureToClearAllLoginLogs'));
   await cleanLoginInfo();
   await getList();
-  proxy?.$modal.msgSuccess('清空成功');
+  proxy?.$modal.msgSuccess(t('monitor.auto.clearedSuccessfully'));
 };
 /** 解锁按钮操作 */
 const handleUnlock = async () => {
   const username = selectName.value;
-  await proxy?.$modal.confirm('是否确认解锁用户"' + username + '"数据项?');
+  await proxy?.$modal.confirm(t('monitor.auto.areYouSureToUnlockUser') + username + t('monitor.auto.text2'));
   await unlockLoginInfo(username);
-  proxy?.$modal.msgSuccess('用户' + username + '解锁成功');
+  proxy?.$modal.msgSuccess(t('monitor.auto.user') + username + t('monitor.auto.unlockedSuccessfully'));
 };
 /** 导出按钮操作 */
 const handleExport = () => {

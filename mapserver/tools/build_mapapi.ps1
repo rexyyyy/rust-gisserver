@@ -1,5 +1,5 @@
-# 重编 rust-gisserver 的 map-api（debug）。手动设齐 MSVC + Windows SDK 环境后直调 cargo。
-# 用法：powershell -ExecutionPolicy Bypass -File build_mapapi.ps1
+# Rebuild rust-gisserver map-api (debug); set MSVC + Windows SDK env first, then call cargo.
+# Usage: powershell -ExecutionPolicy Bypass -File build_mapapi.ps1
 $msvc  = "C:\Program Files\Microsoft Visual Studio\2022\Community\VC\Tools\MSVC\14.44.35207"
 $sdk   = "C:\Program Files (x86)\Windows Kits\10"
 $sdkv  = "10.0.26100.0"

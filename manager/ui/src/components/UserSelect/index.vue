@@ -5,7 +5,7 @@
         <!-- 部门树 -->
         <el-col :lg="4" :xs="24" style="">
           <el-card shadow="hover">
-            <el-input v-model="deptName" placeholder="请输入部门名称" prefix-icon="Search" clearable />
+            <el-input v-model="deptName" :placeholder="$t('misc.auto.pleaseEnterDepartmentName')" prefix-icon="Search" clearable />
             <el-tree
               ref="deptTreeRef"
               class="mt-2"
@@ -25,15 +25,15 @@
             <div v-show="showSearch" class="mb-[10px]">
               <el-card shadow="hover">
                 <el-form ref="queryFormRef" :model="queryParams" :inline="true">
-                  <el-form-item label="用户名称" prop="userName">
-                    <el-input v-model="queryParams.userName" placeholder="请输入用户名称" clearable @keyup.enter="handleQuery" />
+                  <el-form-item :label="$t('misc.auto.userName')" prop="userName">
+                    <el-input v-model="queryParams.userName" :placeholder="$t('misc.auto.pleaseEnterUserName')" clearable @keyup.enter="handleQuery" />
                   </el-form-item>
-                  <el-form-item label="手机号码" prop="phonenumber">
-                    <el-input v-model="queryParams.phonenumber" placeholder="请输入手机号码" clearable @keyup.enter="handleQuery" />
+                  <el-form-item :label="$t('misc.auto.phoneNumber')" prop="phonenumber">
+                    <el-input v-model="queryParams.phonenumber" :placeholder="$t('misc.auto.pleaseEnterPhoneNumber')" clearable @keyup.enter="handleQuery" />
                   </el-form-item>
                   <el-form-item>
-                    <el-button type="primary" icon="Search" @click="handleQuery">搜索</el-button>
-                    <el-button icon="Refresh" @click="() => resetQuery()">重置</el-button>
+                    <el-button type="primary" icon="Search" @click="handleQuery">{{ $t('misc.auto.search') }}</el-button>
+                    <el-button icon="Refresh" @click="() => resetQuery()">{{ $t('misc.auto.reset') }}</el-button>
                   </el-form-item>
                 </el-form>
               </el-card>
@@ -60,18 +60,18 @@
               @checkbox-change="handleCheckboxChange"
             >
               <vxe-column type="checkbox" width="50" align="center" />
-              <vxe-column key="userId" title="用户编号" align="center" field="userId" />
-              <vxe-column key="userName" title="用户名称" align="center" field="userName" />
-              <vxe-column key="nickName" title="用户昵称" align="center" field="nickName" />
-              <vxe-column key="deptName" title="部门" align="center" field="deptName" />
-              <vxe-column key="phonenumber" title="手机号码" align="center" field="phonenumber" width="120" />
-              <vxe-column key="status" title="状态" align="center">
+              <vxe-column key="userId" :title="$t('misc.auto.userID')" align="center" field="userId" />
+              <vxe-column key="userName" :title="$t('misc.auto.userName')" align="center" field="userName" />
+              <vxe-column key="nickName" :title="$t('misc.auto.nickname')" align="center" field="nickName" />
+              <vxe-column key="deptName" :title="$t('misc.auto.department')" align="center" field="deptName" />
+              <vxe-column key="phonenumber" :title="$t('misc.auto.phoneNumber')" align="center" field="phonenumber" width="120" />
+              <vxe-column key="status" :title="$t('misc.auto.status')" align="center">
                 <template #default="scope">
                   <dict-tag :options="sys_normal_disable" :value="scope.row.status"></dict-tag>
                 </template>
               </vxe-column>
 
-              <vxe-column title="创建时间" align="center" width="160">
+              <vxe-column :title="$t('misc.auto.createdAt')" align="center" width="160">
                 <template #default="scope">
                   <span>{{ scope.row.createTime }}</span>
                 </template>
@@ -90,14 +90,16 @@
       </el-row>
 
       <template #footer>
-        <el-button @click="close">取消</el-button>
-        <el-button type="primary" @click="confirm">确定</el-button>
+        <el-button @click="close">{{ $t('misc.auto.cancel') }}</el-button>
+        <el-button type="primary" @click="confirm">{{ $t('misc.auto.ok') }}</el-button>
       </template>
     </el-dialog>
   </div>
 </template>
 
 <script setup lang="ts">
+import { useI18n } from 'vue-i18n';
+const { t } = useI18n();
 import api from '@/api/system/user';
 import { UserQuery, UserVO } from '@/api/system/user/types';
 import { DeptTreeVO, DeptVO } from '@/api/system/dept/types';
@@ -135,7 +137,7 @@ const queryFormRef = ref<ElFormInstance>();
 const tableRef = ref<VxeTableInstance<UserVO>>();
 
 const userDialog = useDialog({
-  title: '用户选择'
+  title: t('misc.auto.selectUser')
 });
 
 const queryParams = ref<UserQuery>({

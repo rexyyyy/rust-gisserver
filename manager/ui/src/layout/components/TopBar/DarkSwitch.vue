@@ -1,5 +1,5 @@
 <template>
-  <el-tooltip :content="isDark ? '切换为亮色主题' : '切换为暗色主题'" effect="dark" placement="bottom">
+  <el-tooltip :content="isDark ? $t('misc.auto.text11') : $t('misc.auto.text12')" effect="dark" placement="bottom">
     <div class="dark-switch" @click="toggleTheme">
       <el-icon :size="18">
         <Sunny v-if="isDark" />

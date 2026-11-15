@@ -1,9 +1,9 @@
-# 用新编译的 release map-api.exe 替换安装目录产物并重启 8080 服务
+# Replace the installed map-api.exe with a fresh release build and restart the 8080 service
 $install = "D:\mycomputor\documents\gis-wt\thirdparty\rust-gisserver-install"
 $src     = "D:\mycomputor\documents\gis-wt\thirdparty\rust-gisserver\target\release\map-api.exe"
 $dst     = "$install\map-api\map-api.exe"
 
-# 1) 停掉占用 8080 的旧进程
+# 1) Stop the old process holding port 8080
 $conn = Get-NetTCPConnection -LocalPort 8080 -State Listen -ErrorAction SilentlyContinue | Select-Object -First 1
 if ($conn) {
   Stop-Process -Id $conn.OwningProcess -Force
@@ -11,11 +11,11 @@ if ($conn) {
   Write-Host "killed old pid=$($conn.OwningProcess)"
 }
 
-# 2) 替换 exe
+# 2) Replace the exe
 Copy-Item $src $dst -Force
 Write-Host "installed: $dst  $((Get-Item $dst).LastWriteTime)"
 
-# 3) 按安装目录 start_mapapi.bat 同口径后台拉起（该 bat 末尾有 pause，不适合直接调）
+# 3) Start it the same way as the install dir's start_mapapi.bat (that bat ends with pause, so do not call it)
 Push-Location $install
 if (Test-Path "$install\.env") {
   Get-Content "$install\.env" | ForEach-Object {
@@ -34,7 +34,7 @@ $p = Start-Process -FilePath "$install\map-api\map-api.exe" `
 Pop-Location
 Write-Host "started pid=$($p.Id)"
 
-# 4) 轮询 8080 就绪
+# 4) Poll port 8080 until ready
 $ok = $false
 foreach ($i in 1..30) {
   Start-Sleep -Seconds 1

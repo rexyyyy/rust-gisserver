@@ -3,11 +3,11 @@
     <el-row :gutter="16">
       <!-- ① 服务统计：类型 × 状态 -->
       <el-col :span="8">
-        <el-card shadow="never" header="服务统计（类型 × 状态）">
+        <el-card shadow="never" :header="$t('map.auto.typeStatus')">
           <el-table :data="kindRows" size="small" border height="260">
-            <el-table-column prop="kind" label="类型" width="110" />
-            <el-table-column prop="count" label="数量" width="80" align="center" />
-            <el-table-column label="状态分布" min-width="160">
+            <el-table-column prop="kind" :label="$t('map.auto.type')" width="110" />
+            <el-table-column prop="count" :label="$t('map.auto.text101')" width="80" align="center" />
+            <el-table-column :label="$t('map.auto.statusminute')" min-width="160">
               <template #default="scope">
                 <el-tag
                   v-for="(n, s) in scope.row.states"
@@ -20,60 +20,60 @@
             </el-table-column>
           </el-table>
           <div class="mt-2 text-sm">
-            合计 <b>{{ totalServices }}</b> 个服务 ·
-            在服 <b>{{ activeCount }}</b> ·
-            回收站 <b>{{ deletedCount }}</b>
+            {{ $t('map.auto.text193') }}<b>{{ totalServices }}</b> {{ $t('map.auto.text194') }}·
+            {{ $t('map.auto.inService2') }}<b>{{ activeCount }}</b> ·
+            {{ $t('map.auto.text195') }}<b>{{ deletedCount }}</b>
           </div>
         </el-card>
       </el-col>
 
       <!-- ② 组件探测 -->
       <el-col :span="8">
-        <el-card shadow="never" header="组件探测（map-api 运行环境）">
+        <el-card shadow="never" :header="$t('map.auto.mapApiRows')">
           <el-descriptions :column="1" border size="small">
-            <el-descriptions-item label="map-api 存活">
+            <el-descriptions-item :label="$t('map.auto.mapApi')">
               <el-tag :type="comp.map_api_up ? 'success' : 'danger'">
-                {{ comp.map_api_up ? '在线' : '离线' }}
+                {{ comp.map_api_up ? $t('map.auto.text102') : $t('map.auto.text103') }}
               </el-tag>
             </el-descriptions-item>
             <el-descriptions-item label="PostGIS">
               <el-tag :type="comp.pg_enabled ? 'success' : 'info'">
-                {{ comp.pg_enabled ? '已启用' : '未启用' }}
+                {{ comp.pg_enabled ? $t('map.auto.enable2') : $t('map.auto.enable3') }}
               </el-tag>
             </el-descriptions-item>
-            <el-descriptions-item label="PROJ 重投影">
+            <el-descriptions-item :label="$t('map.auto.proj')">
               <el-tag :type="comp.proj_loaded ? 'success' : 'info'">
-                {{ comp.proj_loaded ? '已加载' : '未加载' }}
+                {{ comp.proj_loaded ? $t('map.auto.text104') : $t('map.auto.text105') }}
               </el-tag>
               <el-tooltip :content="comp.proj_loaded ? CRS_SUPPORT_HINT : PROJ_MISSING_HINT" placement="bottom">
                 <el-icon style="margin-left: 6px; vertical-align: middle"><question-filled /></el-icon>
               </el-tooltip>
             </el-descriptions-item>
-            <el-descriptions-item label="在服图层">{{ comp.served_layers }}</el-descriptions-item>
-            <el-descriptions-item label="3D Tiles 服务">{{ comp.tilesets }}</el-descriptions-item>
-            <el-descriptions-item label="缓存上限(MiB)">{{ comp.cache_mib }}</el-descriptions-item>
-            <el-descriptions-item label="缓存 TTL(秒)">{{ comp.cache_ttl_secs }}</el-descriptions-item>
+            <el-descriptions-item :label="$t('map.auto.inServiceLayer')">{{ comp.served_layers }}</el-descriptions-item>
+            <el-descriptions-item :label="$t('map.auto.n3dTiles')">{{ comp.tilesets }}</el-descriptions-item>
+            <el-descriptions-item :label="$t('map.auto.cacheMiB')">{{ comp.cache_mib }}</el-descriptions-item>
+            <el-descriptions-item :label="$t('map.auto.cacheTTLSecond')">{{ comp.cache_ttl_secs }}</el-descriptions-item>
           </el-descriptions>
         </el-card>
       </el-col>
 
       <!-- ③ 访问计数 -->
       <el-col :span="8">
-        <el-card shadow="never" header="访问计数">
+        <el-card shadow="never" :header="$t('map.auto.text106')">
           <div class="flex items-center justify-between mb-2">
-            <span class="text-sm">统计周期</span>
+            <span class="text-sm">{{ $t('map.auto.text107') }}</span>
             <el-select v-model="period" size="small" style="width: 140px" @change="loadUsage">
-              <el-option label="近 24 小时（天）" value="day" />
-              <el-option label="近 7 天（周）" value="week" />
-              <el-option label="近 30 天（月）" value="month" />
-              <el-option label="近 365 天（年）" value="year" />
+              <el-option :label="$t('map.auto.n24Hour')" value="day" />
+              <el-option :label="$t('map.auto.n7')" value="week" />
+              <el-option :label="$t('map.auto.n30Month')" value="month" />
+              <el-option :label="$t('map.auto.n365Year')" value="year" />
             </el-select>
           </div>
-          <div class="text-3xl font-bold mb-2">{{ totalHits }} <span class="text-sm font-normal">次请求</span></div>
+          <div class="text-3xl font-bold mb-2">{{ totalHits }} <span class="text-sm font-normal">{{ $t('map.auto.text108') }}</span></div>
           <el-table :data="topRows" size="small" border height="200">
-            <el-table-column prop="name" label="服务" min-width="120" show-overflow-tooltip />
-            <el-table-column prop="kind" label="类型" width="100" />
-            <el-table-column prop="hits" label="命中" width="90" align="center" sortable />
+            <el-table-column prop="name" :label="$t('map.auto.text109')" min-width="120" show-overflow-tooltip />
+            <el-table-column prop="kind" :label="$t('map.auto.type')" width="100" />
+            <el-table-column prop="hits" :label="$t('map.auto.text110')" width="90" align="center" sortable />
           </el-table>
         </el-card>
       </el-col>
@@ -119,8 +119,7 @@ const totalHits = ref(0);
 const topRows = ref<{ kind: string; name: string; hits: number }[]>([]);
 
 async function loadServices() {
-  const { data } = await listServices();
-  const list: MapServiceListResp = data.data || data;
+  const list: any = await listServices();
   const byKind = new Map<string, { count: number; states: Record<string, number> }>();
   let active = 0;
   let deleted = 0;
@@ -139,13 +138,11 @@ async function loadServices() {
 }
 
 async function loadComponents() {
-  const { data } = await getComponents();
-  comp.value = (data.data || data) as ComponentsResp;
+  comp.value = (await getComponents()) as unknown as ComponentsResp;
 }
 
 async function loadUsage() {
-  const { data } = await usage({ period: period.value, group_by: 'name' });
-  const u: UsageResp = data.data || data;
+  const u: any = await usage({ period: period.value, group_by: 'name' });
   totalHits.value = (u.rows || []).reduce((a, r) => a + (r.hits || 0), 0);
   topRows.value = [...(u.rows || [])]
     .sort((a, b) => (b.hits || 0) - (a.hits || 0))

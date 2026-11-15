@@ -27,6 +27,9 @@
 </template>
 
 <script setup lang="ts">
+import { useI18n } from 'vue-i18n';
+import { watch } from 'vue';
+const { t, locale } = useI18n();
 import '@vueup/vue-quill/dist/vue-quill.snow.css';
 
 import { QuillEditor, Quill } from '@vueup/vue-quill';
@@ -90,7 +93,7 @@ const options = ref<any>({
       }
     }
   },
-  placeholder: '请输入内容',
+  placeholder: t('misc.auto.pleaseEnterAValue'),
   readOnly: props.readOnly
 });
 
@@ -130,7 +133,7 @@ const handleUploadSuccess = (res: any) => {
     quill.setSelection(length + 1);
     proxy?.$modal.closeLoading();
   } else {
-    proxy?.$modal.msgError('图片插入失败');
+    proxy?.$modal.msgError(t('misc.auto.failedToInsertImage'));
     proxy?.$modal.closeLoading();
   }
 };
@@ -141,25 +144,56 @@ const handleBeforeUpload = (file: any) => {
   const isJPG = type.includes(file.type);
   //检验文件格式
   if (!isJPG) {
-    proxy?.$modal.msgError(`图片格式错误!`);
+    proxy?.$modal.msgError(t('misc.auto.imageFormatError'));
     return false;
   }
   // 校检文件大小
   if (props.fileSize) {
     const isLt = file.size / 1024 / 1024 < props.fileSize;
     if (!isLt) {
-      proxy?.$modal.msgError(`上传文件大小不能超过 ${props.fileSize} MB!`);
+      proxy?.$modal.msgError(`${t('misc.auto.fileSizeMustNotExceed')}${props.fileSize} MB!`);
       return false;
     }
   }
-  proxy?.$modal.loading('正在上传文件，请稍候...');
+  proxy?.$modal.loading(t('misc.auto.uploadingPleaseWait'));
   return true;
 };
 
 // 图片失败拦截
 const handleUploadError = (err: any) => {
-  proxy?.$modal.msgError('上传文件失败');
+  proxy?.$modal.msgError(t('misc.auto.uploadFailed'));
 };
+
+// Quill renders toolbar/tooltip labels via CSS content; inject localized rules
+// at runtime so they follow the active locale instead of staying in Chinese.
+const QUILL_CONTENT_RULES: Array<[string, string]> = [
+  ['.ql-snow .ql-tooltip[data-mode="link"]::before', 'misc.auto.quillEnterLink'],
+  ['.ql-snow .ql-tooltip.ql-editing a.ql-action::after', 'misc.auto.quillSave'],
+  ['.ql-snow .ql-tooltip[data-mode="video"]::before', 'misc.auto.quillEnterVideo'],
+  ['.ql-snow .ql-picker.ql-header .ql-picker-label::before, .ql-snow .ql-picker.ql-header .ql-picker-item::before', 'misc.auto.quillNormalText'],
+  ['.ql-snow .ql-picker.ql-header .ql-picker-label[data-value="1"]::before, .ql-snow .ql-picker.ql-header .ql-picker-item[data-value="1"]::before', 'misc.auto.quillHeading1'],
+  ['.ql-snow .ql-picker.ql-header .ql-picker-label[data-value="2"]::before, .ql-snow .ql-picker.ql-header .ql-picker-item[data-value="2"]::before', 'misc.auto.quillHeading2'],
+  ['.ql-snow .ql-picker.ql-header .ql-picker-label[data-value="3"]::before, .ql-snow .ql-picker.ql-header .ql-picker-item[data-value="3"]::before', 'misc.auto.quillHeading3'],
+  ['.ql-snow .ql-picker.ql-header .ql-picker-label[data-value="4"]::before, .ql-snow .ql-picker.ql-header .ql-picker-item[data-value="4"]::before', 'misc.auto.quillHeading4'],
+  ['.ql-snow .ql-picker.ql-header .ql-picker-label[data-value="5"]::before, .ql-snow .ql-picker.ql-header .ql-picker-item[data-value="5"]::before', 'misc.auto.quillHeading5'],
+  ['.ql-snow .ql-picker.ql-header .ql-picker-label[data-value="6"]::before, .ql-snow .ql-picker.ql-header .ql-picker-item[data-value="6"]::before', 'misc.auto.quillHeading6'],
+  ['.ql-snow .ql-picker.ql-font .ql-picker-label::before, .ql-snow .ql-picker.ql-font .ql-picker-item::before', 'misc.auto.quillFontStandard'],
+  ['.ql-snow .ql-picker.ql-font .ql-picker-label[data-value="serif"]::before, .ql-snow .ql-picker.ql-font .ql-picker-item[data-value="serif"]::before', 'misc.auto.quillFontSerif'],
+  ['.ql-snow .ql-picker.ql-font .ql-picker-label[data-value="monospace"]::before, .ql-snow .ql-picker.ql-font .ql-picker-item[data-value="monospace"]::before', 'misc.auto.quillFontMono']
+];
+const applyQuillLocale = () => {
+  let el = document.getElementById('quill-i18n-style') as HTMLStyleElement | null;
+  if (!el) {
+    el = document.createElement('style');
+    el.id = 'quill-i18n-style';
+    document.head.appendChild(el);
+  }
+  el.textContent = QUILL_CONTENT_RULES.map(([selector, key]) => {
+    const label = t(key).replace(/\\/g, '\\\\').replace(/'/g, "\\'");
+    return selector + "{content:'" + label + "'}";
+  }).join('\n');
+};
+watch(locale, applyQuillLocale, { immediate: true });
 </script>
 
 <style>
@@ -175,15 +209,12 @@ const handleUploadError = (err: any) => {
   display: none;
 }
 .ql-snow .ql-tooltip[data-mode='link']::before {
-  content: '请输入链接地址:';
 }
 .ql-snow .ql-tooltip.ql-editing a.ql-action::after {
   border-right: 0;
-  content: '保存';
   padding-right: 0;
 }
 .ql-snow .ql-tooltip[data-mode='video']::before {
-  content: '请输入视频地址:';
 }
 .ql-snow .ql-picker.ql-size .ql-picker-label::before,
 .ql-snow .ql-picker.ql-size .ql-picker-item::before {
@@ -203,42 +234,32 @@ const handleUploadError = (err: any) => {
 }
 .ql-snow .ql-picker.ql-header .ql-picker-label::before,
 .ql-snow .ql-picker.ql-header .ql-picker-item::before {
-  content: '文本';
 }
 .ql-snow .ql-picker.ql-header .ql-picker-label[data-value='1']::before,
 .ql-snow .ql-picker.ql-header .ql-picker-item[data-value='1']::before {
-  content: '标题1';
 }
 .ql-snow .ql-picker.ql-header .ql-picker-label[data-value='2']::before,
 .ql-snow .ql-picker.ql-header .ql-picker-item[data-value='2']::before {
-  content: '标题2';
 }
 .ql-snow .ql-picker.ql-header .ql-picker-label[data-value='3']::before,
 .ql-snow .ql-picker.ql-header .ql-picker-item[data-value='3']::before {
-  content: '标题3';
 }
 .ql-snow .ql-picker.ql-header .ql-picker-label[data-value='4']::before,
 .ql-snow .ql-picker.ql-header .ql-picker-item[data-value='4']::before {
-  content: '标题4';
 }
 .ql-snow .ql-picker.ql-header .ql-picker-label[data-value='5']::before,
 .ql-snow .ql-picker.ql-header .ql-picker-item[data-value='5']::before {
-  content: '标题5';
 }
 .ql-snow .ql-picker.ql-header .ql-picker-label[data-value='6']::before,
 .ql-snow .ql-picker.ql-header .ql-picker-item[data-value='6']::before {
-  content: '标题6';
 }
 .ql-snow .ql-picker.ql-font .ql-picker-label::before,
 .ql-snow .ql-picker.ql-font .ql-picker-item::before {
-  content: '标准字体';
 }
 .ql-snow .ql-picker.ql-font .ql-picker-label[data-value='serif']::before,
 .ql-snow .ql-picker.ql-font .ql-picker-item[data-value='serif']::before {
-  content: '衬线字体';
 }
 .ql-snow .ql-picker.ql-font .ql-picker-label[data-value='monospace']::before,
 .ql-snow .ql-picker.ql-font .ql-picker-item[data-value='monospace']::before {
-  content: '等宽字体';
 }
 </style>

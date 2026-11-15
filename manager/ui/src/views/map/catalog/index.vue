@@ -3,8 +3,8 @@
     <!-- 红线提示：目录层只存指针与元数据，不碰数据本体 -->
     <el-alert type="info" :closable="false" show-icon class="mb-[10px]">
       <template #title>
-        组织层只登记<b>指针</b>与只读探测得到的<b>元数据</b>：发现只读文件头 / 归档元数据 / geometry_columns，
-        发布只写引擎的 Layer / TilesetService 配置并热重载。不导入数据、不生成瓦片、不重投影落库。
+        {{ $t('map.auto.text174') }}<b>{{ $t('map.auto.text45') }}</b>{{ $t('map.auto.of2') }}<b>{{ $t('map.auto.text46') }}</b>：{{ $t('map.auto.text175') }}/ {{ $t('map.auto.text176') }}/ geometry_columns，
+        {{ $t('map.auto.of4') }}Layer / TilesetService {{ $t('map.auto.importData2') }}
       </template>
     </el-alert>
 
@@ -30,8 +30,8 @@
         <el-card shadow="hover">
           <template #header>
             <div class="flex items-center justify-between">
-              <span class="font-bold">目录树</span>
-              <el-button link type="primary" icon="Refresh" @click="loadTree">刷新</el-button>
+              <span class="font-bold">{{ $t('map.auto.catalog3') }}</span>
+              <el-button link type="primary" icon="Refresh" @click="loadTree">{{ $t('map.auto.refresh') }}</el-button>
             </div>
           </template>
           <el-tree
@@ -53,7 +53,7 @@
             </template>
           </el-tree>
           <div v-if="!treeData.length && !treeLoading" class="text-xs text-gray-400">
-            尚无工作空间，请到「工作空间」页新建（默认种子 ws1 由 08-catalog.sql 写入）。
+            {{ $t('map.auto.noWorkspaceHint') }}
           </div>
         </el-card>
       </el-col>
@@ -63,25 +63,25 @@
         <el-card shadow="hover">
           <template #header>
             <div class="flex items-center justify-between">
-              <span class="font-bold">发布能力矩阵</span>
-              <span class="text-xs text-gray-400">口径来自引擎 /admin/capabilities，不在管理端复制第二份</span>
+              <span class="font-bold">{{ $t('map.auto.text47') }}</span>
+              <span class="text-xs text-gray-400">{{ $t('map.auto.adminCapabilitiesTwo') }}</span>
             </div>
           </template>
           <el-table v-loading="!caps" border :data="caps?.data_types || []" size="small" style="width: 100%">
-            <el-table-column label="数据类型" align="center" width="130">
+            <el-table-column :label="$t('map.auto.dataType')" align="center" width="130">
               <template #default="{ row }">
                 <el-tag effect="plain" size="small">{{ row.data_type }}</el-tag>
               </template>
             </el-table-column>
-            <el-table-column label="引擎文档" align="center" prop="mapserver_kind" width="110" />
-            <el-table-column label="可发布" align="center" width="80">
+            <el-table-column :label="$t('map.auto.text48')" align="center" prop="mapserver_kind" width="110" />
+            <el-table-column :label="$t('map.auto.text49')" align="center" width="80">
               <template #default="{ row }">
                 <el-tag :type="row.publishable ? 'success' : 'danger'" size="small">
-                  {{ row.publishable ? '可' : '否' }}
+                  {{ row.publishable ? $t('map.auto.text50') : $t('map.auto.no2') }}
                 </el-tag>
               </template>
             </el-table-column>
-            <el-table-column label="可勾协议" align="center" min-width="200">
+            <el-table-column :label="$t('map.auto.protocol4')" align="center" min-width="200">
               <template #default="{ row }">
                 <el-tag v-for="t in row.service_types" :key="t" size="small" effect="plain" class="mr-1">
                   {{ protoLabel(t) }}
@@ -89,15 +89,15 @@
                 <span v-if="!row.service_types?.length" class="text-xs text-gray-400">—</span>
               </template>
             </el-table-column>
-            <el-table-column label="默认协议" align="center" min-width="120">
+            <el-table-column :label="$t('map.auto.defaultprotocol')" align="center" min-width="120">
               <template #default="{ row }">
                 <span class="text-xs">{{ (row.default_service_types || []).map(protoLabel).join(' / ') || '—' }}</span>
               </template>
             </el-table-column>
-            <el-table-column label="说明" prop="note" min-width="220" :show-overflow-tooltip="true" />
+            <el-table-column :label="$t('map.auto.text20')" prop="note" min-width="220" :show-overflow-tooltip="true" />
           </el-table>
           <div v-if="caps && !caps.data_types.length" class="text-xs text-gray-400">
-            引擎未返回能力矩阵（map-api 不可达？），发布向导将拿不到协议勾选项。
+            {{ $t('map.auto.back2') }}map-api {{ $t('map.auto.protocol6') }}
           </div>
         </el-card>
       </el-col>
@@ -106,6 +106,8 @@
 </template>
 
 <script setup name="MapCatalog" lang="ts">
+import { useI18n } from 'vue-i18n';
+const { t } = useI18n();
 import { listPublished, listStores, listWorkspaces } from '@/api/map/catalog';
 import { PublishedVO, StoreVO, WorkspaceVO } from '@/api/map/catalog/types';
 import { protoLabel, useCaps } from './composables/useCatalog';
@@ -151,29 +153,29 @@ const treeData = computed<CatalogNode[]>(() =>
 // 四个入口的计数都来自既有清单接口，不额外请求（资源数按 store 的 resourceCount 汇总）
 const entries = computed(() => [
   {
-    title: '工作空间',
-    desc: '命名空间容器（Workspace）',
+    title: t('map.auto.text51'),
+    desc: t('map.auto.workspace'),
     icon: 'workspace',
     path: '/data/workspace',
     value: workspaces.value.length
   },
   {
-    title: '数据源',
-    desc: '目录 / PostGIS 连接指针（Store）',
+    title: t('map.auto.text52'),
+    desc: t('map.auto.catalogPostGISStore'),
     icon: 'store',
     path: '/data/store',
     value: liveStores.value.length
   },
   {
-    title: '数据图层',
-    desc: '只读发现的资源与发布（Resource）',
+    title: t('map.auto.dataLayer'),
+    desc: t('map.auto.ofResource'),
     icon: 'layers',
     path: '/data/resource',
     value: liveStores.value.reduce((n, s) => n + (s.resourceCount || 0), 0)
   },
   {
-    title: '已发布服务',
-    desc: '生命周期与端点预览（Layer）',
+    title: t('map.auto.publishedServices'),
+    desc: t('map.auto.previewLayer'),
     icon: 'published',
     path: '/data/published',
     value: published.value.filter((p) => p.state === 'active').length

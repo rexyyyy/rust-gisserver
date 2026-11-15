@@ -4,18 +4,18 @@
     <div class="mb-[10px]">
       <el-card shadow="hover">
         <template #header>
-          <span class="font-bold">样式库（SLD 1.1 / SE，只读管理）</span>
+          <span class="font-bold">{{ $t('map.auto.styleSLD11SE') }}</span>
         </template>
         <el-alert
           type="info"
           :closable="false"
           class="mb-2"
-          title="编辑引导：建议使用桌面 GIS 工具编辑后放回图层同名目录"
-          description="图层属性 → 样式 → 导出 SLD 1.1（.sld）；将文件放在对应图层同名目录（vector/ 或 postgis/ 下），map-api 按请求读取、purge 即生效，无需 reload。本页不提供规则级 Web 设计器。"
+          :title="$t('map.auto.gisLayerCatalog')"
+          :description="$t('map.auto.layerStyleExportSLD11SldLayerCatalogVector')"
         />
         <el-descriptions :column="2" border size="small">
-          <el-descriptions-item label="样式目录">{{ styleDir || '—' }}</el-descriptions-item>
-          <el-descriptions-item label="样式数量">{{ styleList.length }}</el-descriptions-item>
+          <el-descriptions-item :label="$t('map.auto.stylecatalog')">{{ styleDir || '—' }}</el-descriptions-item>
+          <el-descriptions-item :label="$t('map.auto.style')">{{ styleList.length }}</el-descriptions-item>
         </el-descriptions>
       </el-card>
     </div>
@@ -24,60 +24,60 @@
       <template #header>
         <el-row :gutter="10" class="mb8">
           <el-col :span="1.5">
-            <el-button icon="Refresh" @click="getList">刷新</el-button>
+            <el-button icon="Refresh" @click="getList">{{ $t('map.auto.refresh') }}</el-button>
           </el-col>
           <el-col :span="1.5">
-            <el-button v-hasPermi="['map:style:upload']" type="primary" icon="Upload" @click="openUpload">上传/替换样式</el-button>
+            <el-button v-hasPermi="['map:style:upload']" type="primary" icon="Upload" @click="openUpload">{{ $t('map.auto.style2') }}</el-button>
           </el-col>
           <right-toolbar v-model:show-search="showSearch" @query-table="getList" />
         </el-row>
       </template>
 
       <el-table v-loading="loading" border :data="pagedStyles" style="width: 100%" max-height="560">
-        <el-table-column label="样式名" align="center" prop="name" min-width="180" :show-overflow-tooltip="true" />
-        <el-table-column label="大小" align="center" width="100">
+        <el-table-column :label="$t('map.auto.style3')" align="center" prop="name" min-width="180" :show-overflow-tooltip="true" />
+        <el-table-column :label="$t('map.auto.size')" align="center" width="100">
           <template #default="scope">{{ (scope.row.size / 1024).toFixed(1) }} KB</template>
         </el-table-column>
-        <el-table-column label="修改时间" align="center" width="170">
+        <el-table-column :label="$t('map.auto.edithour')" align="center" width="170">
           <template #default="scope">
             <span class="text-xs">{{ proxy?.parseTime(scope.row.modified) }}</span>
           </template>
         </el-table-column>
-        <el-table-column label="样式标题" align="center" prop="style_name" min-width="140" :show-overflow-tooltip="true">
+        <el-table-column :label="$t('map.auto.styletitle')" align="center" prop="style_name" min-width="140" :show-overflow-tooltip="true">
           <template #default="scope">
             <span v-if="scope.row.style_name">{{ scope.row.style_name }}</span>
             <span v-else class="text-gray-400">—</span>
           </template>
         </el-table-column>
-        <el-table-column label="关联图层" align="center" prop="layer_name" min-width="140" :show-overflow-tooltip="true">
+        <el-table-column :label="$t('map.auto.layer4')" align="center" prop="layer_name" min-width="140" :show-overflow-tooltip="true">
           <template #default="scope">
             <span v-if="scope.row.layer_name">{{ scope.row.layer_name }}</span>
             <span v-else class="text-gray-400">—</span>
           </template>
         </el-table-column>
-        <el-table-column label="规则数" align="center" width="90" prop="rules" />
-        <el-table-column label="解析" align="center" width="90">
+        <el-table-column :label="$t('map.auto.text148')" align="center" width="90" prop="rules" />
+        <el-table-column :label="$t('map.auto.parse')" align="center" width="90">
           <template #default="scope">
             <el-tag :type="scope.row.parse_ok ? 'success' : 'danger'" effect="dark" size="small">
-              {{ scope.row.parse_ok ? '正常' : '异常' }}
+              {{ scope.row.parse_ok ? $t('map.auto.normal') : $t('map.auto.text149') }}
             </el-tag>
           </template>
         </el-table-column>
-        <el-table-column label="被引用" align="center" min-width="160">
+        <el-table-column :label="$t('map.auto.text150')" align="center" min-width="160">
           <template #default="scope">
             <el-tag v-for="u in scope.row.used_by || []" :key="u" class="mr-1 mb-1" type="info" effect="plain" size="small">{{ u }}</el-tag>
-            <span v-if="!scope.row.used_by || !scope.row.used_by.length" class="text-gray-400">未引用</span>
+            <span v-if="!scope.row.used_by || !scope.row.used_by.length" class="text-gray-400">{{ $t('map.auto.text151') }}</span>
           </template>
         </el-table-column>
-        <el-table-column label="操作" align="center" width="200" class-name="small-padding fixed-width">
+        <el-table-column :label="$t('map.auto.actions')" align="center" width="200" class-name="small-padding fixed-width">
           <template #default="scope">
-            <el-button v-hasPermi="['map:style:list']" link type="primary" @click="openContent(scope.row)">查看</el-button>
-            <el-button v-hasPermi="['map:style:list']" link type="success" @click="openLegend(scope.row)">图例</el-button>
-            <el-button v-hasPermi="['map:style:remove']" link type="danger" @click="handleDelete(scope.row)">删除</el-button>
+            <el-button v-hasPermi="['map:style:list']" link type="primary" @click="openContent(scope.row)">{{ $t('map.auto.text152') }}</el-button>
+            <el-button v-hasPermi="['map:style:list']" link type="success" @click="openLegend(scope.row)">{{ $t('map.auto.text153') }}</el-button>
+            <el-button v-hasPermi="['map:style:remove']" link type="danger" @click="handleDelete(scope.row)">{{ $t('map.auto.delete6') }}</el-button>
           </template>
         </el-table-column>
       </el-table>
-      <el-empty v-if="!loading && styleList.length === 0" description="样式库为空" />
+      <el-empty v-if="!loading && styleList.length === 0" :description="$t('map.auto.style4')" />
       <div class="mt-3 flex justify-end">
         <el-pagination
           v-model:current-page="page"
@@ -91,7 +91,7 @@
     </el-card>
 
     <!-- 样式原文（只读） -->
-    <el-dialog v-model="contentVisible" :title="`样式原文 — ${contentRow?.name || ''}`" width="760px" append-to-body>
+    <el-dialog v-model="contentVisible" :title="`${t('map.auto.style5')}${contentRow?.name || ''}`" width="760px" append-to-body>
       <el-input
         v-model="contentText"
         type="textarea"
@@ -102,32 +102,34 @@
     </el-dialog>
 
     <!-- 图例预览 -->
-    <el-dialog v-model="legendVisible" :title="`图例 — ${legendRow?.name || ''}`" width="420px" append-to-body @closed="closeLegend">
+    <el-dialog v-model="legendVisible" :title="`${t('map.auto.text154')}${legendRow?.name || ''}`" width="420px" append-to-body @closed="closeLegend">
       <div class="flex justify-center">
         <img v-if="legendUrl" :src="legendUrl" alt="legend" style="max-width: 100%; border: 1px solid var(--el-border-color); border-radius: 4px" />
-        <el-empty v-else description="图例生成失败" :image-size="60" />
+        <el-empty v-else :description="$t('map.auto.failed2')" :image-size="60" />
       </div>
     </el-dialog>
 
     <!-- 上传/替换 -->
-    <el-dialog v-model="uploadVisible" title="上传 / 替换 SLD 样式" width="720px" append-to-body @closed="resetUpload">
+    <el-dialog v-model="uploadVisible" :title="$t('map.auto.sldStyle')" width="720px" append-to-body @closed="resetUpload">
       <el-form label-width="90px">
-        <el-form-item label="样式名" required>
-          <el-input v-model="uploadName" placeholder="不含扩展名，如 buildings" />
+        <el-form-item :label="$t('map.auto.style3')" required>
+          <el-input v-model="uploadName" :placeholder="$t('map.auto.buildings')" />
         </el-form-item>
-        <el-form-item label="SLD 内容" required>
-          <el-input v-model="uploadContent" type="textarea" :rows="16" placeholder="粘贴 SLD 1.1 / SE XML 内容" style="font-family: monospace; font-size: 12px" />
+        <el-form-item :label="$t('map.auto.sldContent')" required>
+          <el-input v-model="uploadContent" type="textarea" :rows="16" :placeholder="$t('map.auto.sld11SEXMLContent')" style="font-family: monospace; font-size: 12px" />
         </el-form-item>
       </el-form>
       <template #footer>
-        <el-button @click="uploadVisible = false">取消</el-button>
-        <el-button type="primary" :loading="uploading" @click="handleUpload">提交（服务端解析校验后落盘）</el-button>
+        <el-button @click="uploadVisible = false">{{ $t('map.auto.cancel') }}</el-button>
+        <el-button type="primary" :loading="uploading" @click="handleUpload">{{ $t('map.auto.submitParse') }}</el-button>
       </template>
     </el-dialog>
   </div>
 </template>
 
 <script setup lang="ts" name="MapStyle">
+import { useI18n } from 'vue-i18n';
+const { t } = useI18n();
 import { listStyles, styleContent, styleLegend, uploadStyle, deleteStyle } from '@/api/map/service';
 import { StyleVO, StyleListResp } from '@/api/map/service/types';
 import { to } from 'await-to-js';
@@ -167,7 +169,7 @@ const getList = async () => {
   const [err, res] = await to(listStyles());
   loading.value = false;
   if (err) {
-    proxy?.$modal.msgError('样式库获取失败：' + (err as Error).message);
+    proxy?.$modal.msgError(t('map.auto.stylefailed') + (err as Error).message);
     return;
   }
   const data = (res?.data ?? {}) as StyleListResp;
@@ -178,10 +180,10 @@ const getList = async () => {
 const openContent = async (row: StyleVO) => {
   contentRow.value = row;
   contentVisible.value = true;
-  contentText.value = '加载中…';
+  contentText.value = t('map.auto.text155');
   const [err, res] = await to(styleContent(row.name));
   if (err) {
-    contentText.value = '读取失败：' + (err as Error).message;
+    contentText.value = t('map.auto.failed3') + (err as Error).message;
     return;
   }
   contentText.value = (res?.data as any)?.content || '';
@@ -197,7 +199,7 @@ const openLegend = async (row: StyleVO) => {
   }
   const [err, res] = await to(styleLegend(row.name, { width: 256, height: 256 }));
   if (err) {
-    proxy?.$modal.msgError('图例生成失败：' + (err as Error).message);
+    proxy?.$modal.msgError(t('map.auto.failed4') + (err as Error).message);
     return;
   }
   const blob = res?.data as Blob;
@@ -225,34 +227,34 @@ const resetUpload = () => {
 
 const handleUpload = async () => {
   if (!uploadName.value.trim()) {
-    proxy?.$modal.msgWarning('请填写样式名');
+    proxy?.$modal.msgWarning(t('map.auto.pleaseFillInStyle'));
     return;
   }
   if (!uploadContent.value.trim()) {
-    proxy?.$modal.msgWarning('请粘贴 SLD 内容');
+    proxy?.$modal.msgWarning(t('map.auto.sldContent2'));
     return;
   }
   uploading.value = true;
   const [err] = await to(uploadStyle(uploadName.value.trim(), uploadContent.value));
   uploading.value = false;
   if (err) {
-    proxy?.$modal.msgError('上传失败：' + (err as Error).message);
+    proxy?.$modal.msgError(t('map.auto.failed5') + (err as Error).message);
     return;
   }
-  proxy?.$modal.msgSuccess('上传成功（服务端已解析校验）');
+  proxy?.$modal.msgSuccess(t('map.auto.successParse'));
   uploadVisible.value = false;
   await getList();
 };
 
 const handleDelete = async (row: StyleVO) => {
-  const [err] = await to(proxy?.$modal.confirm(`确认删除样式「${row.name}」？删除后对应图层将回退到默认样式。`) as any);
+  const [err] = await to(proxy?.$modal.confirm(`${t('map.auto.confirmdeletestyle')}${row.name}${t('map.auto.deletelayerdefaultstyle')}`) as any);
   if (err) return;
   const [delErr] = await to(deleteStyle(row.name));
   if (delErr) {
-    proxy?.$modal.msgError('删除失败：' + (delErr as Error).message);
+    proxy?.$modal.msgError(t('map.auto.deletefailed') + (delErr as Error).message);
     return;
   }
-  proxy?.$modal.msgSuccess('删除成功');
+  proxy?.$modal.msgSuccess(t('map.auto.deletedSuccessfully'));
   await getList();
 };
 

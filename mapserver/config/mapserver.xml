@@ -42,10 +42,11 @@
        集群部署时各节点重读共享 XML，另一节点 admin 改的图层无需手工 reload
        即在本节点生效；单机部署不需要（admin 本地已热重载）。
        重扫会重开数据源并清缓存，间隔建议 30~60 秒。 -->
-  <!-- 缓存预算（P0 扩容）：
+  <!-- 缓存预算（开发态小配置；上生产再按机器内存 / 磁盘扩容）：
        cache_mib        = RGBA 解码瓦片缓存（按条目数折算）
        foyer_cache_mib  = foyer 输出缓存 L1 内存（按字节计量，缺省跟随 cache_mib）
        disk_cache.capacity_mib = foyer L2 磁盘（重启可复用）
+       当前：内存两档各 512 MiB，L2 磁盘 1 GiB（1024 MiB）。
        动态 PostGIS MVT 瓦片在冷生成时已 gzip 一次，同样预算约可放 2 倍瓦片。 -->
   <!-- data_root：默认取启动工作目录下的 data 子目录，无需配置环境变量。
        安装布局下 start-*.bat 先 cd 到安装目录，即 <安装目录>\data；
@@ -53,8 +54,8 @@
        install.bat 创建（源码树里留了 .gitkeep 占位）。只有把影像/瓦片
        放到外置数据盘时才需要在 .env 里设 DATA_ROOT 覆盖，例如
        DATA_ROOT=E:\data\1；容器模板另用固定的 /app/data。 -->
-  <server host="0.0.0.0" port="8080" cache_mib="1024" foyer_cache_mib="2048" cache_ttl_secs="300" cache_stats_secs="60" data_root="${DATA_ROOT:-data}">
-    <disk_cache dir="cache/foyer" capacity_mib="8192"/>
+  <server host="0.0.0.0" port="8080" cache_mib="512" foyer_cache_mib="512" cache_ttl_secs="300" cache_stats_secs="60" data_root="${DATA_ROOT:-data}">
+    <disk_cache dir="cache/foyer" capacity_mib="1024"/>
     <!-- s3 全局凭证：图层 source path 写 s3://bucket/key 时必配。
          path-style 寻址，兼容 MinIO / RustFS / AWS 及各类 S3 兼容云。
          region 对 MinIO/RustFS 任意值均可（惯例 auto）；AWS 填桶所在区域。 -->

@@ -63,7 +63,7 @@ foreach ($w in $want) {
     Say $ok ("menu " + $w.path) ("component=" + $(if ($hit.Count) { $hit[0].component } else { '<missing>' }))
 }
 
-# 3) sidebar order: 数据功能 right behind 地图服务
+# 3) sidebar order: Data Functions right behind Map Services
 $top = @($routers | ForEach-Object { $_.path })
 $ixMap = $top.IndexOf('/map'); $ixData = $top.IndexOf('/data')
 $ok = ($ixMap -ge 0) -and ($ixData -eq $ixMap + 1)

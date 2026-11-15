@@ -1,28 +1,30 @@
 <template>
   <el-form ref="userRef" :model="userForm" :rules="rules" label-width="80px">
-    <el-form-item label="用户昵称" prop="nickName">
+    <el-form-item :label="$t('system.auto.nickname')" prop="nickName">
       <el-input v-model="userForm.nickName" maxlength="30" />
     </el-form-item>
-    <el-form-item label="手机号码" prop="phonenumber">
+    <el-form-item :label="$t('system.auto.phoneNumber')" prop="phonenumber">
       <el-input v-model="userForm.phonenumber" maxlength="11" />
     </el-form-item>
-    <el-form-item label="邮箱" prop="email">
+    <el-form-item :label="$t('system.auto.email')" prop="email">
       <el-input v-model="userForm.email" maxlength="50" />
     </el-form-item>
-    <el-form-item label="性别">
+    <el-form-item :label="$t('system.auto.gender2')">
       <el-radio-group v-model="userForm.sex">
-        <el-radio value="0">男</el-radio>
-        <el-radio value="1">女</el-radio>
+        <el-radio value="0">{{ $t('system.auto.male') }}</el-radio>
+        <el-radio value="1">{{ $t('system.auto.female') }}</el-radio>
       </el-radio-group>
     </el-form-item>
     <el-form-item>
-      <el-button type="primary" @click="submit">保存</el-button>
-      <el-button type="danger" @click="close">关闭</el-button>
+      <el-button type="primary" @click="submit">{{ $t('system.auto.save') }}</el-button>
+      <el-button type="danger" @click="close">{{ $t('system.auto.close') }}</el-button>
     </el-form-item>
   </el-form>
 </template>
 
 <script setup lang="ts">
+import { useI18n } from 'vue-i18n';
+const { t } = useI18n();
 import { updateUserProfile } from '@/api/system/user';
 import { propTypes } from '@/utils/propTypes';
 
@@ -33,22 +35,22 @@ const userForm = computed(() => props.user);
 const { proxy } = getCurrentInstance() as ComponentInternalInstance;
 const userRef = ref<ElFormInstance>();
 const rule: ElFormRules = {
-  nickName: [{ required: true, message: '用户昵称不能为空', trigger: 'blur' }],
+  nickName: [{ required: true, message: t('system.auto.nicknameisRequired'), trigger: 'blur' }],
   email: [
-    { required: true, message: '邮箱地址不能为空', trigger: 'blur' },
+    { required: true, message: t('system.auto.emailaddressisRequired'), trigger: 'blur' },
     {
       type: 'email',
-      message: '请输入正确的邮箱地址',
+      message: t('system.auto.pleaseEnterAValidEmailAddress'),
       trigger: ['blur', 'change']
     }
   ],
   phonenumber: [
     {
       required: true,
-      message: '手机号码不能为空',
+      message: t('system.auto.phoneNumberisRequired'),
       trigger: 'blur'
     },
-    { pattern: /^1[3456789][0-9]\d{8}$/, message: '请输入正确的手机号码', trigger: 'blur' }
+    { pattern: /^1[3456789][0-9]\d{8}$/, message: t('system.auto.pleaseEnterAValidPhoneNumber'), trigger: 'blur' }
   ]
 };
 const rules = ref<ElFormRules>(rule);
@@ -58,7 +60,7 @@ const submit = () => {
   userRef.value?.validate(async (valid: boolean) => {
     if (valid) {
       await updateUserProfile(props.user);
-      proxy?.$modal.msgSuccess('修改成功');
+      proxy?.$modal.msgSuccess(t('system.auto.updatedSuccessfully'));
     }
   });
 };

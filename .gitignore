@@ -38,3 +38,32 @@
 # Authoritative examples live in mapserver/config/*/README.md; the postgis/
 # layer files are machine-local test fixtures with hardcoded credentials.
 /mapserver/config/postgis/
+
+# ===== One-off i18n migration scratch (never commit) =====
+# Dumps, translation batches and generator scripts used while translating
+# Chinese source comments and building the bilingual catalogs. Local only;
+# the tracked tooling lives in manager/tools/ and manager/ui/scripts/.
+/all_lines.txt
+/all_remaining_lines.txt
+/missing_lines.txt
+/remaining.json
+/remaining_by_file.txt
+/trades_template.txt
+/extract_all.js
+/gen_safe_v3.js
+/gen_template.js
+/safe_v3.js
+/trans_catalog.js
+/trans_xmlcfg.js
+/translate_all.js
+/translate_rs_comments.js
+/translations_batch1.json
+/translations_batch2.json
+/manager_err.log
+/manager_out.log
+/manager/ui/_i18n_map_*.py
+
+# Ad-hoc audit output from pre-commit verification runs.
+/_fmt_err.txt
+/manager/ui/_i18n_*_out.txt
+/manager/backend/_i18n_cargo_test.txt

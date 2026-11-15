@@ -12,7 +12,7 @@
     <div class="right-menu flex align-center">
       <template v-if="appStore.device !== 'mobile'">
         <search-menu ref="searchMenuRef" />
-        <el-tooltip content="搜索" effect="dark" placement="bottom">
+        <el-tooltip :content="$t('misc.auto.search')" effect="dark" placement="bottom">
           <div class="right-menu-item hover-effect" @click="openSearchMenu">
             <svg-icon class-name="search-icon" icon-class="search" />
           </div>
@@ -82,6 +82,8 @@
 </template>
 
 <script setup lang="ts">
+import { useI18n } from 'vue-i18n';
+const { t } = useI18n();
 import SearchMenu from './TopBar/search.vue';
 import { useAppStore } from '@/store/modules/app';
 import { useUserStore } from '@/store/modules/user';
@@ -92,7 +94,7 @@ import router from '@/router';
 import { ElMessageBoxOptions } from 'element-plus/es/components/message-box/src/message-box.type';
 import { NavTypeEnum } from '@/enums/NavTypeEnum';
 import Logo from "@/layout/components/Sidebar/Logo.vue";
-import TopBar from './TopBar'
+import TopBar from '@/layout/components/TopBar/index.vue'
 import DarkSwitch from './TopBar/DarkSwitch.vue'
 import defAva from '@/assets/images/profile.jpg'
 
@@ -120,9 +122,9 @@ const toggleSideBar = () => {
 };
 
 const logout = async () => {
-  await ElMessageBox.confirm('确定注销并退出系统吗？', '提示', {
-    confirmButtonText: '确定',
-    cancelButtonText: '取消',
+  await ElMessageBox.confirm(t('misc.auto.oksystem'), t('misc.auto.info'), {
+    confirmButtonText: t('misc.auto.ok'),
+    cancelButtonText: t('misc.auto.cancel'),
     type: 'warning'
   } as ElMessageBoxOptions);
   userStore.logout().then(() => {

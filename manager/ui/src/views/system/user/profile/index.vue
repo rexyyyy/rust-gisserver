@@ -5,7 +5,7 @@
         <el-card class="box-card">
           <template #header>
             <div class="clearfix">
-              <span>个人信息</span>
+              <span>{{ $t('system.auto.personalInfo') }}</span>
             </div>
           </template>
           <div>
@@ -14,27 +14,27 @@
             </div>
             <ul class="list-group list-group-striped">
               <li class="list-group-item">
-                <svg-icon icon-class="user" />用户名称
+                <svg-icon icon-class="user" />{{ $t('system.auto.userName') }}
                 <div class="pull-right">{{ state.user.userName }}</div>
               </li>
               <li class="list-group-item">
-                <svg-icon icon-class="phone" />手机号码
+                <svg-icon icon-class="phone" />{{ $t('system.auto.phoneNumber') }}
                 <div class="pull-right">{{ state.user.phonenumber }}</div>
               </li>
               <li class="list-group-item">
-                <svg-icon icon-class="email" />用户邮箱
+                <svg-icon icon-class="email" />{{ $t('system.auto.useremail') }}
                 <div class="pull-right">{{ state.user.email }}</div>
               </li>
               <li class="list-group-item">
-                <svg-icon icon-class="tree-dept" />所属部门
+                <svg-icon icon-class="tree-dept" />{{ $t('system.auto.department3') }}
                 <div v-if="state.user.deptName" class="pull-right">{{ state.user.deptName }} / {{ state.postGroup }}</div>
               </li>
               <li class="list-group-item">
-                <svg-icon icon-class="peoples" />所属角色
+                <svg-icon icon-class="peoples" />{{ $t('system.auto.role2') }}
                 <div class="pull-right">{{ state.roleGroup }}</div>
               </li>
               <li class="list-group-item">
-                <svg-icon icon-class="date" />创建日期
+                <svg-icon icon-class="date" />{{ $t('system.auto.day') }}
                 <div class="pull-right">{{ state.user.createTime }}</div>
               </li>
             </ul>
@@ -45,17 +45,17 @@
         <el-card>
           <template #header>
             <div class="clearfix">
-              <span>基本资料</span>
+              <span>{{ $t('system.auto.profile') }}</span>
             </div>
           </template>
           <el-tabs v-model="activeTab">
-            <el-tab-pane label="基本资料" name="userinfo">
+            <el-tab-pane :label="$t('system.auto.profile')" name="userinfo">
               <userInfo :user="userForm" />
             </el-tab-pane>
-            <el-tab-pane label="修改密码" name="resetPwd">
+            <el-tab-pane :label="$t('system.auto.changePassword')" name="resetPwd">
               <resetPwd />
             </el-tab-pane>
-            <el-tab-pane label="在线设备" name="onlineDevice">
+            <el-tab-pane :label="$t('system.auto.onlineDevices')" name="onlineDevice">
               <onlineDevice :devices="state.devices" />
             </el-tab-pane>
           </el-tabs>

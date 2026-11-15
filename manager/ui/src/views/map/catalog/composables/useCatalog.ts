@@ -1,3 +1,4 @@
+import i18n from '@/lang';
 /**
  * 数据功能各页（工作空间 / 数据源 / 数据图层 / 已发布服务 / 总览）的共享口径。
  *
@@ -9,10 +10,10 @@ import { CatalogCaps, DataTypeCap, NativeGrid } from '@/api/map/catalog/types';
 
 /** 引擎登记簿四态：各页必须叫同一个名字，否则同一个状态在两个页面两种说法 */
 export const STATE_LABELS: Record<string, string> = {
-  active: '在服',
-  stopped: '停止',
-  paused: '暂停',
-  deleted: '已删'
+  active: i18n.global.t('map.auto.inService2'),
+  stopped: i18n.global.t('map.auto.text42'),
+  paused: i18n.global.t('map.auto.text43'),
+  deleted: i18n.global.t('map.auto.text44')
 };
 
 export const stateLabel = (s: string) => STATE_LABELS[s] || s;
@@ -74,9 +75,13 @@ export function nativeGridTip(
 ): string {
   const where = [info.crs, info.grid].filter(Boolean).join(' · ');
   if (row.mapserverKind === 'arcgis') {
-    return `该图层是 ArcGIS 预切片缓存（原生坐标系 + 自定义 LOD：${where}），只能按缓存网格调用：/tiles/${row.layerName}/{z}/{x}/{y}.png；预览请用 viewer-arcgis。用默认 WebMercator 预览或浏览会白屏。`;
+    return i18n.global.t('map.nativeGrid.arcgis', { where, layer: row.layerName });
   }
-  return `该图层按原生坐标系 + 自定义 LOD 网格动态切片（${where}），调用必须带 grid 段：/mvt/${row.layerName}/${info.grid || '{grid}'}/{z}/{x}/{y}.pbf；预览请用 viewer-mvt。用默认 WebMercator 预览或浏览会白屏。`;
+  return i18n.global.t('map.nativeGrid.dynamic', {
+    where,
+    layer: row.layerName,
+    grid: info.grid || '{grid}'
+  });
 }
 
 /** 能力矩阵 + 按数据类型取行（发布勾选取于此） */

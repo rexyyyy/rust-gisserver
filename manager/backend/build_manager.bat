@@ -2,10 +2,10 @@
 REM rust-gisserver manager backend build script
 REM Usage: build_manager.bat [debug|release]
 REM
-REM 环境策略：PATH 里已有 cl.exe（说明已在 VS Developer Prompt / 已配置好的环境里）
-REM 就直接使用，不覆盖；否则回退到下方登记的 VS/Windows SDK 路径（可按本机调整），
-REM 手工设置 PATH/LIB/INCLUDE 而不调 vcvars64.bat —— 后者依赖 reg.exe 探测 SDK
-REM 路径，在受限环境里会被拦。目录一律按脚本自身位置解析，不绑定绝对路径。
+REM Environment policy: when cl.exe is already on PATH (VS Developer Prompt / preconfigured env),
+REM keep it untouched; otherwise fall back to the registered VS/Windows SDK paths below.
+REM Set PATH/LIB/INCLUDE manually instead of calling vcvars64.bat, which probes the SDK
+REM via reg.exe and is blocked in restricted environments. Paths stay script-relative.
 setlocal
 
 set "MSVC=C:\Program Files\Microsoft Visual Studio\2022\Community\VC\Tools\MSVC\14.44.35207"

@@ -5,6 +5,7 @@ mod config;
 mod engine_monitor;
 mod error;
 mod handlers;
+mod i18n;
 mod models;
 mod perm;
 mod resp;

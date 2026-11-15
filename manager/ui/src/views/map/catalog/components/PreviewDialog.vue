@@ -1,14 +1,14 @@
 <template>
   <!-- 预览与服务地址：端点 URL 一律由引擎给出，管理端不自行拼接 -->
-  <el-dialog v-model="visible" :title="`服务预览：${layerName}`" width="900px" append-to-body>
+  <el-dialog v-model="visible" :title="`${t('map.auto.preview')}${layerName}`" width="900px" append-to-body>
     <div v-loading="loading">
       <div class="mb-2 flex items-center gap-2">
         <el-tag :type="stateTag(state)" size="small" effect="dark">{{ stateLabel(state) }}</el-tag>
         <el-tag v-if="data.engineName" size="small" effect="plain">{{ data.engineName }}</el-tag>
         <!-- 矢量瓦片预览：把该图层实际加载用的 CRS / 网格 / LOD 常量打成可复制的代码 -->
-        <el-button v-if="isCodeable" size="small" type="primary" plain @click="openCode">代码</el-button>
+        <el-button v-if="isCodeable" size="small" type="primary" plain @click="openCode">{{ $t('map.auto.text26') }}</el-button>
         <el-link v-if="previewUrl" type="primary" underline="never" class="ml-auto" @click="openUrl(previewUrl)">
-          新窗口全屏打开
+          {{ $t('map.auto.text163') }}
         </el-link>
       </div>
       <el-alert
@@ -17,7 +17,7 @@
         type="warning"
         :closable="false"
         show-icon
-        :title="data.hint || '引擎目录里没有该服务的配置'"
+        :title="data.hint || $t('map.auto.catalogof')"
       />
       <el-alert
         v-else-if="!data.serving"
@@ -25,7 +25,7 @@
         type="warning"
         :closable="false"
         show-icon
-        :title="`服务当前不在服（${stateLabel(state)}）${data.note ? '：' + data.note : ''}，预览可能无输出，启动后再看。`"
+        :title="`${t('map.auto.inService')}${stateLabel(state)})${data.note ? '：' + data.note : ''}${t('map.auto.preview2')}`"
       />
       <iframe
         v-if="previewUrl"
@@ -33,43 +33,45 @@
         style="width: 100%; height: 380px; border: 1px solid var(--el-border-color); border-radius: 4px"
         allowfullscreen
       ></iframe>
-      <el-divider content-position="left">协议端点</el-divider>
+      <el-divider content-position="left">{{ $t('map.auto.protocol') }}</el-divider>
       <el-table :data="shownEndpoints" border size="small" max-height="240">
-        <el-table-column label="协议 / 用途" width="200" prop="name" />
+        <el-table-column :label="$t('map.auto.protocol2')" width="200" prop="name" />
         <el-table-column label="URL" prop="url" :show-overflow-tooltip="true">
           <template #default="{ row }">
             <span class="text-xs">{{ row.url }}</span>
           </template>
         </el-table-column>
-        <el-table-column label="操作" width="130" align="center">
+        <el-table-column :label="$t('map.auto.actions')" width="130" align="center">
           <template #default="{ row }">
-            <el-button link type="primary" size="small" @click="copyUrl(row.url)">复制</el-button>
-            <el-button link type="success" size="small" @click="openUrl(row.url)">打开</el-button>
+            <el-button link type="primary" size="small" @click="copyUrl(row.url)">{{ $t('map.auto.text12') }}</el-button>
+            <el-button link type="success" size="small" @click="openUrl(row.url)">{{ $t('map.auto.text27') }}</el-button>
           </template>
         </el-table-column>
       </el-table>
       <div v-if="hiddenCount || showAll" class="mt-1 text-xs" style="color: var(--el-text-color-secondary)">
-        另有 {{ hiddenCount }} 个端点引擎按图层能力仍可访问，但发布时未勾选该服务类型。
+        {{ $t('map.auto.text164') }}{{ hiddenCount }} {{ $t('map.auto.bylayerHourType') }}
         <el-link type="primary" underline="never" class="text-xs" @click="showAll = !showAll">
-          {{ showAll ? '只看已声明' : '全部显示' }}
+          {{ showAll ? $t('map.auto.text28') : $t('map.auto.allshow') }}
         </el-link>
       </div>
     </div>
   </el-dialog>
 
   <!-- 加载代码：常量（CRS / 网格 / 原点 / LOD 分辨率 / 四至）随图层与发布网格变化 -->
-  <el-dialog v-model="codeVisible" :title="`加载代码：${layerName}`" width="820px" append-to-body>
+  <el-dialog v-model="codeVisible" :title="`${t('map.auto.text29')}${layerName}`" width="820px" append-to-body>
     <div v-loading="codeLoading">
       <pre class="code-pre">{{ codeText }}</pre>
     </div>
     <template #footer>
-      <el-button @click="codeVisible = false">关闭</el-button>
-      <el-button type="primary" :disabled="codeLoading" @click="copyCode">复制</el-button>
+      <el-button @click="codeVisible = false">{{ $t('map.auto.close') }}</el-button>
+      <el-button type="primary" :disabled="codeLoading" @click="copyCode">{{ $t('map.auto.text12') }}</el-button>
     </template>
   </el-dialog>
 </template>
 
 <script setup lang="ts">
+import { useI18n } from 'vue-i18n';
+const { t } = useI18n();
 import { listPublishedEndpoints } from '@/api/map/catalog';
 import { PublishedEndpoints, PublishedVO } from '@/api/map/catalog/types';
 import { stateLabel, stateTag } from '../composables/useCatalog';
@@ -92,7 +94,7 @@ const pendingRow = ref<PublishedVO | null>(null);
 // 条目匹配不到（返回空串），一律保留，避免把有用信息藏掉。
 const PROTO_OF: Array<[RegExp, string]> = [
   [/^WMS/, 'wms'],
-  [/^图例/, 'wms'],
+  [ /^\u56fe\u4f8b/, 'wms' ], // archived endpoint label (data match, not UI text)
   [/^WMTS/, 'wmts'],
   [/^XYZ/, 'xyz'],
   [/^MVT|^TileJSON/, 'mvt'],
@@ -118,7 +120,7 @@ const previewUrl = ref('');
 async function buildPreviewUrl(baseUrl: string, row: PublishedVO): Promise<string> {
   if (!baseUrl || !baseUrl.includes('viewer_mvt')) return baseUrl;
   try {
-    const kind = row.mapserverKind || row.mapserver_kind || 'postgis';
+    const kind = (row as any).mapserverKind || (row as any).mapserver_kind || 'postgis';
     const res = await getMvtStyle(kind, row.layerName);
     const style = res?.data?.style || res?.style;
     if (style && typeof style === 'object') {
@@ -142,7 +144,7 @@ const open = async (row: PublishedVO) => {
   try {
     data.value = (await listPublishedEndpoints(row.id)).data;
     state.value = data.value.state || row.state;
-    const baseUrl = data.value.endpoints.find((e) => e.name.startsWith('内置预览'))?.url || '';
+    const baseUrl = data.value.endpoints.find((e) => e.name.startsWith(t('map.auto.builtInPreview')))?.url || '';
     previewUrl.value = await buildPreviewUrl(baseUrl, row);
   } finally {
     loading.value = false;
@@ -152,9 +154,9 @@ const open = async (row: PublishedVO) => {
 const copyUrl = async (url: string) => {
   try {
     await navigator.clipboard.writeText(url);
-    proxy?.$modal.msgSuccess('已复制到剪贴板');
+    proxy?.$modal.msgSuccess(t('map.auto.text30'));
   } catch {
-    proxy?.$modal.msgWarning('浏览器拒绝访问剪贴板，请手动选择复制');
+    proxy?.$modal.msgWarning(t('map.auto.browser2'));
   }
 };
 
@@ -286,7 +288,7 @@ const buildCode = (
 const openCode = async () => {
   codeVisible.value = true;
   codeLoading.value = true;
-  codeText.value = '正在读取该图层的网格定义…';
+  codeText.value = t('map.auto.layerof');
   try {
     const kind = previewKind.value || 'mvt';
     const u = new URL(previewUrl.value, window.location.origin);
@@ -318,9 +320,9 @@ const openCode = async () => {
 const copyCode = async () => {
   try {
     await navigator.clipboard.writeText(codeText.value);
-    proxy?.$modal.msgSuccess('已复制到剪贴板');
+    proxy?.$modal.msgSuccess(t('map.auto.text30'));
   } catch {
-    proxy?.$modal.msgWarning('浏览器拒绝访问剪贴板，请手动选择复制');
+    proxy?.$modal.msgWarning(t('map.auto.browser2'));
   }
 };
 

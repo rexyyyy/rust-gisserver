@@ -11,6 +11,7 @@ pub mod catalog_import;
 pub mod config;
 pub mod db_catalog;
 pub mod handlers;
+pub mod i18n;
 pub mod legend;
 pub mod layer;
 pub mod manager;

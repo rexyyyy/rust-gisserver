@@ -1,3 +1,4 @@
+import i18n from '@/lang';
 import request from '@/utils/request';
 import { getToken } from '@/utils/auth';
 import { AxiosPromise } from 'axios';
@@ -190,7 +191,7 @@ export async function importStoreShpStream(
     signal
   });
   if (!resp.ok || !resp.body) {
-    throw new Error(`导入接口异常（HTTP ${resp.status}）`);
+    throw new Error(`${i18n.global.t('misc.auto.importAPIErrorHTTP')}${resp.status})`);
   }
   const reader = resp.body.getReader();
   const decoder = new TextDecoder();

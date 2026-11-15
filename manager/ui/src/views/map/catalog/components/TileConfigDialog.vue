@@ -1,15 +1,15 @@
 <template>
   <!-- 选择服务器上的 ArcGIS Conf.xml，解析出发布所需的瓦片网格（CRS/原点/LOD） -->
-  <el-dialog v-model="visible" title="选择瓦片配置 XML" width="820px" append-to-body @open="onOpen">
+  <el-dialog v-model="visible" :title="$t('map.auto.selectTileConfigurationXML')" width="820px" append-to-body @open="onOpen">
     <el-alert type="info" :closable="false" show-icon class="mb-[10px]">
       <template #title>
-        选择工作空间数据根目录下的 ArcGIS <b>Conf.xml</b>（或其所在缓存目录），读取坐标系、原点、瓦片尺寸与 LOD 阶梯。
+        {{ $t('map.auto.arcgisCacheHint') }}
       </template>
     </el-alert>
 
     <div class="flex items-center gap-2 mb-[8px]">
-      <el-button size="small" icon="Back" :disabled="!canGoUp" @click="goUp">上一级</el-button>
-      <span class="text-xs text-[#888] truncate" :title="curPath">{{ relPath || root || '未配置数据根目录' }}</span>
+      <el-button size="small" icon="Back" :disabled="!canGoUp" @click="goUp">{{ $t('map.auto.parent') }}</el-button>
+      <span class="text-xs text-[#888] truncate" :title="curPath">{{ relPath || root || $t('map.auto.dataRootIsNotConfigured') }}</span>
     </div>
 
     <el-table
@@ -21,53 +21,55 @@
       highlight-current-row
       @row-click="onRowClick"
     >
-      <el-table-column label="名称" min-width="320" :show-overflow-tooltip="true">
+      <el-table-column :label="$t('map.auto.name')" min-width="320" :show-overflow-tooltip="true">
         <template #default="{ row }">
-          <span :class="row.is_dir ? 'text-[#2f6fd0]' : ''">{{ row.is_dir ? '[目录] ' + row.name : row.name }}</span>
+          <span :class="row.is_dir ? 'text-[#2f6fd0]' : ''">{{ row.is_dir ? $t('map.auto.dir') + row.name : row.name }}</span>
         </template>
       </el-table-column>
-      <el-table-column label="类型" width="90" align="center">
+      <el-table-column :label="$t('map.auto.type')" width="90" align="center">
         <template #default="{ row }">
           <el-tag size="small" effect="plain" :type="row.is_dir ? 'info' : 'success'">
-            {{ row.is_dir ? '目录' : 'XML' }}
+            {{ row.is_dir ? $t('map.auto.catalog2') : 'XML' }}
           </el-tag>
         </template>
       </el-table-column>
-      <el-table-column label="大小" width="110" align="right">
+      <el-table-column :label="$t('map.auto.size')" width="110" align="right">
         <template #default="{ row }">{{ row.is_dir ? '—' : fmtSize(row.size) }}</template>
       </el-table-column>
     </el-table>
 
     <div class="mt-[12px] flex items-center gap-2">
-      <span class="text-sm shrink-0">XML 路径</span>
-      <el-input v-model="pathInput" placeholder="可直接粘贴绝对路径，或在上表中选择 Conf.xml" />
-      <el-button type="primary" :loading="parsing" @click="parse(pathInput)">解析</el-button>
+      <span class="text-sm shrink-0">{{ $t('map.auto.xmlPath') }}</span>
+      <el-input v-model="pathInput" :placeholder="$t('map.auto.pasteAnAbsolutePathOrSelectConfXmlFromTheT')" />
+      <el-button type="primary" :loading="parsing" @click="parse(pathInput)">{{ $t('map.auto.parse') }}</el-button>
     </div>
 
     <el-alert v-if="error" :title="error" type="error" :closable="false" show-icon class="mt-[10px]" />
 
     <div v-if="parsed" class="mt-[10px]">
       <div class="text-xs">
-        坐标系 <b>{{ parsed.crs }}</b> · 瓦片 {{ parsed.tile_px || parsed.tile_cols || '—' }} px · 原点
-        [{{ (parsed.origin || []).join(', ') }}] · 层级 {{ parsed.min_zoom ?? '—' }}–{{ parsed.max_zoom ?? '—' }}
-        （{{ (parsed.lods || []).length }} 级）
+        {{ $t('map.auto.crs8') }} <b>{{ parsed.crs }}</b> · {{ $t('map.auto.text169') }} {{ parsed.tile_px || parsed.tile_cols || '—' }} px · {{ $t('map.auto.text170') }}
+        [{{ (parsed.origin || []).join(', ') }}] · {{ $t('map.auto.level') }} {{ parsed.min_zoom ?? '—' }}–{{ parsed.max_zoom ?? '—' }}
+        ({{ (parsed.lods || []).length }} {{ $t('map.auto.text172') }})
       </div>
-      <div class="text-xs text-gray-400 truncate" :title="parsed.source">来源：{{ parsed.source }}</div>
+      <div class="text-xs text-gray-400 truncate" :title="parsed.source">{{ $t('map.auto.text41') }}{{ parsed.source }}</div>
       <el-table :data="lods" size="small" border max-height="150" class="mt-1">
-        <el-table-column prop="level" label="级别" width="70" align="center" />
-        <el-table-column prop="scale" label="比例尺" align="right" />
-        <el-table-column prop="resolution" label="分辨率（地图单位/像素）" align="right" />
+        <el-table-column prop="level" :label="$t('map.auto.level')" width="70" align="center" />
+        <el-table-column prop="scale" :label="$t('map.auto.scale')" align="right" />
+        <el-table-column prop="resolution" :label="$t('map.auto.resolutionMapUnitsPixel')" align="right" />
       </el-table>
     </div>
 
     <template #footer>
-      <el-button @click="visible = false">取消</el-button>
-      <el-button type="primary" :disabled="!parsed" @click="confirm">确定</el-button>
+      <el-button @click="visible = false">{{ $t('map.auto.cancel') }}</el-button>
+      <el-button type="primary" :disabled="!parsed" @click="confirm">{{ $t('map.auto.ok') }}</el-button>
     </template>
   </el-dialog>
 </template>
 
 <script setup lang="ts">
+import { useI18n } from 'vue-i18n';
+const { t } = useI18n();
 import { getCurrentInstance, ComponentInternalInstance, computed, ref } from 'vue';
 import { listWorkspaceDirs, parseTileGrid } from '@/api/map/catalog';
 import type { DirEntry, NativeGridLevel, TileGridParseResp } from '@/api/map/catalog/types';
@@ -128,7 +130,7 @@ const lods = computed<NativeGridLevel[]>(() => {
 
 const load = async (path?: string) => {
   if (!props.workspaceId) {
-    error.value = '未能确定所属工作空间，无法浏览服务器目录';
+    error.value = t('map.auto.cannotDetermineTheWorkspaceUnableToBrowseT');
     return;
   }
   loading.value = true;
@@ -143,7 +145,7 @@ const load = async (path?: string) => {
       .filter((e) => e.is_dir || e.name.toLowerCase().endsWith('.xml'))
       .sort((a, b) => (a.is_dir === b.is_dir ? a.name.localeCompare(b.name) : a.is_dir ? -1 : 1));
   } catch (e: any) {
-    proxy?.$modal.msgError(e?.message || '目录读取失败');
+    proxy?.$modal.msgError(e?.message || t('map.auto.failedToReadDirectory'));
   } finally {
     loading.value = false;
   }
@@ -164,7 +166,7 @@ const goUp = () => {
 const parse = async (raw: string) => {
   const path = (raw || '').trim();
   if (!path) {
-    error.value = '请选择或填写 Conf.xml 路径';
+    error.value = t('map.auto.selectOrEnterTheConfXmlPath');
     return;
   }
   parsing.value = true;
@@ -175,7 +177,7 @@ const parse = async (raw: string) => {
     pathInput.value = res.data.source || path;
   } catch (e: any) {
     parsed.value = null;
-    error.value = e?.message || '解析失败';
+    error.value = e?.message || t('map.auto.parseFailed');
   } finally {
     parsing.value = false;
   }

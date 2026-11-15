@@ -1,3 +1,4 @@
+import i18n from '@/lang';
 import { parseTime } from '@/utils/ruoyi';
 
 /**
@@ -33,19 +34,19 @@ export const formatTime = (time: string, option: string) => {
   const diff = (now - d) / 1000;
 
   if (diff < 30) {
-    return '刚刚';
+    return i18n.global.t('misc.auto.justNow');
   } else if (diff < 3600) {
     // less 1 hour
-    return Math.ceil(diff / 60) + '分钟前';
+    return Math.ceil(diff / 60) + i18n.global.t('misc.auto.minutesAgo');
   } else if (diff < 3600 * 24) {
-    return Math.ceil(diff / 3600) + '小时前';
+    return Math.ceil(diff / 3600) + i18n.global.t('misc.auto.hoursAgo');
   } else if (diff < 3600 * 24 * 2) {
-    return '1天前';
+    return i18n.global.t('misc.auto.n1DayAgo');
   }
   if (option) {
     return parseTime(t, option);
   } else {
-    return d.getMonth() + 1 + '月' + d.getDate() + '日' + d.getHours() + '时' + d.getMinutes() + '分';
+    return d.getMonth() + 1 + i18n.global.t('misc.auto.month') + d.getDate() + i18n.global.t('misc.auto.day') + d.getHours() + i18n.global.t('misc.auto.hour') + d.getMinutes() + i18n.global.t('misc.auto.minute');
   }
 };
 

@@ -3,9 +3,8 @@
     <!-- 红线提示：这里是「发现」出来的元数据清单，不是数据本体 -->
     <el-alert type="info" :closable="false" show-icon class="mb-[10px]">
       <template #title>
-        数据源（Store）是目录 / 连接串指针；数据图层（Resource）是「只读发现」
-        扫描该数据源后得到的实体清单，一个数据源可含 0..N 个图层。首次选中空数据源会自动发现一次；「发布」只写引擎的
-        Layer / TilesetService 配置并热重载，不导入数据、不生成瓦片。
+        {{ $t('map.auto.catalogLegend') }}
+        Layer / TilesetService {{ $t('map.auto.importData3') }}
       </template>
     </el-alert>
 
@@ -15,10 +14,10 @@
         <aside class="catalog-side" :style="{ width: sideWidth + 'px' }">
           <el-select
             v-model="wsId"
-            placeholder="全部空间"
+            :placeholder="$t('map.auto.all3')"
             clearable
             style="width: 100% !important"
-            :title="wsId ? wsLabel(wsId) : '全部工作空间'"
+            :title="wsId ? wsLabel(wsId) : $t('map.auto.all')"
             @change="onWsChange"
           >
             <el-option v-for="w in workspaces" :key="w.id" :label="`${w.name}${w.title ? ' — ' + w.title : ''}`" :value="w.id" />
@@ -31,16 +30,16 @@
                 :key="s.id"
                 class="catalog-side__item"
                 :class="{ 'is-active': s.id === storeId, 'is-del': s.delFlag === 1 }"
-                :title="`${s.name}（${s.storeType}）${s.delFlag === 1 ? ' · 已删除' : ''}`"
+                :title="`${s.name} (${s.storeType})${s.delFlag === 1 ? $t('map.auto.delete3') : ''}`"
                 @click="selectStore(s)"
               >
                 <span class="name">{{ s.name }}</span>
                 <span class="meta">{{ s.resourceCount }}</span>
               </div>
             </template>
-            <el-empty v-if="!sideGroups.length" :image-size="48" description="该工作空间下暂无数据源" />
+            <el-empty v-if="!sideGroups.length" :image-size="48" :description="$t('map.auto.text60')" />
           </div>
-          <div class="catalog-side__resize" @mousedown="startResize" title="拖动调整侧栏宽度" />
+          <div class="catalog-side__resize" @mousedown="startResize" :title="$t('map.auto.text61')" />
         </aside>
 
         <!-- 右侧：数据图层列表 -->
@@ -51,9 +50,9 @@
                 v-if="currentStore && !currentStore.isPostgis"
                 v-model="discoverDepth"
                 style="width: 130px"
-                title="目录型数据源「只读发现」的递归层深"
+                :title="$t('map.auto.catalogOf2')"
               >
-                <el-option v-for="d in [1, 2, 3, 4]" :key="d" :label="`发现深度 ${d}`" :value="d" />
+                <el-option v-for="d in [1, 2, 3, 4]" :key="d" :label="`${t('map.auto.text62')}${d}`" :value="d" />
               </el-select>
               <el-button
                 v-hasPermi="['map:catalog:publish']"
@@ -64,13 +63,13 @@
                 :disabled="!currentStore || currentStore.delFlag === 1"
                 @click="handleDiscover"
               >
-                只读发现
+                {{ $t('map.auto.text185') }}
               </el-button>
-              <el-checkbox v-model="includeDeleted" @change="onFilterChange">显示已删除</el-checkbox>
+              <el-checkbox v-model="includeDeleted" @change="onFilterChange">{{ $t('map.auto.showdelete') }}</el-checkbox>
             </template>
             <template #actions>
-              <el-button icon="Refresh" @click="reloadAll">刷新</el-button>
-              <router-link to="/data/store" class="link-type">维护数据源</router-link>
+              <el-button icon="Refresh" @click="reloadAll">{{ $t('map.auto.refresh') }}</el-button>
+              <router-link to="/data/store" class="link-type">{{ $t('map.auto.text63') }}</router-link>
             </template>
           </CatalogToolbar>
 
@@ -78,7 +77,7 @@
             <div class="mb-[10px] flex flex-wrap items-center gap-2">
               <el-tag type="primary" effect="dark">{{ wsName(currentStore.workspaceId) }} / {{ currentStore.name }}</el-tag>
               <el-tag type="info" effect="plain">{{ currentStore.storeType }}</el-tag>
-              <span class="text-xs text-gray-500">{{ currentStore.isPostgis ? currentStore.pgDsnMasked || '未登记连接串' : currentStore.basePath }}</span>
+              <span class="text-xs text-gray-500">{{ currentStore.isPostgis ? currentStore.pgDsnMasked || $t('map.auto.text64') : currentStore.basePath }}</span>
             </div>
             <el-table
               v-loading="loading"
@@ -88,15 +87,15 @@
               size="small"
               style="width: 100%"
             >
-              <el-table-column label="资源名" min-width="180">
+              <el-table-column :label="$t('map.auto.text65')" min-width="180">
                 <template #default="{ row }">
                   <el-tooltip placement="top">
                     <template #content>
-                      <div>数据类型：{{ row.dataType || '—' }}</div>
+                      <div>{{ $t('map.auto.dataType2') }}{{ row.dataType || '—' }}</div>
                       <div>
-                        源坐标系：{{ row.srcCrs || '未声明' }}<span v-if="row.crsSuspicious && !is3dOrTerrain(row)" class="crs-warn">（可疑）</span>
+                        {{ $t('map.auto.crs12') }}{{ row.srcCrs || $t('map.auto.text67') }}<span v-if="row.crsSuspicious && !is3dOrTerrain(row)" class="crs-warn">{{ $t('map.auto.text66') }}</span>
                       </div>
-                      <div>四至：{{ row.bbox ? bboxText(row.bbox) : '待填写' }}</div>
+                      <div>{{ $t('map.auto.four2') }}{{ row.bbox ? bboxText(row.bbox) : $t('map.auto.text68') }}</div>
                     </template>
                     <span class="res-name">
                       <span class="name-text">{{ row.name }}</span>
@@ -106,7 +105,7 @@
                         size="small"
                         effect="plain"
                         class="ml-1"
-                      >可疑</el-tag>
+                      >{{ $t('map.auto.text69') }}</el-tag>
                       <el-tag
                         v-if="needsNativeGrid(row)"
                         type="warning"
@@ -114,13 +113,13 @@
                         effect="light"
                         class="ml-1"
                         :title="nativeGridTip(row)"
-                      >自定义坐标/网格</el-tag>
+                      >{{ $t('map.auto.customCRSGrid') }}</el-tag>
                     </span>
                   </el-tooltip>
                 </template>
               </el-table-column>
-              <el-table-column label="数据定位" prop="source" min-width="190" :show-overflow-tooltip="true" />
-              <el-table-column label="发布态" align="center" min-width="110">
+              <el-table-column :label="$t('map.auto.text70')" prop="source" min-width="190" :show-overflow-tooltip="true" />
+              <el-table-column :label="$t('map.auto.text71')" align="center" min-width="110">
                 <template #default="{ row }">
                   <template v-if="publishedOf(row).length">
                     <div class="flex flex-wrap items-center justify-center gap-1">
@@ -133,10 +132,10 @@
                       >{{ stateLabel(p.state) }}</el-tag>
                     </div>
                   </template>
-                  <el-tag v-else type="info" size="small" effect="plain">未发布</el-tag>
+                  <el-tag v-else type="info" size="small" effect="plain">{{ $t('map.auto.text72') }}</el-tag>
                 </template>
               </el-table-column>
-              <el-table-column label="操作" align="center" width="300" fixed="right">
+              <el-table-column :label="$t('map.auto.actions')" align="center" width="300" fixed="right">
                 <template #default="{ row }">
                   <!-- PostGIS 普通表：提供数据查询服务（不发布图层） -->
                   <el-button
@@ -148,7 +147,7 @@
                     :disabled="row.delFlag === 1"
                     @click="openQuery(row)"
                   >
-                    数据查询
+                    {{ $t('map.auto.query4') }}
                   </el-button>
                   <!-- 空间图层：发布为图层服务 -->
                   <el-button
@@ -160,10 +159,10 @@
                     :disabled="!row.publishable || publishedOf(row).length > 0 || row.delFlag === 1"
                     @click="pubRef?.open(row, currentStore?.workspaceId || 0)"
                   >
-                    发布
+                    {{ $t('map.auto.text37') }}
                   </el-button>
                   <template v-if="solePublished(row)">
-                    <el-button link type="success" icon="View" @click="pvRef?.open(solePublished(row)!)">预览</el-button>
+                    <el-button link type="success" icon="View" @click="pvRef?.open(solePublished(row)!)">{{ $t('map.auto.preview3') }}</el-button>
                     <el-button
                       v-hasPermi="['map:catalog:publish']"
                       link
@@ -171,7 +170,7 @@
                       icon="Edit"
                       @click="pubRef?.openEdit(solePublished(row)!)"
                     >
-                      修改
+                      {{ $t('map.auto.edit') }}
                     </el-button>
                   </template>
                   <el-button
@@ -183,7 +182,7 @@
                     :loading="refreshingId === row.id"
                     @click="handleRefresh(row)"
                   >
-                    刷新
+                    {{ $t('map.auto.refresh') }}
                   </el-button>
                   <el-button
                     v-if="row.delFlag === 1"
@@ -193,14 +192,13 @@
                     icon="RefreshLeft"
                     @click="handleRestore(row)"
                   >
-                    恢复
+                    {{ $t('map.auto.text55') }}
                   </el-button>
                 </template>
               </el-table-column>
             </el-table>
             <div class="mt-2 text-xs text-gray-400">
-              共 {{ total }} 个数据图层。图层来自数据源「只读发现」，是派生记录：源文件/库表变化后点单行「刷新」重读元数据；
-              不再提供删除（重新发现即可同步增删）。一个资源已有服务时「发布」禁用，请到「已发布服务」页调整。
+              {{ $t('map.auto.resourceCountHint', { n: total }) }}
             </div>
             <div class="mt-3 flex justify-end">
               <el-pagination
@@ -213,7 +211,7 @@
               />
             </div>
           </template>
-          <el-empty v-else description="请先选择一个数据源（没有的话到「数据源」页新建并执行只读发现）" />
+          <el-empty v-else :description="$t('map.auto.oneOfRows')" />
         </section>
       </div>
     </el-card>
@@ -222,12 +220,12 @@
     <PreviewDialog ref="pvRef" />
 
     <!-- PostGIS 普通表数据查询对话框 -->
-    <el-dialog v-model="queryDlg.visible" :title="`数据查询 — ${queryDlg.tableName}`" width="900px" append-to-body>
+    <el-dialog v-model="queryDlg.visible" :title="`${t('map.auto.query')}${queryDlg.tableName}`" width="900px" append-to-body>
       <div class="mb-2 flex items-center gap-2">
         <span class="text-xs text-gray-500">{{ queryDlg.schema }}.{{ queryDlg.table }}</span>
         <el-input-number v-model="queryDlg.limit" :min="1" :max="1000" size="small" controls-position="right" style="width: 120px" />
-        <el-button type="primary" plain size="small" icon="Search" :loading="queryDlg.loading" @click="runQuery">查询</el-button>
-        <span class="text-xs text-gray-400">共返回 {{ queryDlg.rowCount }} 行（上限 {{ queryDlg.limit }}）</span>
+        <el-button type="primary" plain size="small" icon="Search" :loading="queryDlg.loading" @click="runQuery">{{ $t('map.auto.query2') }}</el-button>
+        <span class="text-xs text-gray-400">{{ $t('map.auto.back') }}{{ queryDlg.rowCount }} {{ $t('map.auto.rows') }}{{ queryDlg.limit }}）</span>
       </div>
       <el-table v-loading="queryDlg.loading" :data="queryDlg.tableData" border size="small" max-height="500" style="width: 100%">
         <el-table-column
@@ -245,6 +243,8 @@
 </template>
 
 <script setup name="MapCatalogResource" lang="ts">
+import { useI18n } from 'vue-i18n';
+const { t } = useI18n();
 import {
   discoverStore,
   listPublished,
@@ -320,7 +320,7 @@ const runQuery = async () => {
     });
     queryDlg.rowCount = res.data.row_count ?? rows.length;
   } catch (e: any) {
-    queryDlg.error = e?.message || '查询失败';
+    queryDlg.error = e?.message || t('map.auto.queryfailed');
     queryDlg.columns = [];
     queryDlg.tableData = [];
     queryDlg.rowCount = 0;
@@ -490,8 +490,8 @@ const needsNativeGrid = (row: ResourceVO) => {
   return !!m && !['3857', '900913'].includes(m[1]);
 };
 const nativeGridTip = (row: ResourceVO) =>
-  `源坐标系 ${row.srcCrs}，不是 WebMercator：发布时请选该坐标系对应的网格（4490 可选 ` +
-  'CGCS2000Quad / 天地图 LOD / 自定义 XML），并用原生坐标预览；按默认 WebMercator 浏览会白屏。';
+  `${t('map.auto.crs9')}${row.srcCrs}${t('map.auto.yesWebMercatorHourCRSof4490')}` +
+  t('map.auto.cgcs2000quadLODXMLPreviewByDefaultWebMerca');
 /** 仅一个服务时才给「预览 / 修改」，多个则到「已发布服务」页分别操作 */
 const solePublished = (row: ResourceVO) => (publishedOf(row).length === 1 ? publishedOf(row)[0] : undefined);
 
@@ -506,7 +506,7 @@ const runDiscover = async (s: StoreVO) => {
   discovering.value = true;
   try {
     const res = await discoverStore(s.id, s.isPostgis ? { schema: s.pgSchema } : { depth: discoverDepth.value });
-    proxy?.$modal.msgSuccess(`发现 ${res.data.discovered} 个实体，刷新账本 ${res.data.stored} 条`);
+    proxy?.$modal.msgSuccess(`${t('map.auto.text73')}${res.data.discovered}${t('map.auto.refresh3')}${res.data.stored}${t('map.auto.text74')}`);
     await loadStores();
     await load();
   } finally {
@@ -531,16 +531,16 @@ const ensureDiscovered = async (s: StoreVO) => {
 /** 空表格提示：把「为什么没有图层」和下一步动作讲清楚 */
 const emptyText = computed(() => {
   const s = currentStore.value;
-  if (!s) return '请先选择一个数据源';
-  if (s.delFlag === 1) return '该数据源已删除，可到「数据源」页恢复';
-  return '该数据源下暂无数据图层：已尝试自动发现。如仍为空，请确认目录内有受支持的数据文件（tif/mbtiles/pmtiles/geojson/…），且引擎 DATA_ROOT 覆盖该目录';
+  if (!s) return t('map.auto.one3');
+  if (s.delFlag === 1) return t('map.auto.delete4');
+  return t('map.auto.dataLayerPleaseConfirmCatalogofTifMbtilesP');
 });
 
 const handleRefresh = async (row: ResourceVO) => {
   refreshingId.value = row.id;
   try {
     await refreshResource(row.id);
-    proxy?.$modal.msgSuccess(`已刷新「${row.name}」的元数据`);
+    proxy?.$modal.msgSuccess(`${t('map.auto.refresh4')}${row.name}${t('map.auto.of3')}`);
     await load();
   } finally {
     refreshingId.value = null;
@@ -548,9 +548,9 @@ const handleRefresh = async (row: ResourceVO) => {
 };
 
 const handleRestore = async (row: ResourceVO) => {
-  await proxy?.$modal.confirm(`确认恢复数据图层「${row.name}」？其关联服务还需到「已发布服务」页单独启动。`);
+  await proxy?.$modal.confirm(`${t('map.auto.confirmdataLayer')}${row.name}${t('map.auto.publishedServices2')}`);
   await restoreResource(row.id);
-  proxy?.$modal.msgSuccess('已恢复');
+  proxy?.$modal.msgSuccess(t('map.auto.text75'));
   await reloadAll();
 };
 

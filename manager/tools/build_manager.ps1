@@ -1,7 +1,7 @@
-# 重编 rust-gisserver 后端（debug）+ 跑单测。手动设齐 MSVC + Windows SDK 环境后直调 cargo。
-# 用法：powershell -ExecutionPolicy Bypass -File tools/build_manager.ps1
-# 说明：本机 Bash shim 残缺、PowerShell 禁止 cmd.exe，.bat 跑不了；jsonwebtoken→ring
-#       等依赖仍需 MSVC link.exe + kernel32.lib，故必须显式设齐 LIB/INCLUDE/PATH。
+# Rebuild the rust-gisserver backend (debug) and run unit tests; set MSVC + Windows SDK env first.
+# Usage: powershell -ExecutionPolicy Bypass -File tools/build_manager.ps1
+# Note: the local Bash shim is incomplete and PowerShell blocks cmd.exe, so .bat files fail;
+#       jsonwebtoken->ring still needs MSVC link.exe + kernel32.lib, so LIB/INCLUDE/PATH must be set.
 $msvc  = "C:\Program Files\Microsoft Visual Studio\2022\Community\VC\Tools\MSVC\14.44.35207"
 $sdk   = "C:\Program Files (x86)\Windows Kits\10"
 $sdkv  = "10.0.26100.0"

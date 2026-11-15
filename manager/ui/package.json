@@ -10,6 +10,8 @@
     "build:prod": "vite build --mode production",
     "build:dev": "vite build --mode development",
     "preview": "vite preview",
+    "test:i18n": "vitest run src/lang/__tests__",
+    "check:i18n": "node scripts/check-hardcoded-zh.mjs",
     "lint:eslint": "eslint",
     "lint:eslint:fix": "eslint --fix",
     "prettier": "prettier --write ."
