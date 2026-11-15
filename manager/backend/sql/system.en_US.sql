@@ -1,4 +1,4 @@
-﻿-- =====================================================================
+-- =====================================================================
 -- rust-gisserver - system.sql - System & Monitoring modules (DDL + seed data)
 -- ---------------------------------------------------------------------
 -- Purpose: rust-gisserver manager (Axum + PostgreSQL) baseline - create all tables and seed

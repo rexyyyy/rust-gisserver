@@ -1,4 +1,4 @@
-﻿-- =====================================================================
+-- =====================================================================
 -- rust-gisserver - map.sql - Map & Data Services modules (DDL + menus)
 -- ---------------------------------------------------------------------
 -- Purpose: rust-gisserver manager map business baseline with two top-level directories:
