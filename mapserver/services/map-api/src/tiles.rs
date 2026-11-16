@@ -1,7 +1,9 @@
 //! Tile factory: turns a (grid, z, col, row) address into tile bytes,
 //! shared by the TMS / WMTS / MVT / XYZ front-ends.
 
+use std::collections::HashMap;
 use std::io::{Read, Write};
+use std::sync::{Mutex, OnceLock};
 
 use gisserver::pmtiles::tile_type as pt;
 use gisserver::projection::Transformer;
@@ -76,6 +78,21 @@ pub fn gunzip_pbf(bytes: &[u8]) -> std::io::Result<Vec<u8>> {
     Ok(out)
 }
 
+/// 一张 `tile_px` 见方的全透明 PNG：缓存里根本没切这一级时的应答（见
+/// [`raster_tile`] 的 arcgis 分支）。按尺寸记忆化，免得每次 miss 都重编码空画布。
+fn blank_tile_png(tile_px: u32) -> Option<TileOut> {
+    static BLANKS: OnceLock<Mutex<HashMap<u32, Vec<u8>>>> = OnceLock::new();
+    let map = BLANKS.get_or_init(Default::default);
+    let mut map = map.lock().unwrap_or_else(|e| e.into_inner());
+    if let Some(bytes) = map.get(&tile_px) {
+        return Some(TileOut::png(bytes.clone()));
+    }
+    let canvas = vec![0u8; (tile_px * tile_px * 4) as usize];
+    let bytes = gisserver::renderer::png::encode_rgba(&canvas, tile_px, tile_px).ok()?;
+    map.insert(tile_px, bytes.clone());
+    Some(TileOut::png(bytes))
+}
+
 /// Render a raster tile at a top-left grid address `(z, col, row)`.
 ///
 /// * MBTiles archive -> read-through (PNG/JPEG/WebP payload per `metadata`).
@@ -114,12 +131,22 @@ pub fn raster_tile(
     }
     if let Some(ac) = &layer.arcgis {
         // 寻址直接沿用 (z, col, row)：ArcGIS 缓存的 row 自 TileOrigin（左上）
-        // 向南递增，与本函数的 XYZ/左上约定一致。空槽/未切层级/缓存区外都是
-        // Ok(None) —— 给 404，不是 500（客户端总会沿数据矩形外多取一圈）。
+        // 向南递增，与本函数的 XYZ/左上约定一致。
         let tile = ac
             .read_tile(z, col, row)
-            .map_err(|e| format!("read arcgis cache {z}/{col}/{row}: {e}"))?
-            .ok_or_else(|| format!("tile {z}/{col}/{row} not in cache"))?;
+            .map_err(|e| format!("read arcgis cache {z}/{col}/{row}: {e}"))?;
+        let Some(tile) = tile else {
+            // 层级存在但槽位为空 / 数据矩形外：继续给 404。这类地址无界，回 200
+            // 会把它们一一存进输出缓存挤掉真实瓦片的预算（同 cache.rs 不把 empty
+            // 载荷写进 output 的取舍）。
+            if ac.probe().levels.contains(&z) {
+                return Err(format!("tile {z}/{col}/{row} not in cache"));
+            }
+            // 这一级没切（缓存层级区间由 Conf.xml 收紧，见 grid::derive）：地址有界
+            // 且数量很小，给一张透明瓦片，免得直连 XYZ 的客户端把整幅空白读成故障。
+            return blank_tile_png(grid.tile_w.max(1))
+                .ok_or_else(|| format!("tile {z}/{col}/{row} not in cache"));
+        };
         return Ok(TileOut {
             bytes: tile.bytes,
             content_type: tile.content_type.to_string(),

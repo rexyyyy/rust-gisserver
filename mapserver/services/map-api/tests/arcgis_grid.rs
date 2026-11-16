@@ -225,3 +225,92 @@ fn real_cache_grid_and_scales_survive_the_service_layer() {
         .expect("真实缓存应可打开为图层");
     assert!(rt.arcgis.is_some(), "LayerRuntime 应持有 arcgis 读取器");
 }
+
+/// 合成一份 compact v2 缓存的 Conf.xml：声明 0/1 两级，磁盘上只有 `L01`。
+const CONF_V2_TWO_LEVELS: &str = r#"<?xml version="1.0" encoding="utf-8" ?>
+<CacheInfo xsi:type='typens:CacheInfo' xmlns:xsi='http://www.w3.org/2001/XMLSchema-instance' xmlns:xs='http://www.w3.org/2001/XMLSchema' xmlns:typens='http://www.esri.com/schemas/ArcGIS/10.1'>
+	<TileCacheInfo xsi:type='typens:TileCacheInfo'>
+		<SpatialReference xsi:type='typens:GeographicCoordinateSystem'>
+			<WKT>GEOGCS[&quot;GCS_China_Geodetic_Coordinate_System_2000&quot;,AUTHORITY[&quot;EPSG&quot;,4490]]</WKT>
+			<WKID>4490</WKID>
+			<LatestWKID>4490</LatestWKID>
+		</SpatialReference>
+		<TileOrigin xsi:type='typens:PointN'><X>-180</X><Y>90</Y></TileOrigin>
+		<TileCols>256</TileCols>
+		<TileRows>256</TileRows>
+		<DPI>96</DPI>
+		<LODInfos xsi:type='typens:ArrayOfLODInfo'>
+			<LODInfo xsi:type='typens:LODInfo'><LevelID>0</LevelID><Scale>295829355.454566</Scale><Resolution>0.703125</Resolution></LODInfo>
+			<LODInfo xsi:type='typens:LODInfo'><LevelID>1</LevelID><Scale>147914677.727283</Scale><Resolution>0.3515625</Resolution></LODInfo>
+		</LODInfos>
+	</TileCacheInfo>
+	<TileImageInfo xsi:type='typens:TileImageInfo'><CacheTileFormat>PNG</CacheTileFormat></TileImageInfo>
+	<CacheStorageInfo xsi:type='typens:CacheStorageInfo'><StorageFormat>esriMapCacheStorageModeCompactV2</StorageFormat><PacketSize>128</PacketSize></CacheStorageInfo>
+</CacheInfo>
+"#;
+
+/// v2 bundle 字节：64 字节头 + 128×128 个 8 字节槽（前 5 字节绝对偏移、后 3 字节
+/// 载荷大小，**行优先**）+ 载荷。与 `gisserver` 侧的合成 fixture 同一口径。
+fn v2_bundle(png: &[u8], row_in: u32, col_in: u32) -> Vec<u8> {
+    const PACKET: u32 = 128;
+    let data = 64 + (PACKET * PACKET * 8) as usize;
+    let mut b = vec![0u8; data + png.len()];
+    let p = 64 + (PACKET * row_in + col_in) as usize * 8;
+    b[p..p + 5].copy_from_slice(&(data as u64).to_le_bytes()[..5]);
+    b[p + 5..p + 8].copy_from_slice(&(png.len() as u32).to_le_bytes()[..3]);
+    b[data..].copy_from_slice(png);
+    b
+}
+
+/// 三种"没图"的分工，用合成缓存钉住（真实 E 盘缓存没有"整级缺失"的样例）：
+///
+/// * 槽位为空 / 数据矩形外 → 404：这是一片无界地址，客户端该收手，回 200 会把
+///   它们一一存进输出缓存，挤掉真实瓦片的预算。
+/// * 整级没切 → 200 全透明 PNG：粗级地址总数很小（4^z），而破图与控制台噪声对
+///   直连 XYZ 的客户端没有任何价值。
+/// * 命中 → 缓存里的原样字节，Content-Type 由载荷魔数决定。
+#[tokio::test]
+async fn missing_level_answers_blank_while_empty_slot_stays_404() {
+    let mut base = std::env::temp_dir();
+    base.push(format!("rmap_arcgis_blank_{}", std::process::id()));
+    let cache = base.join("svc");
+    let layers = cache.join("Layers");
+    let all = layers.join("_alllayers");
+    std::fs::create_dir_all(all.join("L01")).expect("建 fixture 目录");
+    let one_px = gisserver::renderer::png::encode_rgba(&[0xFF, 0xFF, 0xFF, 0xFF], 1, 1).expect("编码 1px PNG");
+    std::fs::write(all.join("L01/R0000C0000.bundle"), v2_bundle(&one_px, 1, 2)).expect("写 bundle");
+    std::fs::write(layers.join("Conf.xml"), CONF_V2_TWO_LEVELS).expect("写 Conf.xml");
+
+    let catalog = temp_catalog(&layer_xml(&cache.display().to_string().replace('\\', "/")));
+    let cfg = config_with_root(&catalog);
+    let (layers_def, grids, warnings) = cfg.collect_layers();
+    assert!(warnings.is_empty(), "合成缓存不该有告警：{warnings:?}");
+    let state = map_api::AppState::new(cfg, None).await.expect("AppState");
+    let layer = map_api::layer::LayerRuntime::open(layers_def[0].clone(), None, 3, None)
+        .expect("fixture 应可打开为图层");
+    let tms = grids.get("arcgis_td").expect("应注入 arcgis_td 网格").to_tms("arcgis_td");
+
+    let hit = map_api::tiles::raster_tile(&state, &layer, &tms, 1, 2, 1).expect("槽位命中");
+    assert_eq!(hit.bytes, one_px, "命中应给缓存原样字节");
+    assert_eq!(hit.content_type, "image/png");
+
+    let err = map_api::tiles::raster_tile(&state, &layer, &tms, 1, 5, 5).unwrap_err();
+    assert!(err.contains("not in cache"), "空槽应报缺片：{err}");
+    assert_eq!(map_api::handlers::tile_error_status(&err).as_u16(), 404, "空槽仍是 404");
+
+    for z in [0, 2] {
+        // z=0：Conf.xml 声明了但 L00 目录不存在；z=2：连阶梯里都没有——都该出透明片
+        let blank = map_api::tiles::raster_tile(&state, &layer, &tms, z, 0, 0)
+            .unwrap_or_else(|e| panic!("缺级 z{z} 应给透明瓦片，实际：{e}"));
+        assert_eq!(blank.content_type, "image/png");
+        assert!(blank.bytes.starts_with(&[0x89, b'P', b'N', b'G', 0x0D, 0x0A, 0x1A, 0x0A]), "z{z} 应答不是 PNG");
+        let w = u32::from_be_bytes(blank.bytes[16..20].try_into().unwrap());
+        let h = u32::from_be_bytes(blank.bytes[20..24].try_into().unwrap());
+        assert_eq!((w, h), (tms.tile_w, tms.tile_h), "z{z} 透明瓦片应为整张瓦片尺寸");
+        let again = map_api::tiles::raster_tile(&state, &layer, &tms, z, 1, 1).expect("同尺寸再取");
+        assert_eq!(again.bytes, blank.bytes, "透明瓦片应按尺寸复用同一份字节");
+    }
+
+    let _ = std::fs::remove_dir_all(&base);
+    let _ = std::fs::remove_dir_all(&catalog);
+}
