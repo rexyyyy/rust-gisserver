@@ -67,3 +67,10 @@
 /_fmt_err.txt
 /manager/ui/_i18n_*_out.txt
 /manager/backend/_i18n_cargo_test.txt
+
+# ===== Full-test run artifacts (never commit) =====
+# 2026-11-12/ holds a 13 GB full test run: build/test logs, scratch scripts
+# and CSV inventories, some with machine-local paths and plaintext secrets.
+# Only the four Chinese reports under outputs/ were force-added on purpose;
+# ignore rules do not affect files already tracked.
+/2026-11-12/
