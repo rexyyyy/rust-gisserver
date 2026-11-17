@@ -25,6 +25,8 @@ use crate::arcgis_cache::xmlscan;
 pub enum ImageType {
     Png,
     Jpeg,
+    /// gis-wt 定制：WebP 瓦片（bundle 扩展名为 .webpdle）。
+    Webp,
     /// 混合：同一缓存里既有 PNG 又有 JPEG（最常见），需按瓦片魔数嗅探。
     Mixed,
     /// 其他/未知（LERC 等），按二进制透传。
@@ -36,6 +38,9 @@ impl ImageType {
         match s.trim().to_ascii_uppercase().as_str() {
             "PNG" | "PNG8" => ImageType::Png,
             "JPEG" | "MIXEDJPEG" => ImageType::Jpeg,
+            // WEBPDLE 是 gis-wt 写端在 CacheTileFormat 里打的定制标识；
+            // 也兼容标准 "WEBP"，便于将来读标准 WebP 缓存。
+            "WEBP" | "WEBPDLE" => ImageType::Webp,
             "MIXED" => ImageType::Mixed,
             _ => ImageType::Other,
         }

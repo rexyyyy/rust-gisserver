@@ -18,6 +18,11 @@
 //! * **v2（ArcGIS 10.3+）**：无 `.bundlx`，索引内嵌在 `.bundle` 的 64 字节头之后，
 //!   每槽 **8 字节**（前 5 字节偏移 + 后 3 字节大小），槽位号 `idx =
 //!   PacketSize * (row % PacketSize) + (col % PacketSize)`（**行优先**，与 v1 相反）。
+//! * **WTC v1（gis-wt 自有，2026-11）**：`magic = "GISWTC01"` 开头，64B 自描述头 +
+//!   `tile_count × 16B` 稀疏索引（只存有效瓦片，按 `(row_in,col_in)` 升序，二分查找），
+//!   瓦片 `[4B size][WebP]`。不再是 ArcGIS 格式变体，详见 gis-wt `docs/12-WebP缓存格式规范.md`。
+//!   WTC 的 `offset`/`size` 语义与 v2 一致（offset 指向图像数据首字节），故读瓦片时共用
+//!   v2 分支；区别只在索引如何解析。扩展名沿用 `.webpdle`，靠 magic 分派。
 //!
 //! v1 的列优先 / v2 的行优先是这类读取最容易写错、且错了**不报错**（只会整体镜像
 //! 错位）的一处，因此 [`tests`] 用两种顺序分别解出矩阵，再与 conf.cdi 的真实
@@ -41,6 +46,9 @@ use crate::arcgis_cache::grid::{self, GridSpec};
 /// bundle 头长度（v1 的 `.bundlx`、v2 的 `.bundle` 各取自身格式的头）。
 const HDR_V1_BUNDLX: u64 = 16;
 const HDR_V2_BUNDLE: u64 = 64;
+/// WTC v1 自描述头长度与 magic。
+const HDR_WTC: u64 = 64;
+const WTC_MAGIC: &[u8; 8] = b"GISWTC01";
 /// 一个 bundle 最多容纳的瓦片数上限（PacketSize² 的实际取值就是 128²=16384）。
 const MAX_PACKET: u32 = 256;
 /// 索引表缓存的 bundle 个数上限：一张表 16384×(8B) ≈ 128 KB，64 张 ≈ 8 MB，
@@ -54,6 +62,8 @@ pub enum CacheVersion {
     V1,
     /// ArcGIS 10.3+：索引内嵌 `.bundle`。
     V2,
+    /// gis-wt WTC v1：magic `GISWTC01`，自描述头 + 16B 稀疏索引（扩展名沿用 `.webpdle`）。
+    Wtc,
 }
 
 /// 一片瓦片的读取结果。
@@ -292,9 +302,10 @@ impl ArcgisCache {
                 }
                 (off + 4, size)
             }
-            // v2：大小就在索引槽里（3 字节），0 = 空槽。
-            CacheVersion::V2 if size_v2 == 0 => return Ok(None),
-            CacheVersion::V2 => (off, size_v2),
+            // v2 / WTC v1：大小就在索引槽里，0 = 空槽；offset 指向图像数据首字节。
+            // WTC 的稀疏索引在 table() 里已展开成同样的 (off, size) 密集槽，共用此分支。
+            CacheVersion::V2 | CacheVersion::Wtc if size_v2 == 0 => return Ok(None),
+            CacheVersion::V2 | CacheVersion::Wtc => (off, size_v2),
         };
         if size > 64 * 1024 * 1024 {
             return Err(format!(
@@ -354,6 +365,51 @@ impl ArcgisCache {
                     .collect();
                 (entries, Arc::new(bundle))
             }
+            CacheVersion::Wtc => {
+                // WTC v1：magic + 64B 自描述头 + tile_count×16B 稀疏索引。
+                // 把稀疏索引展开成 packet² 密集槽（与 V2 同构），缺槽 (0,0)。
+                let bundle = sidecar(base, "bundle")?;
+                let bytes = std::fs::read(&bundle)
+                    .map_err(|e| format!("读 {}: {e}", bundle.display()))?;
+                if bytes.len() < HDR_WTC as usize {
+                    return Err(format!("{} 长度 {} < WTC 头 64B", bundle.display(), bytes.len()));
+                }
+                if &bytes[..8] != WTC_MAGIC {
+                    return Err(format!("{} 非 WTC 格式（magic={:?}）", bundle.display(), &bytes[..8]));
+                }
+                let wpacket = u32::from_le_bytes(bytes[20..24].try_into().unwrap()) as usize;
+                let tile_count = u32::from_le_bytes(bytes[24..28].try_into().unwrap()) as usize;
+                let entry_size = u32::from_le_bytes(bytes[28..32].try_into().unwrap()) as usize;
+                let index_off = u64::from_le_bytes(bytes[32..40].try_into().unwrap()) as usize;
+                if wpacket == 0 || wpacket > MAX_PACKET as usize {
+                    return Err(format!("{} WTC packet={wpacket} 越界", bundle.display()));
+                }
+                if entry_size != 16 {
+                    return Err(format!("{} WTC 索引条目大小 {entry_size} != 16", bundle.display()));
+                }
+                let need = index_off.saturating_add(tile_count * 16);
+                if bytes.len() < need {
+                    return Err(format!("{} WTC 索引截断：需 {need}B，实际 {}B", bundle.display(), bytes.len()));
+                }
+                let wn = wpacket * wpacket;
+                let mut dense = vec![(0u64, 0u32); wn];
+                for i in 0..tile_count {
+                    let p = index_off + i * 16;
+                    let col_in = u16::from_le_bytes(bytes[p..p + 2].try_into().unwrap()) as usize;
+                    let row_in = u16::from_le_bytes(bytes[p + 2..p + 4].try_into().unwrap()) as usize;
+                    let size = u32::from_le_bytes(bytes[p + 4..p + 8].try_into().unwrap());
+                    let offset = u64::from_le_bytes(bytes[p + 8..p + 16].try_into().unwrap());
+                    if col_in >= wpacket || row_in >= wpacket {
+                        return Err(format!("{} WTC 索引 {i} 的 (col,row)=({col_in},{row_in}) 越界", bundle.display()));
+                    }
+                    // 行优先，与 slot(V2) 一致；wpacket 应与 Conf.xml packet 相同。
+                    let idx = wpacket * row_in + col_in;
+                    if idx < dense.len() {
+                        dense[idx] = (offset, size);
+                    }
+                }
+                (dense, Arc::new(bundle))
+            }
         };
         let t = Arc::new(Table { entries, bundle });
         self.tables
@@ -364,40 +420,56 @@ impl ArcgisCache {
     }
 }
 
-/// 槽位号：v1 列优先、v2 行优先（见模块文档）。
+/// 槽位号：v1 列优先、v2 / WTC 行优先（见模块文档）。
 fn slot(packet: u32, col_in: u32, row_in: u32, version: CacheVersion) -> usize {
     match version {
         CacheVersion::V1 => (packet * col_in + row_in) as usize,
-        CacheVersion::V2 => (packet * row_in + col_in) as usize,
+        CacheVersion::V2 | CacheVersion::Wtc => (packet * row_in + col_in) as usize,
     }
 }
 
 /// 把 `<base>` 换成同目录的 `<stem>.<ext>`，并按磁盘实际大小写解析。
+///
+/// gis-wt 定制：当 `ext == "bundle"` 但标准 `.bundle` 不存在时，回退查找
+/// `.webpdle`（Compact Cache V2 结构 + WebP 瓦片，扩展名定制）。这样一份
+/// 缓存里两种扩展名可共存，读端对老格式行为完全不变。
 fn sidecar(base: &Path, ext: &str) -> Result<PathBuf, String> {
-    let candidate = format!("{}.{}", base.display(), ext);
-    let p = Path::new(&candidate);
-    if p.exists() {
-        return Ok(actual_case(p));
-    }
-    // bundle 基名里的十六进制大小写可能不一致。
-    if let Some(dir) = base.parent() {
-        if let Some(stem) = base.file_name().and_then(|s| s.to_str()) {
-            let want = format!("{stem}.{ext}").to_ascii_lowercase();
-            if let Ok(entries) = std::fs::read_dir(dir) {
-                for e in entries.flatten() {
-                    let np = e.path();
-                    if np.is_file()
-                        && np.file_name()
-                            .map(|n| n.to_string_lossy().to_ascii_lowercase() == want)
-                            .unwrap_or(false)
-                    {
-                        return Ok(np);
+    // 依次尝试的扩展名：标准扩展优先，webpdle 仅作为 bundle 的回退。
+    let exts: &[&str] = if ext == "bundle" {
+        &["bundle", "webpdle"]
+    } else {
+        &[ext]
+    };
+    for &e in exts {
+        let candidate = format!("{}.{}", base.display(), e);
+        let p = Path::new(&candidate);
+        if p.exists() {
+            return Ok(actual_case(p));
+        }
+        // bundle 基名里的十六进制大小写可能不一致。
+        if let Some(dir) = base.parent() {
+            if let Some(stem) = base.file_name().and_then(|s| s.to_str()) {
+                let want = format!("{stem}.{e}").to_ascii_lowercase();
+                if let Ok(entries) = std::fs::read_dir(dir) {
+                    for entry in entries.flatten() {
+                        let np = entry.path();
+                        if np.is_file()
+                            && np.file_name()
+                                .map(|n| n.to_string_lossy().to_ascii_lowercase() == want)
+                                .unwrap_or(false)
+                        {
+                            return Ok(np);
+                        }
                     }
                 }
             }
         }
     }
-    Err(format!("{} 不存在", p.display()))
+    Err(format!(
+        "{} 不存在（已尝试 {}）",
+        base.display(),
+        exts.iter().map(|e| format!(".{e}")).collect::<Vec<_>>().join(" / ")
+    ))
 }
 
 /// Windows/macOS 大小写不敏感文件系统上，把路径换成磁盘实际拼写（错误信息里
@@ -429,6 +501,26 @@ pub fn find_alllayers(cache_dir: &Path) -> Result<PathBuf, String> {
 /// 版本判定：优先 Conf.xml 的显式 `BundleVersion`，否则看 `.bundlx` 是否存在，
 /// 再否则看首个 `.bundle` 的头（v2 把 16384×8B 索引嵌在 64B 头之后）。
 fn detect_version(docs: &CacheDocs, allayers: &Path) -> Result<CacheVersion, String> {
+    // WTC v1 优先：magic 是格式自描述的权威判据，必须先看文件头，
+    // 否则 Conf.xml 里若带 BundleVersion=2 会把 WTC 误判成 V2。
+    for z in docs.info.min_zoom()..=docs.info.max_zoom() {
+        let dir = allayers.join(format!("L{z:02}"));
+        if !dir.is_dir() { continue; }
+        let Ok(entries) = std::fs::read_dir(&dir) else { continue };
+        for e in entries.flatten() {
+            let p = e.path();
+            let name = p.file_name().map(|n| n.to_string_lossy().to_ascii_lowercase()).unwrap_or_default();
+            if name.ends_with(".webpdle") || name.ends_with(".bundle") {
+                let mut head = [0u8; 8];
+                if let Ok(mut f) = std::fs::File::open(&p) {
+                    use std::io::Read;
+                    if f.read_exact(&mut head).is_ok() && &head == WTC_MAGIC {
+                        return Ok(CacheVersion::Wtc);
+                    }
+                }
+            }
+        }
+    }
     if let Some(v) = docs.info.bundle_version {
         return match v {
             1 | 0 => Ok(CacheVersion::V1),
@@ -453,17 +545,15 @@ fn detect_version(docs: &CacheDocs, allayers: &Path) -> Result<CacheVersion, Str
                     return Ok(CacheVersion::V1);
                 }
             }
-            if name.ends_with(".bundle") {
+            if name.ends_with(".bundle") || name.ends_with(".webpdle") {
                 saw_bundle = true;
-                // v2：头 64B 之后应能容下一整张 8B 槽位表；v1 的 .bundle 通常更短
-                //（只有 size 数组 + 数据），但不足以据此区分，故 .bundlx 才是判据。
             }
         }
     }
     if saw_bundle {
         Ok(CacheVersion::V2)
     } else {
-        Err(format!("{} 里既无 .bundle 也无 .bundlx，不是紧凑缓存", allayers.display()))
+        Err(format!("{} 里既无 .bundle/.webpdle 也无 .bundlx，不是紧凑缓存", allayers.display()))
     }
 }
 
@@ -513,6 +603,7 @@ fn probe_alllayers(allayers: &Path) -> CacheProbe {
 fn parse_bundle_name(lower: &str) -> Option<(u32, u32)> {
     let stem = lower
         .strip_suffix(".bundle")
+        .or_else(|| lower.strip_suffix(".webpdle"))
         .or_else(|| lower.strip_suffix(".bundlx"))?;
     let pos = stem.find('c')?;
     let (rs, cs) = (&stem[1..pos], &stem[pos + 1..]);
@@ -573,6 +664,7 @@ fn sniff(bytes: &[u8], declared: ImageType) -> &'static str {
     match declared {
         ImageType::Png => "image/png",
         ImageType::Jpeg => "image/jpeg",
+        ImageType::Webp => "image/webp",
         // MIXED / Other 且魔数不认：按二进制透传，交由浏览器处理。
         _ => "application/octet-stream",
     }
@@ -645,6 +737,10 @@ mod tests {
         assert_eq!(sniff(JPG, ImageType::Mixed), "image/jpeg");
         assert_eq!(sniff(&[], ImageType::Png), "image/png");
         assert_eq!(sniff(&[1, 2, 3], ImageType::Other), "application/octet-stream");
+        // gis-wt 定制：WebP 魔数优先于声明类型，WEBPDLE 声明也能识别。
+        let webp = b"RIFF\x1a\x00\x00\x00WEBPVP8 ";
+        assert_eq!(sniff(webp, ImageType::Webp), "image/webp");
+        assert_eq!(sniff(webp, ImageType::Other), "image/webp");
     }
 
     #[test]
@@ -718,6 +814,112 @@ mod tests {
         assert_eq!(t.content_type, "image/png");
         // 用 v1 的列优先顺序去取同一瓦片必须拿不到（证明两种顺序确实分叉）
         assert!(ac.read_tile(0, 9, 7).unwrap().is_none());
+    }
+
+    /// gis-wt writer 产物读回：定制扩展名 .webpdle + V2 索引 offset 指向 WebP 数据首字节
+    /// （4B size 前缀在 offset-4），行优先槽位。覆盖老杨"格式必须完全保证"的读回闭环。
+    #[test]
+    fn gislab_webpdle_v2_roundtrip() {
+        // 一个最小的合法 lossless WebP（1x1，RIFF....WEBPVP8L）
+        let webp: &[u8] = b"RIFF\x1a\x00\x00\x00WEBPVP8L\x12\x00\x00\x00\x2f\x00\x00\x00\x10\x07\x10\x11\x11\x88\x88\xfe\x07\x00";
+        let dir = tempfile::tempdir().unwrap();
+        let cache = dir.path().join("svc_webpdle");
+        let l0 = cache.join("_alllayers").join("L00");
+        std::fs::create_dir_all(&l0).unwrap();
+        // CacheTileFormat=WEBPDLE：reader 需识别为 Webp；StorageFormat 声明 V2
+        std::fs::write(
+            cache.join("Conf.xml"),
+            tiny_conf(128, "WEBPDLE", &[0.703125]),
+        )
+        .unwrap();
+        let packet = 128u32;
+        let n = (packet * packet) as usize;
+        let header_idx = 64 + n * 8;
+        let mut b = vec![0u8; header_idx];
+        // 模拟 writer：col_in=3,row_in=5 -> idx=128*5+3；先写 4B size 前缀，再写 WebP；
+        // 索引 offset 指向 WebP 首字节（= payload+4），size 用真实 WebP 长度。
+        let col_in = 3u32;
+        let row_in = 5u32;
+        let idx = (packet * row_in + col_in) as usize;
+        let size_prefix_pos = header_idx as u64;
+        let data_off = size_prefix_pos + 4;
+        b[64 + idx * 8..64 + idx * 8 + 5]
+            .copy_from_slice(&data_off.to_le_bytes()[..5]);
+        b[64 + idx * 8 + 5..64 + idx * 8 + 8]
+            .copy_from_slice(&(webp.len() as u32).to_le_bytes()[..3]);
+        b.extend_from_slice(&(webp.len() as u32).to_le_bytes()); // 4B size 前缀
+        b.extend_from_slice(webp);
+        assert_eq!(b.len() as u64, data_off + webp.len() as u64);
+        // 关键：写 .webpdle 而非 .bundle
+        std::fs::write(l0.join("R0000C0000.webpdle"), b).unwrap();
+
+        let ac = ArcgisCache::open(&cache).unwrap();
+        assert_eq!(ac.version(), CacheVersion::V2, ".webpdle 应识别为 V2 bundle");
+        let t = ac.read_tile(0, col_in, row_in).unwrap().expect("应读回 WebP 瓦片");
+        assert_eq!(t.content_type, "image/webp");
+        assert!(t.bytes.starts_with(b"RIFF") && t.bytes.get(8..12) == Some(b"WEBP"));
+        assert_eq!(t.bytes.len(), webp.len(), "读回长度应精确等于 WebP 长度（不多读 4B 前缀、不少读尾字节）");
+        // 行列方向：V2 行优先，交换 col/row 不应命中
+        assert!(ac.read_tile(0, row_in, col_in).unwrap().is_none());
+    }
+
+    /// WTC v1 格式读回：magic + 64B 自描述头 + 16B 稀疏索引（非 V2 固定槽）。
+    /// 覆盖独立格式的核心：自描述头解析、稀疏索引展开、offset 指向 WebP 首字节。
+    #[test]
+    fn gislab_wtc_v1_roundtrip() {
+        let webp: &[u8] = b"RIFF\x1a\x00\x00\x00WEBPVP8L\x12\x00\x00\x00\x2f\x00\x00\x00\x10\x07\x10\x11\x11\x88\x88\xfe\x07\x00";
+        let dir = tempfile::tempdir().unwrap();
+        let cache = dir.path().join("svc_wtc");
+        let l0 = cache.join("_alllayers").join("L00");
+        std::fs::create_dir_all(&l0).unwrap();
+        std::fs::write(cache.join("Conf.xml"), tiny_conf(128, "WEBPDLE", &[0.703125])).unwrap();
+
+        let packet = 128u32;
+        let tile_px = 256u32;
+        // 放两张瓦片，验证稀疏索引（不写满 128×128）与排序/查找。
+        let tiles = [(3u16, 5u16, webp), (7u16, 9u16, webp)];
+        let tile_count = tiles.len() as u32;
+        let index_off = 64u64;
+        let data_off = index_off + tile_count as u64 * 16;
+        let mut b = vec![0u8; data_off as usize];
+        b[..8].copy_from_slice(WTC_MAGIC);
+        b[8..12].copy_from_slice(&1u32.to_le_bytes());          // version
+        b[12..16].copy_from_slice(&64u32.to_le_bytes());        // header_size
+        b[16..20].copy_from_slice(&tile_px.to_le_bytes());      // tile_size_px
+        b[20..24].copy_from_slice(&packet.to_le_bytes());       // packet
+        b[24..28].copy_from_slice(&tile_count.to_le_bytes());   // tile_count
+        b[28..32].copy_from_slice(&16u32.to_le_bytes());        // index_entry_size
+        b[32..40].copy_from_slice(&index_off.to_le_bytes());
+        b[40..48].copy_from_slice(&data_off.to_le_bytes());
+        // 索引按 (row_in,col_in) 升序写：(3,5) 再 (7,9)
+        let mut cursor = data_off as usize;
+        for (i, (col_in, row_in, payload)) in tiles.iter().enumerate() {
+            let p = index_off as usize + i * 16;
+            b[p..p + 2].copy_from_slice(&col_in.to_le_bytes());
+            b[p + 2..p + 4].copy_from_slice(&row_in.to_le_bytes());
+            b[p + 4..p + 8].copy_from_slice(&(payload.len() as u32).to_le_bytes());
+            b[p + 8..p + 16].copy_from_slice(&((cursor + 4) as u64).to_le_bytes()); // offset=WebP 首字节
+            b.extend_from_slice(&(payload.len() as u32).to_le_bytes()); // 4B size 前缀
+            b.extend_from_slice(payload);
+            cursor += 4 + payload.len();
+        }
+        let file_size = b.len() as u64;
+        b[48..56].copy_from_slice(&file_size.to_le_bytes()); // file_size（回填）
+        std::fs::write(l0.join("R0000C0000.webpdle"), b).unwrap();
+
+        let ac = ArcgisCache::open(&cache).unwrap();
+        assert_eq!(ac.version(), CacheVersion::Wtc, "magic GISWTC01 应判为 WTC");
+        for (col_in, row_in, payload) in tiles {
+            let t = ac.read_tile(0, col_in as u32, row_in as u32)
+                .unwrap().expect("应读回 WTC 瓦片");
+            assert_eq!(t.content_type, "image/webp");
+            assert!(t.bytes.starts_with(b"RIFF") && t.bytes.get(8..12) == Some(b"WEBP"));
+            assert_eq!(t.bytes.len(), payload.len());
+        }
+        // 不存在的槽位应返回 None（稀疏索引不占位）
+        assert!(ac.read_tile(0, 4, 4).unwrap().is_none());
+        // 行列交换不应命中
+        assert!(ac.read_tile(0, 5, 3).unwrap().is_none());
     }
 
     /// Conf.xml 最小可用文本（LOD 数 = resolutions 长度）。
