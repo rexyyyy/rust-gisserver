@@ -71,6 +71,29 @@ python manager/tools/gen_i18n_sql.py          # 重新生成
 python manager/tools/gen_i18n_sql.py --check  # 校验生成物是否最新（CI 用）
 ```
 
+### 已有库切换语言（不要重装）
+
+`system.en_US.sql` / `map.en_US.sql` 只在空库安装时有效；已有中文种子的库直接执行会因
+`on conflict do nothing` 静默失效。这种情况用就地切换补丁，不清空任何表：
+
+```bash
+# 生成补丁（中文基线或 i18n_terms.json 变更后重新生成）
+python manager/tools/gen_i18n_update_sql.py
+python manager/tools/gen_i18n_update_sql.py --check
+
+# 单事务执行（-1 保证出错整体回滚）
+psql -h localhost -p 5434 -U postgres -d mapserver-manager -v ON_ERROR_STOP=1 -1 -f manager/backend/sql/switch_to_en_US.sql
+
+# 回滚到中文
+psql -h localhost -p 5434 -U postgres -d mapserver-manager -v ON_ERROR_STOP=1 -1 -f manager/backend/sql/switch_to_zh_CN.sql
+```
+
+补丁按主键配对中英文基线中相同的种子行，只更新有差异的文本列（菜单名、字典项、公告、
+组织名、对象注释），不动用户自建行、运行时表与 `perms` / `password` / `config_key` 等业务字段。
+英文译文超出 `varchar(n)` 的列会先放宽上限（只放宽、不改数据）；对象注释在容错块中执行，
+库里缺少基线对象时自动跳过。两个方向的补丁互为回滚，均可重复执行。
+`switch_to_*.sql` 是生成物，禁止手工编辑。
+
 后端用户可见提示由请求头 `X-Language: zh_CN|en_US` 决定（缺省回落 `Accept-Language`，
 再缺省 `zh_CN`），前端 axios 拦截器统一注入；详见 `docs/i18n-and-comment-style.md`。
 

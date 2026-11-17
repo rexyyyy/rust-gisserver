@@ -1,0 +1,95 @@
+# ============================================================================
+# rust-gisserver 数据底座 — 中文环境部署入口（deploy_zh-cn）
+#
+# 公共资产（config 模板 / .env 样例 / README / validate / start）在 ../deploy/。
+# 与 deploy_en 的唯一差别：PostGIS 首次初始化种中文基线
+#   system.sql → map.sql（dbinit/00-init.sql）
+# 运行期接口 msg 由 manager 后端 i18n 中间件按请求头 X-Language 动态 zh→en。
+#
+# 使用：
+#   cd manager/deploy_zh-cn
+#   copy ..\deploy\.env.example .env   # 填 MAPSERVER_DB_PASSWORD / MANAGER_JWT_SECRET
+#   docker compose up -d --build
+#   pwsh -File ..\deploy\start.ps1 -Dir .   # 或直接 up 后跑 validate.ps1
+#
+# 两个语言目录是独立 compose 项目（卷互不共享）：切换语言 = 另一目录直接 up，
+# 不需要 down -v；但 6180/8080/15434 端口相同，不能同时起两套。
+# ============================================================================
+name: gis-data-base-zh
+
+services:
+  postgis:
+    image: postgis/postgis:16-3.4
+    container_name: gis-postgis
+    environment:
+      POSTGRES_DB: "mapserver-manager"
+      # PG 账号走环境变量：默认 postgres / 123456（本机开发口径），可被 .env 覆盖
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${MAPSERVER_DB_PASSWORD:-123456}
+    ports:
+      - "${MAPSERVER_DB_PORT:-5434}:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      # 首次启动受控建表：dbinit/00-init.sql 依序执行 /sql 下 system.sql → map.sql
+      # （不能把 backend/sql 整目录挂进 initdb.d —— 字母序会先跑 cleanup/clear_seed，
+      #   对尚不存在的表 DELETE/TRUNCATE，初始化直接失败）
+      - ../backend/sql:/sql:ro
+      - ./dbinit:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U \"$$POSTGRES_USER\" -d 'mapserver-manager'"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+    restart: unless-stopped
+
+  map-api:
+    build:
+      # 仓库根为上下文：工作区 mapserver/ 的核心库是 path 依赖 ../gisserver，
+      # 两者必须同上下文（见仓库根 .dockerignore）
+      context: ../..
+      dockerfile: mapserver/Dockerfile
+    image: gis/map-api:0.1
+    container_name: gis-map-api
+    depends_on:
+      postgis:
+        condition: service_healthy
+    environment:
+      MAPSERVER_DB_PASSWORD: ${MAPSERVER_DB_PASSWORD:-123456}
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+    volumes:
+      - ../deploy/config/mapserver:/app/config.template:ro
+      - map_cache:/app/cache
+      # gisdata 数据挂载点：ws1 工作区 data_root 即此目录（容器内 /app/data）。
+      # 宿主路径经 GISDATA_DIR 指定（默认 ./gisdata，Windows 路径请用正斜杠）
+      - ${GISDATA_DIR:-./gisdata}:/app/data:ro
+    ports:
+      - "8080:8080"
+    restart: unless-stopped
+
+  manager:
+    build:
+      context: ..
+      dockerfile: Dockerfile
+    image: gis/manager:0.1
+    container_name: gis-manager
+    depends_on:
+      postgis:
+        condition: service_healthy
+    environment:
+      MAPSERVER_DB_PASSWORD: ${MAPSERVER_DB_PASSWORD:-123456}
+      MANAGER_JWT_SECRET: ${MANAGER_JWT_SECRET:?MANAGER_JWT_SECRET 未设置，请在 .env 中配置}
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+    volumes:
+      - ../deploy/config/manager:/app/config.template:ro
+      - mgr_storage:/app/storage
+      # gisdata 同路径挂进 manager（可写）：工作区保存时 ensure_std_subdirs
+      # 要在 data_root 下创建 14 个标准子目录，manager 必须能写
+      - ${GISDATA_DIR:-./gisdata}:/app/data
+    ports:
+      - "6180:6180"
+    restart: unless-stopped
+
+volumes:
+  pgdata:
+  map_cache:
+  mgr_storage:

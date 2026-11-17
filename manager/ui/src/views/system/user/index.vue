@@ -151,7 +151,7 @@
         <el-row>
           <el-col :span="12">
             <el-form-item :label="$t('system.auto.nickname')" prop="nickName">
-              <el-input v-model="form.nickName" :placeholder="$t('system.auto.pleaseEnterNickname')" maxlength="30" />
+              <el-input v-model="form.nickName" :placeholder="$t('system.auto.pleaseEnterNickname')" maxlength="64" />
             </el-form-item>
           </el-col>
           <el-col :span="12" v-if="form.userId == null || form.userId != useUserStore().userId">

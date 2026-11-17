@@ -23,4 +23,3 @@ deploy/
 
 Dockerfile
 .dockerignore
-docker-entrypoint.sh

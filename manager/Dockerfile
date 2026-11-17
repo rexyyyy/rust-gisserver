@@ -4,7 +4,9 @@
 #
 # 三阶段：
 #   1) ui       node:22-slim  pnpm 构建前端 → /ui/dist
-#   2) api      rust:1-slim-book 编译后端 manager（reqwest 关 TLS、
+#   2) api      debian:bookworm-slim + rustup 装 Rust 工具链（USTC 镜像，
+#               钉 1.98.1 与本机一致；不用 rust:1-slim-book——国内 mirror
+#               对其 manifest 返回 DENIED）编译后端 manager（reqwest 关 TLS、
 #               tokio-postgres 无 TLS、jsonwebtoken 用 ring → 仅 C 工具链，
 #               无需 OpenSSL）
 #   3) runtime  debian:bookworm-slim + ca-certificates + gettext-base
@@ -18,16 +20,27 @@
 # ---- 1) frontend -----------------------------------------------------------
 FROM node:22-slim AS ui
 WORKDIR /ui
-RUN npm install -g pnpm@9
-COPY ui/package.json ui/pnpm-lock.yaml ./
+RUN npm install -g pnpm@12
+COPY ui/package.json ui/pnpm-lock.yaml ui/pnpm-workspace.yaml ./
 RUN pnpm install --frozen-lockfile
 COPY ui/ ./
 RUN pnpm run build:prod
 
 # ---- 2) backend ------------------------------------------------------------
-FROM rust:1-slim-book AS api
+FROM debian:bookworm-slim AS api
+
+ENV RUSTUP_HOME=/usr/local/rustup \
+    CARGO_HOME=/usr/local/cargo \
+    RUSTUP_DIST_SERVER=https://mirrors.ustc.edu.cn/rust-static \
+    RUSTUP_UPDATE_ROOT=https://mirrors.ustc.edu.cn/rust-static/rustup \
+    PATH=/usr/local/cargo/bin:$PATH
+
 RUN apt-get update \
- && apt-get install -y --no-install-recommends build-essential pkg-config \
+ && apt-get install -y --no-install-recommends build-essential pkg-config curl ca-certificates \
+ && curl -fsSLO "$RUSTUP_UPDATE_ROOT/dist/x86_64-unknown-linux-gnu/rustup-init" \
+ && chmod +x rustup-init \
+ && ./rustup-init -y --profile minimal --default-toolchain 1.98.1 --no-modify-path \
+ && rm rustup-init \
  && rm -rf /var/lib/apt/lists/*
 WORKDIR /src
 COPY backend ./backend

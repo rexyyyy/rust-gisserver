@@ -138,7 +138,7 @@ create table if not exists sys_user
     user_id     int8,
     dept_id     int8,
     user_name   varchar(30)  not null,
-    nick_name   varchar(30)  not null,
+    nick_name   varchar(64)  not null,
     user_type   varchar(10)  default 'sys_user'::varchar,
     email       varchar(50)  default ''::varchar,
     phonenumber varchar(11)  default ''::varchar,
@@ -620,7 +620,7 @@ comment on column sys_logininfor.login_time     is '访问时间';
 create table if not exists sys_notice
 (
     notice_id      int8,
-    notice_title   varchar(50)  not null,
+    notice_title   varchar(64)  not null,
     notice_type    char         not null,
     notice_content text,
     status         char         default '0'::bpchar,
