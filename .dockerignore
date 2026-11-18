@@ -1,0 +1,18 @@
+# map-api 镜像构建上下文（manager/deploy/docker-compose.yml 以仓库根为 context：
+# 工作区 mapserver/ 的核心库是 path 依赖 ../gisserver，两个目录必须同上下文）。
+# 白名单式：先排除一切，再放行两个 Rust 目录，最后剔除其本地构建产物与本机数据。
+*
+!gisserver
+!mapserver
+
+# Rust 构建产物（镜像内重新编译）
+gisserver/target/
+mapserver/target/
+
+# mapserver 下的本机运行数据 / 装置 / 工具，与镜像无关
+mapserver/cache/
+mapserver/config/
+mapserver/data/
+mapserver/fixtures/
+mapserver/install/
+mapserver/tools/

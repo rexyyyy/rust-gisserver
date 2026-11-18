@@ -322,9 +322,9 @@ fn normalize_data_root(raw: &str) -> String {
 }
 
 /// Standard subdirs under workspace data root (auto-created before bind / modify save).
-const WORKSPACE_STD_SUBDIRS: [&str; 13] = [
-    "3dtiles", "arcgis_cah", "cog", "docs", "geojson", "mbtiles", "pmtiles", "postgis", "prj",
-    "recon", "shapefile", "terrain", "xml-grid",
+const WORKSPACE_STD_SUBDIRS: [&str; 14] = [
+    "3dtiles", "arcgis_cache", "arcgis_tpk", "cog", "docs", "geojson", "mbtiles", "pmtiles",
+    "postgis", "prj", "recon", "shapefile", "terrain", "xml-grid",
 ];
 
 /// Ensure data root exists and standard subdirs are in place before save.

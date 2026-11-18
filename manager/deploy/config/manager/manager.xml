@@ -15,7 +15,7 @@
       <item>http://127.0.0.1:6180</item>
     </cors_origins>
   </server>
-  <database url="postgresql://postgres:${MAPSERVER_DB_PASSWORD}@postgis:5432/mapserver-manager" pool_max="16"/>
+  <database url="postgresql://${POSTGRES_USER:-postgres}:${MAPSERVER_DB_PASSWORD}@postgis:5432/mapserver-manager" pool_max="16"/>
   <storage avatar_dir="/app/storage/avatar"/>
   <mapsvc base_url="http://map-api:8080"/>
   <security jwt_secret="${MANAGER_JWT_SECRET}" token_expire_minutes="1440" captcha_enabled="false">

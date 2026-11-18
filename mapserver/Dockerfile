@@ -3,7 +3,9 @@
 # mapserver / map-api — 发布服务平面镜像（开发计划 P0-1 一键部署）
 #
 # 多阶段：
-#   1) builder  rust:1-slim-book，装 build-essential + pkg-config
+#   1) builder  debian:bookworm-slim + rustup 装 Rust 工具链（USTC 镜像）。
+#      不用 rust:1-slim-book：国内 mirror 对该镜像 manifest 返回 DENIED，
+#      而 debian 可正常拉取；工具链版本钉在 1.98.1（与本机开发一致）。
 #      （rusqlite 以 bundled 方式从源码编 libsqlite3，需 C 工具链；
 #        ureq 走 rustls、tokio-postgres 不启用 TLS，故无需 OpenSSL）。
 #   2) runtime  debian:bookworm-slim，带 ca-certificates + gettext-base
@@ -19,21 +21,34 @@
 # ============================================================================
 
 # ---- build stage -----------------------------------------------------------
-FROM rust:1-slim-book AS builder
+FROM debian:bookworm-slim AS builder
+
+ENV RUSTUP_HOME=/usr/local/rustup \
+    CARGO_HOME=/usr/local/cargo \
+    RUSTUP_DIST_SERVER=https://mirrors.ustc.edu.cn/rust-static \
+    RUSTUP_UPDATE_ROOT=https://mirrors.ustc.edu.cn/rust-static/rustup \
+    PATH=/usr/local/cargo/bin:$PATH
 
 RUN apt-get update \
- && apt-get install -y --no-install-recommends build-essential pkg-config \
+ && apt-get install -y --no-install-recommends build-essential pkg-config curl ca-certificates \
+ && curl -fsSLO "$RUSTUP_UPDATE_ROOT/dist/x86_64-unknown-linux-gnu/rustup-init" \
+ && chmod +x rustup-init \
+ && ./rustup-init -y --profile minimal --default-toolchain 1.98.1 --no-modify-path \
+ && rm rustup-init \
  && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /src
 
-# 先复制清单与源码目录，尽量利用依赖编译缓存。
-# 注：/Cargo.lock 被 .gitignore 忽略，全新 clone 时不存在，cargo 自行解析。
-COPY Cargo.toml ./
-COPY crates ./crates
-COPY services ./services
+# 本仓布局：工作区在 mapserver/（成员 services/*），核心库是 path 依赖
+# ../gisserver —— 故 compose 以仓库根为 build 上下文，把两个目录一起送进
+# daemon；容器内保持 gisserver 与 mapserver 同级，依赖路径原样可解析。
+# 先复制清单与核心库，源码放最后，尽量利用依赖编译缓存。
+# 注：Cargo.lock 不入库（全新 clone 时不存在），cargo 自行解析依赖。
+COPY mapserver/Cargo.toml ./mapserver/
+COPY gisserver ./gisserver
+COPY mapserver/services ./mapserver/services
 
-RUN cargo build --release -p map-api
+RUN cargo build --release --manifest-path ./mapserver/Cargo.toml -p map-api
 
 # ---- runtime stage ---------------------------------------------------------
 FROM debian:bookworm-slim AS runtime
@@ -44,8 +59,8 @@ RUN apt-get update \
 
 WORKDIR /app
 
-COPY --from=builder /src/target/release/map-api /app/map-api
-COPY docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh
+COPY --from=builder /src/mapserver/target/release/map-api /app/map-api
+COPY mapserver/docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh
 # 归一化行尾（防 Windows CRLF 破坏 shebang）并赋可执行位。
 RUN sed -i 's/\r$//' /usr/local/bin/docker-entrypoint.sh \
  && chmod +x /usr/local/bin/docker-entrypoint.sh

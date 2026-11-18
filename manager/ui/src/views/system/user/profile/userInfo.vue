@@ -1,7 +1,7 @@
 <template>
   <el-form ref="userRef" :model="userForm" :rules="rules" label-width="80px">
     <el-form-item :label="$t('system.auto.nickname')" prop="nickName">
-      <el-input v-model="userForm.nickName" maxlength="30" />
+      <el-input v-model="userForm.nickName" maxlength="64" />
     </el-form-item>
     <el-form-item :label="$t('system.auto.phoneNumber')" prop="phonenumber">
       <el-input v-model="userForm.phonenumber" maxlength="11" />

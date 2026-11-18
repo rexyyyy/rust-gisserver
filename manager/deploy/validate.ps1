@@ -15,6 +15,7 @@ param(
     [string]$DbHost = 'localhost',
     [int]$DbPort = 5434,
     [string]$AdminToken = '',
+    [string]$Dir = '',
     [switch]$CheckDataRoot
 )
 
@@ -66,12 +67,14 @@ if ($ac) {
 # 5) manager root (static hosting on the same port; any response means it is up)
 $null = Probe 'manager /' "$ManagerBase/"
 
-# 6) Local data_root directory existence (optional)
-#    config/mapserver.xml uses ${DATA_ROOT:-data}; unset falls back to ./data under the deploy dir.
+# 6) gisdata mount-point directory existence (optional)
+#    compose mounts GISDATA_DIR (default ./gisdata under the selected deploy dir)
+#    at /app/data in both containers; ws1's data_root points there.
 if ($CheckDataRoot) {
-    $dr = [Environment]::GetEnvironmentVariable('DATA_ROOT')
-    if ([string]::IsNullOrWhiteSpace($dr)) { $dr = Join-Path $PSScriptRoot 'data' }
-    Add 'data_root 目录' ($(if (Test-Path $dr) { 'PASS' } else { 'WARN' })) $dr
+    $deployDir = if ($Dir) { Join-Path $PSScriptRoot $Dir } else { $PSScriptRoot }
+    $dr = [Environment]::GetEnvironmentVariable('GISDATA_DIR')
+    if ([string]::IsNullOrWhiteSpace($dr)) { $dr = Join-Path $deployDir 'gisdata' }
+    Add 'gisdata 目录' ($(if (Test-Path $dr) { 'PASS' } else { 'WARN' })) $dr
 
     $tdr = [Environment]::GetEnvironmentVariable('TESTDATA_ROOT')
     if ([string]::IsNullOrWhiteSpace($tdr)) {
