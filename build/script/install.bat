@@ -117,6 +117,9 @@ echo # manager DSN password  ^(config/manager/manager.xml^)
 echo MANAGER_DB_PASSWORD=change-me
 echo # manager JWT signing secret  ^(generate: openssl rand -hex 32^)
 echo MANAGER_JWT_SECRET=change-me-random-secret
+echo # manager DSN encryption key ^(optional^): derived from JWT secret when empty;
+echo #   rotate with care - old ciphertext becomes undecryptable; switch dsn_cipher=des/sm4 in config/manager.xml
+echo # MANAGER_DSN_KEY=change-me-random-32-bytes-key
 echo # map-api admin DSN password  ^(config/mapserver.xml^)
 echo MAPSERVER_DB_PASSWORD=change-me
 echo.

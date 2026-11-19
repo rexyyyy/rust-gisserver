@@ -263,7 +263,7 @@ pub async fn pg_tables(
         .unwrap_or("")
         .trim()
         .to_string();
-    let entries = match pg_table_entries(&dsn, &schema).await {
+    let (entries, truncated) = match pg_table_entries(&dsn, &schema).await {
         Ok(r) => r,
         Err(e) => {
             return json(
@@ -278,7 +278,7 @@ pub async fn pg_tables(
         json!({
             "schema_filter": schema,
             "count": count,
-            "truncated": count >= MAX_ENTRIES,
+            "truncated": truncated,
             "tables": entries,
         }),
     )
@@ -290,7 +290,7 @@ pub async fn pg_tables(
 /// 除空间表（`geometry_columns` 登记的）外，还返回同一模式下**无 geometry 列**的
 /// 普通表（`data_type=pg_table`），供组织层提供「数据查询服务」入口。普通表
 /// `publishable=false`，不参与图层发布。
-async fn pg_table_entries(dsn: &str, schema: &str) -> Result<Vec<Value>, String> {
+async fn pg_table_entries(dsn: &str, schema: &str) -> Result<(Vec<Value>, bool), String> {
     let (kind, supported, defaults) = data_type_caps("postgis_table");
     let pool = gisserver::pg_source::PgPool::new(dsn, 1)
         .await
@@ -322,8 +322,10 @@ async fn pg_table_entries(dsn: &str, schema: &str) -> Result<Vec<Value>, String>
         let bbox = client
             .query_opt(
                 &format!(
-                    "SELECT ST_Extent(\"{}\")::text FROM \"{}\".\"{}\"",
-                    geom_col, sch, tbl
+                    "SELECT ST_Extent({})::text FROM {}.{}",
+                    quote_ident(&geom_col),
+                    quote_ident(&sch),
+                    quote_ident(&tbl)
                 ),
                 &[],
             )
@@ -402,7 +404,14 @@ async fn pg_table_entries(dsn: &str, schema: &str) -> Result<Vec<Value>, String>
             "reason": Value::Null,
         }));
     }
-    Ok(entries)
+    let truncated = entries.len() > MAX_ENTRIES;
+    entries.truncate(MAX_ENTRIES);
+    Ok((entries, truncated))
+}
+
+/// Quote a SQL identifier, doubling embedded double quotes.
+fn quote_ident(s: &str) -> String {
+    format!("\"{}\"", s.replace('"', "\"\""))
 }
 
 /// 解析 `ST_Extent::text` 的 `"BOX(minx miny,maxx maxy)"` 为 `[minx,miny,maxx,maxy]`。

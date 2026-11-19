@@ -71,5 +71,10 @@ png = { version = "0.17", optional = true }
 # --- wfs-protocol / ogcapi-features (http response types) ---
 axum = { version = "0.8.9", features = ["macros"], optional = true }
 
+# --- libc — only needed on *nix for proj.rs dlopen/dlsym; Windows uses
+#     extern "system" direct declarations so no crate is required. ---
+[target.'cfg(unix)'.dependencies]
+libc = "0.2"
+
 [dev-dependencies]
 tempfile = "3"

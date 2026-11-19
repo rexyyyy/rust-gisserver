@@ -204,7 +204,7 @@ comment on column sys_engine.is_default is '默认引擎：管理代理 /map/* �
 
 -- 种子：本地 map-api（幂等；base_url 不覆盖已有环境配置）
 insert into sys_engine (engine_id, engine_name, engine_type, base_url, status, is_default, sort, remark)
-values ('map-api', 'rust-gisserver map-api', 'rust-gisserver', 'http://127.0.0.1:8080', '0', '1', 0,
+values ('map-api', 'rust-gisserver map-api', 'rust-gisserver', 'http://map-api:8080', '0', '1', 0,
         '本地 rust-gisserver 服务面（种子值，生产按环境改 base_url）')
 on conflict (engine_id) do nothing;
 

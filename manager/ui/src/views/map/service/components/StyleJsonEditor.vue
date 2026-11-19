@@ -294,7 +294,11 @@ const save = async () => {
 };
 
 const preview = () => {
-  const url = `/preview/viewer_mvt.html?layer=${name.value}&kind=${kind.value}&base=http://127.0.0.1:8080`;
+  // Derive map-api base from the current manager host so preview works
+  // everywhere (localhost dev, Docker/WSL, remote server, prod domain).
+  // Manager (6180) and map-api (8080) share the same host; just swap the port.
+  const base = `${window.location.protocol}//${window.location.hostname}:8080`;
+  const url = `/preview/viewer_mvt.html?layer=${name.value}&kind=${kind.value}&base=${base}`;
   window.open(url, '_blank');
 };
 </script>

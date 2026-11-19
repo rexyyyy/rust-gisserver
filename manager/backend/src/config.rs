@@ -81,6 +81,16 @@ pub struct SecurityCfg {
     pub captcha_enabled: bool,
     #[serde(default)]
     pub white_list: Vec<String>,
+    /// DSN 落库加密算法：`des`（默认）或 `sm4`。
+    #[serde(default = "default_dsn_cipher")]
+    pub dsn_cipher: String,
+    /// DSN 加密密钥；留空时由 `jwt_secret` 派生（生产建议显式配置）。
+    #[serde(default)]
+    pub dsn_key: Option<String>,
+}
+
+fn default_dsn_cipher() -> String {
+    "des".to_string()
 }
 
 /// 本地文件存储配置（头像等）。

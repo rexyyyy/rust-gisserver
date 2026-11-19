@@ -101,9 +101,14 @@
 
   function setHint(t) { hintEl.textContent = t; }
   function toEpsgCode(crs) {
-    var m = /(?:EPSG[:/]|EPSG\/0\/)(\d+)\s*$/i.exec(String(crs || ''));
-    if (!m) { var alt = /(\d+)\D*$/.exec(String(crs || '')); m = alt; }
-    return m ? 'EPSG:' + m[1] : String(crs || '');
+    var s = String(crs || '');
+    // OGC CRS84 (http://www.opengis.net/def/crs/OGC/1.3/CRS84) is WGS84 lon/lat,
+    // i.e. EPSG:4326. Its trailing "84" must not be read as an EPSG code.
+    if (/CRS84\s*$/i.test(s)) return 'EPSG:4326';
+    var m = /\/EPSG\/[\d.]+\/(\d+)\s*$/i.exec(s)  // .../def/crs/EPSG/0/3857
+         || /EPSG:{1,2}\/?(\d+)\s*$/i.exec(s)     // EPSG:4326 / EPSG::4490
+         || /(\d+)\D*$/.exec(s);                  // last resort
+    return m ? 'EPSG:' + m[1] : s;
   }
   function epsgLabel(code) {
     var m = /^EPSG:(\d+)$/i.exec(String(code || ''));
@@ -377,7 +382,17 @@
     }
     src.on('tileloadend', function (e) {
       loaded++;
-      try { var fc = src.getFeatures(e.tile.getTileCoord()); features += fc ? fc.length : 0; } catch (_) {}
+      // Feature counting must go through the tile instance: VectorTileSource has
+      // no getFeatures(tileCoord) in OpenLayers 9, which made the old path throw
+      // and silently report 0 features.
+      try {
+        var t = e && e.tile, fc = null;
+        if (t && typeof t.getFeatures === 'function') fc = t.getFeatures();
+        if ((!fc || !fc.length) && typeof src.getFeatures === 'function') {
+          fc = src.getFeatures(t.getTileCoord());
+        }
+        features += fc ? fc.length : 0;
+      } catch (_) {}
       bump();
     });
     src.on('tileloaderror', function () { loaded++; bump(); });

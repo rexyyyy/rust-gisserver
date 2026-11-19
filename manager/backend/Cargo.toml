@@ -31,3 +31,7 @@ tower-http = { version = "0.6.11", features = ["cors", "fs", "compression-gzip",
 percent-encoding = "2.3"
 # map-api 管理面代理（内网 http，无需 TLS）
 reqwest = { version = "0.12", default-features = false, features = ["json", "stream"] }
+# DSN 落库加密：默认 DES-CBC，可配置 SM4（libsm）
+des = "0.8"
+cbc = { version = "0.1", features = ["alloc"] }
+libsm = "0.6"

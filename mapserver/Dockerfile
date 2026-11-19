@@ -25,17 +25,22 @@ FROM debian:bookworm-slim AS builder
 
 ENV RUSTUP_HOME=/usr/local/rustup \
     CARGO_HOME=/usr/local/cargo \
-    RUSTUP_DIST_SERVER=https://mirrors.ustc.edu.cn/rust-static \
-    RUSTUP_UPDATE_ROOT=https://mirrors.ustc.edu.cn/rust-static/rustup \
+    RUSTUP_DIST_SERVER=https://rsproxy.cn \
+    RUSTUP_UPDATE_ROOT=https://rsproxy.cn/rustup \
     PATH=/usr/local/cargo/bin:$PATH
 
-RUN apt-get update \
+# Debian apt mirror (bookworm DEB822 format uses URIs: http://host/path).
+# Replace the host only — scheme + /debian path are already in the file.
+RUN sed -i 's|deb.debian.org|mirrors.ustc.edu.cn|g; s|security.debian.org|mirrors.ustc.edu.cn|g' /etc/apt/sources.list.d/debian.sources \
+ && apt-get update \
  && apt-get install -y --no-install-recommends build-essential pkg-config curl ca-certificates \
  && curl -fsSLO "$RUSTUP_UPDATE_ROOT/dist/x86_64-unknown-linux-gnu/rustup-init" \
  && chmod +x rustup-init \
  && ./rustup-init -y --profile minimal --default-toolchain 1.98.1 --no-modify-path \
  && rm rustup-init \
- && rm -rf /var/lib/apt/lists/*
+ && rm -rf /var/lib/apt/lists/* \
+ && mkdir -p "$CARGO_HOME"/.cargo \
+ && printf '[source.crates-io]\nreplace-with = "rsproxy-sparse"\n\n[source.rsproxy]\nregistry = "https://rsproxy.cn/crates.io-index"\n\n[source.rsproxy-sparse]\nregistry = "sparse+https://rsproxy.cn/index/"\n' > "$CARGO_HOME"/.cargo/config.toml
 
 WORKDIR /src
 
@@ -48,34 +53,21 @@ COPY mapserver/Cargo.toml ./mapserver/
 COPY gisserver ./gisserver
 COPY mapserver/services ./mapserver/services
 
-RUN cargo build --release --manifest-path ./mapserver/Cargo.toml -p map-api
+RUN cargo build --release --manifest-path ./mapserver/Cargo.toml
 
 # ---- runtime stage ---------------------------------------------------------
 FROM debian:bookworm-slim AS runtime
 
-RUN apt-get update \
- && apt-get install -y --no-install-recommends \
-      ca-certificates gettext-base \
-      libproj25 proj-data \
+# PROJ runtime: libproj.so (dlopen'd by gisserver), proj.db (EPSG dict, needed
+# for any CRS transform beyond the built-in 4326<->3857 pair) and its sqlite dep.
+# Without these, EPSG:4490 / 4522 / 4534 Gauss-Kruger tile requests hit 500.
+ENV PROJ_DATA=/usr/share/proj
+
+RUN sed -i 's|deb.debian.org|mirrors.ustc.edu.cn|g; s|security.debian.org|mirrors.ustc.edu.cn|g' /etc/apt/sources.list.d/debian.sources \
+ && apt-get update \
+ && apt-get install -y --no-install-recommends ca-certificates gettext-base \
+    libproj-dev proj-bin libsqlite3-0 \
  && rm -rf /var/lib/apt/lists/*
-
-# PROJ 由运行期 dlopen 加载（不参与链接），库名按平台不同：
-#   Windows proj_9.dll / Unix libproj.so。
-# Debian 只装出 libproj.so.25（裸名软链 libproj.so 在 -dev 包里），而代码按裸名
-# "libproj.so" 查找。这里建固定路径的软链并显式给出 PROJ_DLL —— 绝对路径 dlopen
-# 不依赖 ld.so 搜索路径，也不受架构 triplet（x86_64-linux-gnu / aarch64-linux-gnu）
-# 影响。PROJ_DATA 指向 proj-data 的安装目录（PROJ 9.1+ 的正式变量名）。
-# proj.db 由 proj-data 提供，与 libproj25 同源同版本（Debian bookworm 9.1.1），
-# 不会出现 Windows 侧那种 LAYOUT.MINOR 版本错配。
-RUN LIBPROJ="$(dpkg -L libproj25 | grep -E '/libproj\.so\.[0-9]+\.[0-9.]+$' | head -1)" \
- && test -n "$LIBPROJ" \
- && mkdir -p /usr/local/lib \
- && ln -sf "$LIBPROJ" /usr/local/lib/libproj.so \
- && ldconfig \
- && test -f /usr/share/proj/proj.db
-
-ENV PROJ_DLL=/usr/local/lib/libproj.so \
-    PROJ_DATA=/usr/share/proj
 
 WORKDIR /app
 
@@ -88,4 +80,4 @@ RUN sed -i 's/\r$//' /usr/local/bin/docker-entrypoint.sh \
 EXPOSE 8080
 
 ENTRYPOINT ["docker-entrypoint.sh"]
-CMD ["serve", "--config", "/app/config/mapserver.xml"]
+CMD ["/app/map-api", "serve", "--config", "/app/config/mapserver.xml"]

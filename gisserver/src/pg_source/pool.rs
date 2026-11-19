@@ -76,13 +76,36 @@ impl fmt::Debug for PgPool {
     }
 }
 
+/// Hide the password part of a DSN before it goes into an error message.
+///
+/// A malformed DSN still carries credentials; the manager forwards this error
+/// text to the browser, so `postgres://user:secret@host` must become
+/// `postgres://user:***@host`. Query parameters are kept as-is.
+fn redact_dsn(dsn: &str) -> String {
+    let Some((scheme, rest)) = dsn.split_once("://") else {
+        return "<dsn>".to_string();
+    };
+    let end = rest
+        .find(|c| c == '/' || c == '?')
+        .unwrap_or(rest.len());
+    let (auth, tail) = rest.split_at(end);
+    let auth = match auth.rsplit_once('@') {
+        Some((creds, host)) => match creds.split_once(':') {
+            Some((user, _)) => format!("{user}:***@{host}"),
+            None => format!("{creds}@{host}"),
+        },
+        None => auth.to_string(),
+    };
+    format!("{scheme}://{auth}{tail}")
+}
+
 impl PgPool {
     /// Build a pool handle from a DSN (shared by `new` / `new_plain`).
     fn build_pool(dsn: &str, max_size: usize) -> Result<(String, Pool), PgPoolError> {
         let config = dsn
             .parse::<tokio_postgres::Config>()
             .map_err(|source| PgPoolError::BadDsn {
-                dsn: dsn.to_string(),
+                dsn: redact_dsn(dsn),
                 source,
             })?;
         let id = pool_id(&config);

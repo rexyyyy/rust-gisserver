@@ -21,5 +21,8 @@
          DATA_ROOT 等环境变量占位都会在加载时展开（rust-gisserver db_catalog
          已接 expand_env）；本模板的 data_root 固定 /app/data，不依赖该变量。 -->
   <catalog root="/app/config" backend="files"/>
-  <admin dsn="postgresql://${POSTGRES_USER:-postgres}:${MAPSERVER_DB_PASSWORD}@postgis:5432/mapserver-manager"/>
+  <!-- 注意：envsubst 只认 ${VAR} / $VAR，不支持 ${VAR:-默认} 这种 shell 写法，
+       否则字面量会原样进入 DSN 导致 PG 连接失败（map-api 的 admin.dsn 不做二次展开）。
+       POSTGRES_USER 的默认值由 docker-entrypoint.sh export 兜底。 -->
+  <admin dsn="postgresql://${POSTGRES_USER}:${MAPSERVER_DB_PASSWORD}@postgis:5432/mapserver-manager"/>
 </config>

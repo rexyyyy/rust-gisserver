@@ -20,7 +20,9 @@
 # ---- 1) frontend -----------------------------------------------------------
 FROM node:22-slim AS ui
 WORKDIR /ui
-RUN npm install -g pnpm@12
+# pnpm/npm mirror — USTC 国内源比默认 registry.npmjs.org 快得多。
+RUN npm install -g pnpm@12 \
+ && pnpm config set registry https://registry.npmmirror.com
 COPY ui/package.json ui/pnpm-lock.yaml ui/pnpm-workspace.yaml ./
 RUN pnpm install --frozen-lockfile
 COPY ui/ ./
@@ -31,24 +33,28 @@ FROM debian:bookworm-slim AS api
 
 ENV RUSTUP_HOME=/usr/local/rustup \
     CARGO_HOME=/usr/local/cargo \
-    RUSTUP_DIST_SERVER=https://mirrors.ustc.edu.cn/rust-static \
-    RUSTUP_UPDATE_ROOT=https://mirrors.ustc.edu.cn/rust-static/rustup \
+    RUSTUP_DIST_SERVER=https://rsproxy.cn \
+    RUSTUP_UPDATE_ROOT=https://rsproxy.cn/rustup \
     PATH=/usr/local/cargo/bin:$PATH
 
-RUN apt-get update \
+RUN sed -i 's|deb.debian.org|mirrors.ustc.edu.cn|g; s|security.debian.org|mirrors.ustc.edu.cn|g' /etc/apt/sources.list.d/debian.sources \
+ && apt-get update \
  && apt-get install -y --no-install-recommends build-essential pkg-config curl ca-certificates \
  && curl -fsSLO "$RUSTUP_UPDATE_ROOT/dist/x86_64-unknown-linux-gnu/rustup-init" \
  && chmod +x rustup-init \
  && ./rustup-init -y --profile minimal --default-toolchain 1.98.1 --no-modify-path \
  && rm rustup-init \
- && rm -rf /var/lib/apt/lists/*
+ && rm -rf /var/lib/apt/lists/* \
+ && mkdir -p "$CARGO_HOME"/.cargo \
+ && printf '[source.crates-io]\nreplace-with = "rsproxy-sparse"\n\n[source.rsproxy]\nregistry = "https://rsproxy.cn/crates.io-index"\n\n[source.rsproxy-sparse]\nregistry = "sparse+https://rsproxy.cn/index/"\n' > "$CARGO_HOME"/.cargo/config.toml
 WORKDIR /src
 COPY backend ./backend
 RUN cargo build --release --manifest-path /src/backend/Cargo.toml
 
 # ---- 3) runtime ------------------------------------------------------------
 FROM debian:bookworm-slim AS runtime
-RUN apt-get update \
+RUN sed -i 's|deb.debian.org|mirrors.ustc.edu.cn|g; s|security.debian.org|mirrors.ustc.edu.cn|g' /etc/apt/sources.list.d/debian.sources \
+ && apt-get update \
  && apt-get install -y --no-install-recommends ca-certificates gettext-base \
  && rm -rf /var/lib/apt/lists/*
 
@@ -62,4 +68,4 @@ RUN sed -i 's/\r$//' /usr/local/bin/docker-entrypoint.sh \
 EXPOSE 6180
 
 ENTRYPOINT ["docker-entrypoint.sh"]
-CMD ["--config", "/app/config/manager.xml"]
+CMD ["/app/manager", "--config", "/app/config/manager.xml"]

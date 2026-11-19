@@ -612,8 +612,9 @@ const saveAdd = async () => {
   addDlg.saving = true;
   try {
     // PostGIS：由表单字段拼装 DSN；目录型：basePath 已在表单填好。
+    // 用户信息按 RFC 3986 编码（encodeURIComponent），避免密码含 @ : / # ? 时拼坏连接串。
     const pgDsn = isAddPgStore.value
-      ? `postgres://${addForm.pgUsername.trim()}:${addForm.pgPassword}@${addForm.pgHost.trim()}:${addForm.pgPort}/${addForm.pgDatabase.trim()}`
+      ? `postgres://${encodeURIComponent(addForm.pgUsername.trim())}:${encodeURIComponent(addForm.pgPassword)}@${addForm.pgHost.trim()}:${addForm.pgPort}/${encodeURIComponent(addForm.pgDatabase.trim())}`
       : '';
     const body: StoreBody = {
       workspaceId: addDlg.workspaceId,

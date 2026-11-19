@@ -2,6 +2,7 @@
 mod auth;
 mod captcha;
 mod config;
+mod dsn_crypto;
 mod engine_monitor;
 mod error;
 mod handlers;
@@ -49,6 +50,11 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         map_http: reqwest::Client::builder()
             .timeout(std::time::Duration::from_secs(30))
             .build()?,
+        dsn: Arc::new(crate::dsn_crypto::DsnCipher::from_config(
+            &cfg.security.dsn_cipher,
+            cfg.security.dsn_key.as_deref(),
+            &cfg.security.jwt_secret,
+        )),
     });
 
     let addr = cfg.server.addr.clone();
@@ -57,6 +63,11 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     staticfiles::log_mount(staticfiles::resolve_dir(cfg.server.static_dir.as_deref()).as_deref());
     // 引擎后台巡检（30s）：引擎存活/服务状态变化写 sys_engine_event
     engine_monitor::spawn(state.clone());
+    // 历史明文 DSN 迁移为密文（幂等，失败不影响启动）
+    tokio::spawn({
+        let st = state.clone();
+        async move { handlers::catalog::migrate_plaintext_dsns(&st).await }
+    });
     let listener = tokio::net::TcpListener::bind(&addr).await?;
     // 优雅停机：收到 SIGINT(Ctrl-C) / SIGTERM 后停止接收新连接，
     // 等待在途请求完成再退出，避免发布/重启掐断前端已发出的请求。

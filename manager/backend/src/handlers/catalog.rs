@@ -327,21 +327,19 @@ const WORKSPACE_STD_SUBDIRS: [&str; 14] = [
     "postgis", "prj", "recon", "shapefile", "terrain", "xml-grid",
 ];
 
-/// Ensure data root exists and standard subdirs are in place before save.
+/// Ensure standard subdirs are in place before save, **only when the data root is
+/// visible to the manager process itself**.
 ///
-/// - `data_root` empty (DB-only workspace) → pass through;
-/// - Root itself missing → treat as input error, reject save (prevents create_dir_all from creating misspelled paths);
-/// - Existing subdirs → skip; missing ones → create; create failure (permission etc.) → error, no DB write.
+/// 数据目录由 map-api 独占挂载（容器里 manager 看不到 `/app/data`），数据操作
+/// 一律走 map-api 接口；因此目录不可见时直接跳过，不做存在性校验。
+/// 原生部署（map-api 与 manager 同机、路径可见）时仍会补齐标准子目录。
 fn ensure_std_subdirs(data_root: &str) -> AppResult<()> {
     if data_root.is_empty() {
         return Ok(());
     }
     let root = std::path::Path::new(data_root);
     if !root.is_dir() {
-        return Err(AppError::Param(format!(
-            "数据根目录不可访问，请先创建或检查路径：{}",
-            data_root.trim_end_matches('/')
-        )));
+        return Ok(());
     }
     for name in WORKSPACE_STD_SUBDIRS {
         let dir = root.join(name);
@@ -410,23 +408,39 @@ pub async fn ws_list(
     Ok(Resp::ok(json!({ "workspaces": items, "total": items.len() })))
 }
 
-/// Canonicalize path to absolute dir; file or inaccessible → error.
-fn canonical_dir(raw: &str) -> std::io::Result<std::path::PathBuf> {
-    let p = std::fs::canonicalize(raw)?;
-    if !p.is_dir() {
-        return Err(std::io::Error::new(
-            std::io::ErrorKind::NotADirectory,
-            "不是目录",
-        ));
+/// Lexically check `path` is inside `root` (no filesystem access).
+///
+/// manager 容器不再挂载数据卷，无法 canonicalize 数据路径；这里只做词法前缀
+/// 校验（拒绝 `..` 上跳）防路径穿越，真实存在性由 map-api 侧守卫。
+fn lexical_inside(path: &str, root: &str) -> bool {
+    fn parts(s: &str) -> Vec<&str> {
+        s.split(['/', '\\'])
+            .filter(|c| !c.is_empty() && *c != ".")
+            .collect()
     }
-    Ok(p)
+    let p = parts(path);
+    let r = parts(root);
+    if p.iter().any(|c| *c == "..") || r.iter().any(|c| *c == "..") {
+        return false;
+    }
+    if p.len() < r.len() {
+        return false;
+    }
+    let eq = |a: &str, b: &str| {
+        if cfg!(windows) {
+            a.eq_ignore_ascii_case(b)
+        } else {
+            a == b
+        }
+    };
+    p.iter().zip(r.iter()).all(|(a, b)| eq(a, b))
 }
 
 /// `GET /map/catalog/dirs?workspaceId=&path=` — List subdirs (one level) under workspace data root.
 ///
-/// Used by the left-side tree in 'new data source'. Data root may not be inside engine `DATA_ROOT`,
-/// so we don't reuse `/admin/browse`'s prefix guard; we only read dir/file metadata, not data content,
-/// and `path` must stay inside workspace `data_root` (prefix check after canonicalize, prevents path traversal).
+/// Used by the left-side tree in 'new data source'. 目录读取属于数据操作，
+/// 统一代理 map-api `/admin/browse` 执行（manager 不再挂载数据卷）；
+/// 这里只校验 `path` 词法上落在工作空间 `data_root` 内，防路径穿越。
 pub async fn dir_list(
     State(state): State<Arc<AppState>>,
     RawQuery(qs): RawQuery,
@@ -447,8 +461,7 @@ pub async fn dir_list(
     if data_root.is_empty() {
         return Err(AppError::Param("该工作空间未配置数据根目录".to_string()));
     }
-    let root = canonical_dir(&data_root)
-        .map_err(|_| AppError::Param(format!("数据根目录不可访问：{data_root}")))?;
+    drop(c);
 
     let requested_raw = query_pairs(qs.as_deref())
         .into_iter()
@@ -457,59 +470,20 @@ pub async fn dir_list(
         .unwrap_or_default();
     let requested_raw = requested_raw.trim().to_string();
     let requested = if requested_raw.is_empty() {
-        root.clone()
+        data_root.clone()
     } else {
-        canonical_dir(&requested_raw)
-            .map_err(|_| AppError::Param(format!("目录不可访问：{requested_raw}")))?
+        requested_raw
     };
-    if !requested.starts_with(&root) {
+    if !lexical_inside(&requested, &data_root) {
         return Err(AppError::Param(format!(
             "目录超出工作空间数据根目录：{}（根：{}）",
-            requested.display(),
-            root.display()
+            requested, data_root
         )));
     }
 
-    let mut entries: Vec<Value> = Vec::new();
-    let rd = std::fs::read_dir(&requested)
-        .map_err(|e| AppError::Msg(format!("读取目录失败：{}（{e}）", requested.display())))?;
-    for e in rd.flatten() {
-        let meta = match e.metadata() {
-            Ok(m) => m,
-            Err(_) => continue,
-        };
-        let is_dir = meta.is_dir();
-        let modified_ms = meta
-            .modified()
-            .ok()
-            .and_then(|t| t.duration_since(std::time::UNIX_EPOCH).ok())
-            .map(|d| d.as_millis() as i64)
-            .unwrap_or(0);
-        entries.push(json!({
-            "name": e.file_name().to_string_lossy(),
-            "is_dir": is_dir,
-            "size": if is_dir { 0 } else { meta.len() },
-            "modified_ms": modified_ms,
-        }));
-    }
-    entries.sort_by(|a, b| {
-        let ad = a["is_dir"].as_bool().unwrap_or(false);
-        let bd = b["is_dir"].as_bool().unwrap_or(false);
-        bd.cmp(&ad).then_with(|| {
-            a["name"]
-                .as_str()
-                .unwrap_or("")
-                .to_lowercase()
-                .cmp(&b["name"].as_str().unwrap_or("").to_lowercase())
-        })
-    });
-
-    Ok(Resp::ok(json!({
-        "path": requested.to_string_lossy(),
-        "parent": requested.parent().map(|p| p.to_string_lossy().to_string()).unwrap_or_default(),
-        "root": root.to_string_lossy(),
-        "entries": entries,
-    })))
+    let q = format!("path={}", qs_encode(&requested));
+    let data = upstream_json(&state, reqwest::Method::GET, "/admin/browse", Some(&q), None).await?;
+    Ok(Resp::ok(data))
 }
 
 #[derive(Debug, Deserialize)]
@@ -549,26 +523,19 @@ pub async fn tile_grid_parse(
     if data_root.is_empty() {
         return Err(AppError::Param("该工作空间未配置数据根目录".to_string()));
     }
-    let root = canonical_dir(&data_root)
-        .map_err(|_| AppError::Param(format!("数据根目录不可访问：{data_root}")))?;
-    let path = std::fs::canonicalize(raw)
-        .map_err(|_| AppError::Param(format!("路径不可访问：{raw}")))?;
-    if !path.starts_with(&root) {
+    if !lexical_inside(raw, &data_root) {
         return Err(AppError::Param(format!(
             "路径超出工作空间数据根目录：{}（根：{}）",
-            path.display(),
-            root.display()
+            raw, data_root
         )));
     }
-    let is_xml = path
-        .extension()
-        .and_then(|e| e.to_str())
-        .map(|e| e.eq_ignore_ascii_case("xml"))
-        .unwrap_or(false);
-    if path.is_file() && !is_xml {
-        return Err(AppError::Param(
-            "请选择 Conf.xml 文件，或该文件所在的缓存目录".to_string(),
-        ));
+    // Conf.xml 才解析网格；目录交给 map-api 自行判断。
+    if let Some(ext) = std::path::Path::new(raw).extension().and_then(|e| e.to_str()) {
+        if !ext.eq_ignore_ascii_case("xml") {
+            return Err(AppError::Param(
+                "请选择 Conf.xml 文件，或该文件所在的缓存目录".to_string(),
+            ));
+        }
     }
     drop(c);
 
@@ -577,7 +544,7 @@ pub async fn tile_grid_parse(
         reqwest::Method::POST,
         "/admin/tile-grid",
         None,
-        Some(json!({ "path": plain_abs_path(&path) })),
+        Some(json!({ "path": raw })),
     )
     .await?;
     Ok(Resp::ok(data))
@@ -749,9 +716,18 @@ async fn load_store(state: &AppState, id: i64) -> AppResult<StoreRow> {
     let sql = format!("{STORE_SELECT} WHERE id = $1 AND del_flag = 0");
     let c = conn(&state.pool).await?;
     let rows = c.query(&sql, &[&id]).await?;
-    rows.first().map(row_to_store).ok_or_else(|| {
+    let row = rows.first().map(row_to_store).ok_or_else(|| {
         AppError::Msg(format!("数据存储不存在：{id}"))
-    })
+    })?;
+    decrypt_store_dsn(state, row)
+}
+
+/// `sys_store.pg_dsn` 以密文落库，读出后统一在这里解密（历史明文原样返回）。
+fn decrypt_store_dsn(state: &AppState, mut row: StoreRow) -> AppResult<StoreRow> {
+    row.pg_dsn = state.dsn.decrypt(&row.pg_dsn).map_err(|e| {
+        AppError::Msg(format!("数据存储 {} 的 DSN 解密失败：{e}", row.id))
+    })?;
+    Ok(row)
 }
 
 /// Store form validation: legal type + required locator fields (dir needs path, PostGIS needs DSN).
@@ -820,6 +796,55 @@ fn store_json(s: &StoreRow, extra: Option<&Value>) -> Value {
     v
 }
 
+/// 启动时把历史明文 DSN 迁移为密文（幂等：已带 `enc:v1:` 前缀的跳过）。
+pub async fn migrate_plaintext_dsns(state: &AppState) {
+    let c = match conn(&state.pool).await {
+        Ok(c) => c,
+        Err(e) => {
+            tracing::warn!("DSN 迁移跳过：{e:?}");
+            return;
+        }
+    };
+    let rows = match c
+        .query(
+            // 含软删除行：已逻辑删除的 Store 也不应留下明文口令。
+            "SELECT id, coalesce(pg_dsn,'') FROM sys_store WHERE coalesce(pg_dsn,'') <> ''",
+            &[],
+        )
+        .await
+    {
+        Ok(r) => r,
+        Err(e) => {
+            tracing::warn!("DSN 迁移查询失败：{e}");
+            return;
+        }
+    };
+    let mut migrated = 0usize;
+    for r in rows {
+        let id: i64 = r.get(0);
+        let dsn: String = r.get(1);
+        if dsn.starts_with("enc:v1:") {
+            continue;
+        }
+        match state.dsn.encrypt(&dsn) {
+            Ok(enc) => {
+                if let Err(e) = c
+                    .execute("UPDATE sys_store SET pg_dsn=$2 WHERE id=$1", &[&id, &enc])
+                    .await
+                {
+                    tracing::warn!(store_id = id, "DSN 迁移写库失败：{e}");
+                } else {
+                    migrated += 1;
+                }
+            }
+            Err(e) => tracing::warn!(store_id = id, "DSN 迁移加密失败：{e}"),
+        }
+    }
+    if migrated > 0 {
+        tracing::info!("已将 {migrated} 条历史明文 DSN 迁移为密文");
+    }
+}
+
 /// `GET /map/catalog/stores?workspaceId=` — Store list (incl. resource counts).
 pub async fn store_list(
     State(state): State<Arc<AppState>>,
@@ -862,8 +887,14 @@ pub async fn store_list(
     let items: Vec<Value> = rows
         .iter()
         .map(|r| {
+            let mut s = row_to_store(r);
+            // 列表只展示掩码；解密失败时降级为空串，不阻断整页。
+            s.pg_dsn = state.dsn.decrypt(&s.pg_dsn).unwrap_or_else(|e| {
+                tracing::warn!(store_id = s.id, "DSN 解密失败：{e}");
+                String::new()
+            });
             store_json(
-                &row_to_store(r),
+                &s,
                 Some(&json!({
                     "remark": r.get::<_, String>(7),
                     "delFlag": r.get::<_, i16>(8),
@@ -918,6 +949,11 @@ pub async fn store_add(
             row.name
         )));
     }
+    // DSN 密文落库；响应仍用内存里的明文做掩码，不回传。
+    let stored_dsn = state
+        .dsn
+        .encrypt(&row.pg_dsn)
+        .map_err(|e| AppError::Msg(format!("DSN 加密失败：{e}")))?;
     let id: i64 = c
         .query_opt(
             "INSERT INTO sys_store (workspace_id, name, store_type, base_path, pg_dsn, pg_schema, remark) \
@@ -927,7 +963,7 @@ pub async fn store_add(
                 &row.name,
                 &row.store_type,
                 &opt_text(&row.base_path),
-                &opt_text(&row.pg_dsn),
+                &opt_text(&stored_dsn),
                 &row.pg_schema,
                 &body.remark.trim(),
             ],
@@ -958,6 +994,10 @@ pub async fn store_update(
     }
     row.id = id;
     row.workspace_id = body.workspace_id;
+    let stored_dsn = state
+        .dsn
+        .encrypt(&row.pg_dsn)
+        .map_err(|e| AppError::Msg(format!("DSN 加密失败：{e}")))?;
     let c = conn(&state.pool).await?;
     let n = c
         .execute(
@@ -969,7 +1009,7 @@ pub async fn store_update(
                 &row.name,
                 &row.store_type,
                 &opt_text(&row.base_path),
-                &opt_text(&row.pg_dsn),
+                &opt_text(&stored_dsn),
                 &row.pg_schema,
                 &body.remark.trim(),
             ],
@@ -1098,6 +1138,21 @@ fn default_pg_port() -> u16 {
     54321
 }
 
+/// Percent-encode one DSN component (userinfo / dbname), keeping RFC 3986
+/// unreserved characters. Host is left untouched (IPv6 literals need brackets).
+fn encode_dsn_component(s: &str) -> String {
+    let mut out = String::with_capacity(s.len());
+    for b in s.bytes() {
+        match b {
+            b'A'..=b'Z' | b'a'..=b'z' | b'0'..=b'9' | b'-' | b'.' | b'_' | b'~' => {
+                out.push(b as char)
+            }
+            _ => out.push_str(&format!("%{b:02X}")),
+        }
+    }
+    out
+}
+
 /// `POST /map/catalog/stores/connect` — Connection test for new data source (no store id needed).
 ///
 /// Front-end sends host/port/username/password/database; backend assembles `postgres://...` DSN
@@ -1115,13 +1170,15 @@ pub async fn store_connect_preflight(
         return Err(AppError::Param("database 不能为空".into()));
     }
     // Password in DSN goes through request body (not URL / access log), consistent with pg-test contract.
+    // userinfo / dbname 按 RFC 3986 百分号编码，否则密码含 @ : / # ? 会拼坏连接串
+    // （tokio-postgres 解析 URI 时会做 percent-decode，可还原原始字符）。
     let dsn = format!(
         "postgres://{}:{}@{}:{}/{}",
-        body.username.trim(),
-        body.password,
+        encode_dsn_component(body.username.trim()),
+        encode_dsn_component(&body.password),
         host,
         body.port,
-        database
+        encode_dsn_component(database)
     );
     let probe = upstream_json(
         &state,
@@ -1181,7 +1238,7 @@ pub async fn store_import_shp(
         Some(json!({
             "dsn": dsn,
             "schema": schema,
-            "shpPath": plain_abs_path(&shp),
+            "shpPath": shp,
             "table": table,
             "srid": body.srid,
         })),
@@ -1212,7 +1269,7 @@ pub async fn store_import_shp_stream(
         .json(&json!({
             "dsn": dsn,
             "schema": schema,
-            "shpPath": plain_abs_path(&shp),
+            "shpPath": shp,
             "table": table,
             "srid": body.srid,
         }));
@@ -1258,7 +1315,7 @@ async fn prepare_import(
     state: &AppState,
     id: i64,
     body: &ImportShpBody,
-) -> AppResult<(String, String, String, std::path::PathBuf)> {
+) -> AppResult<(String, String, String, String)> {
     let store = load_store(state, id).await?;
     if store.store_type != STORE_TYPE_POSTGIS {
         return Err(AppError::Param(
@@ -1290,8 +1347,6 @@ async fn prepare_import(
     if data_root.is_empty() {
         return Err(AppError::Param("该工作空间未配置数据根目录".to_string()));
     }
-    let root = canonical_dir(&data_root)
-        .map_err(|_| AppError::Param(format!("数据根目录不可访问：{data_root}")))?;
     let raw = body.path.trim();
     if raw.is_empty() {
         return Err(AppError::Param("请选择要导入的 .shp 文件".to_string()));
@@ -1299,34 +1354,15 @@ async fn prepare_import(
     if !raw.to_ascii_lowercase().ends_with(".shp") {
         return Err(AppError::Param("仅支持 .shp 矢量文件".to_string()));
     }
-    let shp = std::fs::canonicalize(raw)
-        .map_err(|_| AppError::Param(format!("文件不存在：{raw}")))?;
-    if !shp.is_file() {
-        return Err(AppError::Param(format!("不是文件：{raw}")));
-    }
-    if !shp.starts_with(&root) {
+    if !lexical_inside(raw, &data_root) {
         return Err(AppError::Param(format!(
             "文件超出工作空间数据根目录：{}（根：{}）",
-            shp.display(),
-            root.display()
+            raw, data_root
         )));
     }
+    // 文件存在性 / 可读性由 map-api 的导入接口判定（数据目录只在 map-api 侧挂载）。
 
-    Ok((store.pg_dsn, store.pg_schema, table, shp))
-}
-
-/// Restore Windows verbatim path from `canonicalize` to a plain absolute path
-/// (`\\?\E:\a.shp` → `E:\a.shp`, `\\?\UNC\srv\a.shp` → `\\srv\a.shp`).
-/// On non-Windows or when already plain, returns as-is.
-fn plain_abs_path(p: &std::path::Path) -> String {
-    let s = p.to_string_lossy();
-    if let Some(rest) = s.strip_prefix(r"\\?\UNC\") {
-        format!(r"\\{rest}")
-    } else if let Some(rest) = s.strip_prefix(r"\\?\") {
-        rest.to_string()
-    } else {
-        s.to_string()
-    }
+    Ok((store.pg_dsn, store.pg_schema, table, raw.to_string()))
 }
 
 /// PostGIS identifier (import table name): starts with lowercase letter or underscore, only [A-Za-z0-9_], length ≤ 63.
@@ -1962,23 +1998,40 @@ fn build_service_body(
             }
             d
         };
-        // source = schema.table (written at geometry_columns discovery).
-        let (sch, tbl) = match res.source.split_once('.') {
-            Some((s, t)) => (s.to_string(), t.to_string()),
-            None => (store.pg_schema.clone(), res.source.clone()),
+        // schema/table 优先取发现阶段写入的 meta（名称含点也不会拆错）；旧资源才回退解析 source。
+        let sch_meta = str_field(&res.meta, "schema");
+        let tbl_meta = str_field(&res.meta, "table");
+        let (sch, tbl) = if !sch_meta.is_empty() && !tbl_meta.is_empty() {
+            (sch_meta, tbl_meta)
+        } else {
+            match res.source.split_once('.') {
+                Some((s, t)) => (s.to_string(), t.to_string()),
+                None => (store.pg_schema.clone(), res.source.clone()),
+            }
         };
-        let geometry_column = {
-            let g = str_field(&res.meta, "geometry_column");
-            if g.is_empty() { "geom".to_string() } else { g }
-        };
-        let srid = res
+        let geometry_column = str_field(&res.meta, "geometry_column");
+        if geometry_column.is_empty() {
+            return Err(AppError::Msg(format!(
+                "资源 {} 缺少几何列元数据，请重新发现后再发布",
+                res.name
+            )));
+        }
+        // geometry_columns.srid = 0 表示列上无 SRID 约束：此时回退发布表单的 srcCrs，
+        // 仍取不到就拒绝发布——否则 ST_Transform(..., 0) 会让该图层所有瓦片查询失败。
+        let meta_srid = res
             .meta
             .get("srid")
-            .and_then(|v| v.as_i64())
-            .or_else(|| src_crs.split(':').nth(1).and_then(|d| d.parse().ok()))
-            .ok_or_else(|| {
-                AppError::Msg(format!("资源 {} 缺少 SRID，请重新发现", res.name))
-            })? as i32;
+            .and_then(Value::as_i64)
+            .filter(|v| *v > 0);
+        let srid = match meta_srid.or_else(|| epsg_code(src_crs).map(|v| v as i64)) {
+            Some(v) => v as i32,
+            None => {
+                return Err(AppError::Param(format!(
+                    "资源 {} 的几何列未登记 SRID，请在发布表单指定源坐标系（srcCrs）",
+                    res.name
+                )))
+            }
+        };
         body["source"] = json!({
             "type": "postgis",
             "dsn": dsn,
@@ -2036,6 +2089,7 @@ async fn load_resource_with_store(
         .first()
         .map(row_to_store)
         .ok_or_else(|| AppError::Msg(format!("所属 Store 不存在或已删除：{}", res.store_id)))?;
+    let store = decrypt_store_dsn(state, store)?;
     Ok((res, store))
 }
 
@@ -2068,12 +2122,16 @@ fn native_grid(res: &ResourceRow) -> Option<Value> {
     }))
 }
 
-/// Extract numeric code from `EPSG:4490`; non-standard formats return `None`.
+/// Extract an EPSG code from `EPSG:4326`, `urn:ogc:def:crs:EPSG::4326` or `4326`.
 fn epsg_code(crs: &str) -> Option<u32> {
-    crs.trim()
-        .strip_prefix("EPSG:")
-        .or_else(|| crs.trim().strip_prefix("epsg:"))
-        .and_then(|s| s.trim().parse().ok())
+    let s = crs.trim();
+    s.rsplit(|c| c == ':' || c == '/')
+        .next()
+        .unwrap_or(s)
+        .trim()
+        .parse()
+        .ok()
+        .filter(|c| *c > 0)
 }
 
 /// Scale denominator under OGC 0.28 mm/pixel rule (for ledger/front-end display only; engine uses resolution).

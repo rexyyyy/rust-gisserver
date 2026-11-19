@@ -346,9 +346,16 @@ const kindRows = computed(() => {
 });
 
 // ---------- 数据加载（各项独立容错，失败显示为空不阻塞首页） ----------
+// 后端所有接口统一返回 { code, msg, data } 包装层（见 utils/request.ts 响应拦截器），
+// 首页各块必须先从 data 取值，否则字段全是 undefined，页面会一直显示离线/0。
+function unwrap<T = any>(r: any): T {
+  const v = r && typeof r === 'object' && 'code' in r && 'data' in r ? r.data : r;
+  return (v ?? {}) as T;
+}
+
 async function loadServices() {
   try {
-    const info: any = await listServices();
+    const info: any = unwrap(await listServices());
     services.value = info.services || [];
     engineStats.value = info.engines || [];
     registryMode.value = info.registry_mode || '';
@@ -360,7 +367,7 @@ async function loadServices() {
 
 async function loadComponents() {
   try {
-    comp.value = (await getComponents()) as unknown as ComponentsResp;
+    comp.value = unwrap(await getComponents()) as unknown as ComponentsResp;
   } catch {
     /* map-api 离线时保持默认 */
   }
@@ -368,7 +375,7 @@ async function loadComponents() {
 
 async function loadUsage() {
   try {
-    const u: any = await usage({ period: period.value, group_by: 'name' });
+    const u: any = unwrap(await usage({ period: period.value, group_by: 'name' }));
     totalHits.value = (u.rows || []).reduce((a: number, r: UsageRow) => a + (r.hits || 0), 0);
     topRows.value = [...(u.rows || [])]
       .sort((a: UsageRow, b: UsageRow) => (b.hits || 0) - (a.hits || 0))
@@ -381,7 +388,7 @@ async function loadUsage() {
 
 async function loadLogs() {
   try {
-    const r: any = await listAccessLogs({ limit: 1 });
+    const r: any = unwrap(await listAccessLogs({ limit: 1 }));
     logStats.value = {
       total: r.total || 0,
       client_4xx: r.errors?.client_4xx || 0,
@@ -394,7 +401,7 @@ async function loadLogs() {
 
 async function loadStyles() {
   try {
-    const r: any = await listStyles();
+    const r: any = unwrap(await listStyles());
     styleCount.value = r.count ?? (r.styles || []).length;
   } catch {
     styleCount.value = 0;
@@ -403,7 +410,7 @@ async function loadStyles() {
 
 async function loadCache() {
   try {
-    cache.value = (await cacheStats()) as unknown as CacheStatsResp;
+    cache.value = unwrap(await cacheStats()) as unknown as CacheStatsResp;
   } catch {
     cache.value = null;
   }
@@ -411,7 +418,7 @@ async function loadCache() {
 
 async function loadEngines() {
   try {
-    const r: any = await listEngines();
+    const r: any = unwrap(await listEngines());
     engineList.value = r.engines || [];
   } catch {
     engineList.value = [];

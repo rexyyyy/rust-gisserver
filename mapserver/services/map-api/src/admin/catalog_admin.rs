@@ -197,10 +197,24 @@ pub async fn create(
         );
     }
     let file = dir.join(format!("{name}.xml"));
+    // 同名重发布：先备份旧文件，写盘/热重载失败时恢复，避免把已生效的图层配置弄丢。
+    let backup = dir.join(format!("{name}.xml.bak"));
+    let had_old = file.exists();
+    if had_old {
+        if let Err(e) = std::fs::copy(&file, &backup) {
+            return json(
+                StatusCode::INTERNAL_SERVER_ERROR,
+                json!({ "error": format!("备份旧配置失败：{}（{e}）", backup.display()) }),
+            );
+        }
+    }
     let xml = if kind == "3dtiles" {
         match tileset_xml(&name, obj) {
             Ok(s) => s,
             Err(msg) => {
+                if had_old {
+                    let _ = std::fs::rename(&backup, &file);
+                }
                 return json(StatusCode::BAD_REQUEST, json!({ "error": msg }));
             }
         }
@@ -208,6 +222,9 @@ pub async fn create(
         crate::xmlcfg::to_xml(&body, "layer")
     };
     if let Err(e) = std::fs::write(&file, xml.as_bytes()) {
+        if had_old {
+            let _ = std::fs::rename(&backup, &file);
+        }
         return json(
             StatusCode::INTERNAL_SERVER_ERROR,
             json!({ "error": format!("写盘失败：{}（{e}）", file.display()) }),
@@ -225,6 +242,7 @@ pub async fn create(
                 .iter()
                 .find(|s| s.name == name)
                 .map(|s| s.reason.clone());
+            let _ = std::fs::remove_file(&backup);
             json(
                 StatusCode::OK,
                 json!({
@@ -238,8 +256,12 @@ pub async fn create(
             )
         }
         Err(e) => {
-            // 文件已写入但重载失败；回滚文件以便重试。
-            let _ = std::fs::remove_file(&file);
+            // 文件已写入但重载失败；恢复旧配置（无旧文件则删除新文件）以便重试。
+            if had_old {
+                let _ = std::fs::rename(&backup, &file);
+            } else {
+                let _ = std::fs::remove_file(&file);
+            }
             json(
                 StatusCode::INTERNAL_SERVER_ERROR,
                 json!({ "error": format!("登记后重载失败：{e}") }),

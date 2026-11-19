@@ -71,11 +71,11 @@ services:
     environment:
       MAPSERVER_DB_PASSWORD: ${MAPSERVER_DB_PASSWORD:-123456}
       MANAGER_JWT_SECRET: ${MANAGER_JWT_SECRET:?MANAGER_JWT_SECRET 未设置，请在 .env 中配置}
+      MANAGER_DSN_KEY: ${MANAGER_DSN_KEY:-}
       POSTGRES_USER: ${POSTGRES_USER:-postgres}
     volumes:
       - ../../deploy/config/manager:/app/config.template:ro
       - mgr_storage:/app/storage
-      - ${GISDATA_DIR:-./gisdata}:/app/data
     ports:
       - "6180:6180"
     restart: unless-stopped
