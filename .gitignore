@@ -38,6 +38,15 @@
 # Authoritative examples live in mapserver/config/*/README.md; the postgis/
 # layer files are machine-local test fixtures with hardcoded credentials.
 /mapserver/config/postgis/
+# Same fixtures land in the repo root when map-api is run from there (its
+# default catalog root is "config"): config/postgis/*.xml embeds a plaintext
+# DSN password, so it must stay local too.
+/config/postgis/
+
+# ===== Local packaging outputs (never commit) =====
+# Deployment bundles and ad-hoc doc archives produced by local build scripts.
+/dist/
+/manager/deploy.zip
 
 # ===== One-off i18n migration scratch (never commit) =====
 # Dumps, translation batches and generator scripts used while translating
