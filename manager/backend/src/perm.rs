@@ -298,6 +298,8 @@ const PERM_RULES: &[(&str, &str, &str)] = &[
     ("POST", "/map/catalog/stores", "map:catalog:edit"),
     ("PUT", "/map/catalog/stores/{id}", "map:catalog:edit"),
     ("DELETE", "/map/catalog/stores/{id}", "map:catalog:edit"),
+    // 导入 ArcGIS 缓存包：往数据根目录里落数据，与「目录维护」同口径
+    ("POST", "/map/catalog/import-tpk", "map:catalog:edit"),
     ("POST", "/map/catalog/publish", "map:catalog:publish"),
     ("PUT", "/map/catalog/published/{id}", "map:catalog:publish"),
     ("DELETE", "/map/catalog/resources/{id}", "map:catalog:publish"),

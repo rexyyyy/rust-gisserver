@@ -37,8 +37,9 @@ const STORE_TYPES: &[(&str, &[&str])] = &[
     ("pmtiles_dir", &["pmtiles"]),
     ("mbtiles_dir", &["mbtiles"]),
     ("3dtiles_dir", &[]),
-    // ArcGIS 预切片缓存：目录内（或一级子目录）有 Conf.xml + _alllayers；也接受 .tpk。
-    ("arcgis_dir", &["tpk"]),
+    // ArcGIS 预切片缓存：目录内（或一级子目录）有 Conf.xml + _alllayers；
+    // 也接受 .tpk（Server 紧凑缓存包）与 .tpkx（Pro Compact Tile Package）。
+    ("arcgis_dir", &["tpk", "tpkx"]),
     // 静态 MVT 瓦片金字塔（z/x/y.pbf）：仅发现，暂无对应服务源。
     ("mvt_dir", &[]),
 ];
@@ -159,7 +160,8 @@ pub async fn probe(
             )
         }
     };
-    let path = match guard_data_root(&state, Path::new(&raw)) {
+    let override_root = query_data_root(qs.as_deref());
+    let path = match guard_data_root_with(&state, Path::new(&raw), override_root.as_deref()) {
         Ok(p) => p,
         Err(r) => return r,
     };
@@ -186,7 +188,8 @@ pub async fn discover(
             )
         }
     };
-    let dir = match guard_data_root(&state, Path::new(&raw)) {
+    let override_root = query_data_root(q);
+    let dir = match guard_data_root_with(&state, Path::new(&raw), override_root.as_deref()) {
         Ok(p) => p,
         Err(r) => return r,
     };
@@ -495,8 +498,8 @@ fn scan_dir(
             .and_then(|e| e.to_str())
             .unwrap_or("")
             .to_ascii_lowercase();
-        // ArcGIS 打包缓存 .tpk：按缓存探，而不是当未知扩展名。
-        if wants_arcgis && ext == "tpk" {
+        // ArcGIS 打包缓存 .tpk / .tpkx：按缓存探，而不是当未知扩展名。
+        if wants_arcgis && (ext == "tpk" || ext == "tpkx") {
             out.push(probe_arcgis(&p));
             continue;
         }
@@ -598,7 +601,8 @@ fn probe_arcgis(path: &Path) -> Value {
         }
     };
     let bbox = docs.cdi.as_ref().map(|c| c.bounds);
-    let wkid = if docs.info.wkid > 0 { Some(docs.info.wkid) } else { docs.cdi.as_ref().map(|c| c.wkid).filter(|w| *w > 0) };
+    let def = &docs.def;
+    let wkid = if def.wkid > 0 { Some(def.wkid) } else { docs.cdi.as_ref().map(|c| c.wkid).filter(|w| *w > 0) };
     let mut v = if bbox.is_none() {
         manual(
             path,
@@ -615,20 +619,23 @@ fn probe_arcgis(path: &Path) -> Value {
     v["source"] = json!(display_path(path));
     if let Some(meta) = v.get_mut("meta").and_then(|m| m.as_object_mut()) {
         meta.insert("cache_dir".into(), json!(display_path(&docs.cache_dir)));
-        meta.insert("storage_format".into(), json!(docs.info.storage_format));
-        meta.insert("packet_size".into(), json!(docs.info.packet_size));
-        meta.insert("min_zoom".into(), json!(docs.info.min_zoom()));
-        meta.insert("max_zoom".into(), json!(docs.info.max_zoom()));
-        // 原生网格：发布时固化进账本，前端展示/核对与引擎运行时同源（Conf.xml）。
-        meta.insert("crs".into(), json!(docs.info.crs));
-        meta.insert("tile_cols".into(), json!(docs.info.tile_cols));
-        meta.insert("tile_rows".into(), json!(docs.info.tile_rows));
-        meta.insert("dpi".into(), json!(docs.info.dpi));
-        meta.insert("origin".into(), json!(docs.info.origin));
+        meta.insert("storage_format".into(), json!(def.storage_format));
+        meta.insert("packet_size".into(), json!(def.packet_size));
+        meta.insert("min_zoom".into(), json!(def.min_zoom()));
+        meta.insert("max_zoom".into(), json!(def.max_zoom()));
+        // 原生网格：发布时固化进账本，前端展示/核对与引擎运行时同源（定义记录）。
+        meta.insert("crs".into(), json!(def.crs));
+        meta.insert("tile_cols".into(), json!(def.tile_cols));
+        meta.insert("tile_rows".into(), json!(def.tile_rows));
+        meta.insert("dpi".into(), json!(def.dpi));
+        meta.insert("origin".into(), json!(def.origin));
+        // 定义记录来源与瓦片根目录名（管理面据此展示「这份缓存的配置来自哪」）
+        meta.insert("config_kind".into(), json!(def.kind.as_str()));
+        meta.insert("tile_root".into(), json!(def.tile_root));
+        meta.insert("definition_id".into(), json!(def.id));
         meta.insert(
             "lods".into(),
-            json!(docs
-                .info
+            json!(def
                 .lods
                 .iter()
                 .map(|l| json!({
@@ -940,36 +947,64 @@ fn norm_input_path(p: &str) -> String {
     gisserver::encoding::fix_path(p)
 }
 
-/// `server.data_root` 路径守卫（计划 §9.2：文件浏览器必须限定在 data_root 内）。
+/// `data_root` 路径守卫（计划 §9.2：文件浏览器必须限定在 data_root 内）。
 ///
 /// * 解析为绝对路径（realpath 级 `canonicalize`），杜绝 `..` / 符号链接穿越；
 /// * 未配置 `data_root` 时不设限（零配置向后兼容）；
-/// * 配置后要求目标在 data_root 之内，否则 403。
-pub(crate) fn guard_data_root(state: &AppState, raw: &Path) -> Result<PathBuf, Response> {
+/// * 配置后要求目标在 data_root 之内，否则 403；
+/// * 管理请求可用 `data_root` 查询参数按工作空间覆盖，改 UI 后立即生效，无需重启。
+pub(crate) fn guard_data_root_with(
+    state: &AppState,
+    raw: &Path,
+    data_root_override: Option<&str>,
+) -> Result<PathBuf, Response> {
     // 外部传入路径先过编码归一化（幂等）：修复 GBK 字节被误读为 Latin-1 /
     // UTF-8 被 GBK 误读两类 mojibake，正常 UTF-8 路径原样通过，再 canonicalize。
     let raw = std::path::PathBuf::from(norm_input_path(&raw.to_string_lossy()));
     let abs = raw
         .canonicalize()
         .map_err(|e| json(StatusCode::NOT_FOUND, json!({ "error": format!("路径不可访问：{}（{e}）", raw.display()) })))?;
-    within_data_root(state, &abs)
+    within_data_root(state, &abs, data_root_override)
 }
 
 /// 同上，但允许路径末段尚不存在（登记一个还没落盘的数据文件）。
-pub(crate) fn guard_data_root_laxed(state: &AppState, raw: &Path) -> Result<PathBuf, Response> {
+pub(crate) fn guard_data_root_laxed_with(
+    state: &AppState,
+    raw: &Path,
+    data_root_override: Option<&str>,
+) -> Result<PathBuf, Response> {
     // 编码归一化同 guard_data_root（幂等，正常路径无感）。
     let raw = std::path::PathBuf::from(norm_input_path(&raw.to_string_lossy()));
     let abs = canonicalize_loose(&raw)
         .map_err(|e| json(StatusCode::NOT_FOUND, json!({ "error": format!("路径不可访问：{}（{e}）", raw.display()) })))?;
-    within_data_root(state, &abs)
+    within_data_root(state, &abs, data_root_override)
 }
 
-/// 前缀校验：绝对路径必须落在配置的 `data_root` 内。
-fn within_data_root(state: &AppState, abs: &Path) -> Result<PathBuf, Response> {
-    let Some(root) = state.config.server.data_root.as_deref().filter(|s| !s.trim().is_empty()) else {
+/// 前缀校验：绝对路径必须落在配置或管理请求覆盖的 `data_root` 内。
+fn within_data_root(
+    state: &AppState,
+    abs: &Path,
+    data_root_override: Option<&str>,
+) -> Result<PathBuf, Response> {
+    let root = data_root_override
+        .map(str::trim)
+        .filter(|s| !s.is_empty())
+        .map(str::to_string)
+        .or_else(|| {
+            state
+                .config
+                .server
+                .data_root
+                .as_deref()
+                .map(str::trim)
+                .filter(|s| !s.is_empty())
+                .map(str::to_string)
+        });
+    let Some(root) = root else {
         return Ok(abs.to_path_buf());
     };
-    let root_abs = Path::new(root)
+    let root_path = std::path::PathBuf::from(norm_input_path(&root));
+    let root_abs = root_path
         .canonicalize()
         .map_err(|e| json(StatusCode::INTERNAL_SERVER_ERROR, json!({ "error": format!("data_root 不可访问：{root}（{e}）") })))?;
     if abs.starts_with(&root_abs) {
@@ -1024,6 +1059,13 @@ fn canonicalize_loose(raw: &Path) -> std::io::Result<PathBuf> {
             }
         }
     }
+}
+
+/// 管理请求可用 `data_root` 查询参数覆盖配置中的数据根（manager 按工作空间传入）。
+pub(crate) fn query_data_root(qs: Option<&str>) -> Option<String> {
+    query_param(qs, "data_root")
+        .map(|s| s.trim().to_string())
+        .filter(|s| !s.is_empty())
 }
 
 /// 从原始查询串取参数（percent 解码；Windows 路径的 `\` 与 `:` 会被编码）。

@@ -227,36 +227,67 @@ async fn check_layer(_state: &AppState, def: &gisserver::wms_common::layer::Laye
             }
         }
         SourceKind::Postgis(_) => {} // dedicated PG probes below
-        // ArcGIS 预切片缓存：path 可以是缓存目录，也可以是 `.tpk`（ZIP 缓存包）。
-        // 目录形态 `metadata().is_file()` 恒假、TPK 形态 `is_dir()` 恒假，走文件
-        // 分支都会被误报。统一先经 `tpk::ensure_dir`（`.tpk` 解压、目录原样）得
-        // 到真正的缓存目录，再复用 crate 的 find_conf/find_alllayers（与打开路径
-        // 同一套定位规则），否则出图正常、体检却报 critical。
+        // ArcGIS 预切片缓存：path 可以是缓存目录，也可以是 `.tpk` / `.tpkx`
+        // （ZIP 缓存包）。目录形态 `metadata().is_file()` 恒假、包形态
+        // `is_dir()` 恒假，走文件分支都会被误报。统一先经 `tpk::ensure_dir`
+        // （包解压、目录原样）得到真正的缓存目录，再复用 crate 的定义记录与
+        // 瓦片根定位（与打开路径同一套规则），否则出图正常、体检却报 critical。
         SourceKind::Arcgis { path } => {
             let p = std::path::Path::new(path);
-            let is_tpk = gisserver::arcgis_cache::tpk::is_tpk(p);
+            let is_pkg = gisserver::arcgis_cache::tpk::is_package(p);
             if !p.exists() {
                 report.push(
                     "数据文件",
                     false,
                     "critical",
-                    format!("{path} 不存在（缓存目录或 .tpk 包）"),
+                    format!("{path} 不存在（缓存目录或 .tpk/.tpkx 包）"),
                 );
             } else {
                 match gisserver::arcgis_cache::tpk::ensure_dir(p)
-                    .and_then(|dir| gisserver::arcgis_cache::conf::find_conf(&dir).map(|c| (dir, c)))
+                    .and_then(|dir| {
+                        gisserver::arcgis_cache::definition::find_config(&dir)
+                            .map(|cfg| (dir, cfg))
+                    })
                 {
-                    Ok((dir, conf)) => {
-                        let csize = conf.metadata().map(|c| c.len()).unwrap_or(0);
-                        let what = if is_tpk { "TPK 缓存包" } else { "缓存目录" };
+                    Ok((dir, (config, kind))) => {
+                        let csize = config.metadata().map(|c| c.len()).unwrap_or(0);
+                        let what = if is_pkg { "缓存包" } else { "缓存目录" };
                         report.push(
                             "数据文件",
                             true,
                             "critical",
-                            format!("{what}，Conf.xml {}（{}）", fmt_bytes(csize), conf.display()),
+                            format!(
+                                "{what}，{} {}（{}）",
+                                kind.as_str(),
+                                fmt_bytes(csize),
+                                config.display()
+                            ),
                         );
-                        let cache_dir = conf.parent().unwrap_or(&dir);
-                        match gisserver::arcgis_cache::bundle::find_alllayers(cache_dir) {
+                        let cache_dir = config.parent().unwrap_or(&dir);
+                        // 瓦片根目录名由定义记录给出（_alllayers / tile）。
+                        let def = gisserver::arcgis_cache::definition::CacheDefinition::from_xml(
+                            &gisserver::arcgis_cache::conf::read_to_string_lossy(&config)
+                                .unwrap_or_default(),
+                        )
+                        .or_else(|_| {
+                            gisserver::arcgis_cache::definition::CacheDefinition::from_root_json(
+                                &gisserver::arcgis_cache::conf::read_to_string_lossy(&config)
+                                    .unwrap_or_default(),
+                            )
+                        });
+                        let def = match def {
+                            Ok(d) => d,
+                            Err(e) => {
+                                report.push(
+                                    "瓦片目录",
+                                    false,
+                                    "critical",
+                                    format!("解析瓦片方案失败：{e}"),
+                                );
+                                return;
+                            }
+                        };
+                        match gisserver::arcgis_cache::bundle::find_alllayers(cache_dir, &def) {
                             Ok(all) => report.push(
                                 "瓦片目录",
                                 true,

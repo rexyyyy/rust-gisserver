@@ -36,7 +36,12 @@ pub async fn browse(
     if let Err(r) = authorize(&state, &headers) {
         return r;
     }
-    let root = default_browse_root(&state);
+    let configured_root = default_browse_root(&state);
+    let override_root = crate::admin::discover::query_data_root(qs.as_deref());
+    let root = override_root
+        .as_ref()
+        .map(PathBuf::from)
+        .unwrap_or_else(|| configured_root.clone());
     let requested = qs
         .as_deref()
         .and_then(|q| q.split('&').find_map(|p| {
@@ -47,7 +52,11 @@ pub async fn browse(
         .filter(|s| !s.is_empty())
         .map(|s| PathBuf::from(s))
         .unwrap_or_else(|| root.clone());
-    let requested = match crate::admin::discover::guard_data_root(&state, &requested) {
+    let requested = match crate::admin::discover::guard_data_root_with(
+        &state,
+        &requested,
+        override_root.as_deref(),
+    ) {
         Ok(p) => p,
         Err(r) => return r,
     };
@@ -122,6 +131,7 @@ pub async fn browse(
 pub async fn create(
     State(state): State<Arc<AppState>>,
     headers: axum::http::HeaderMap,
+    RawQuery(qs): RawQuery,
     axum::extract::Json(body): axum::extract::Json<Value>,
 ) -> Response {
     if let Err(r) = authorize(&state, &headers) {
@@ -182,9 +192,12 @@ pub async fn create(
             .unwrap_or_default()
     };
     if !data_path.is_empty() && !data_path.contains("://") {
-        if let Err(r) =
-            crate::admin::discover::guard_data_root_laxed(&state, Path::new(data_path))
-        {
+        let override_root = crate::admin::discover::query_data_root(qs.as_deref());
+        if let Err(r) = crate::admin::discover::guard_data_root_laxed_with(
+            &state,
+            Path::new(data_path),
+            override_root.as_deref(),
+        ) {
             return r;
         }
     }

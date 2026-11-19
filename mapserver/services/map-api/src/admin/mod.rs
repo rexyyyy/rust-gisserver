@@ -7,6 +7,7 @@ pub mod catalog_admin;
 pub mod check;
 pub mod discover;
 pub mod http;
+pub mod import_tpk;
 pub mod pg_import;
 pub mod registry;
 pub mod styles;

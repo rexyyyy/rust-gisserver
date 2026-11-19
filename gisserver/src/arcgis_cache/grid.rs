@@ -28,7 +28,7 @@ use std::path::Path;
 
 use crate::wms_common::crs;
 
-use crate::arcgis_cache::conf::CacheInfo;
+use crate::arcgis_cache::definition::CacheDefinition;
 
 /// 一份可直接落到图层 XML `<custom_grids>` 的网格规格。
 ///
@@ -80,13 +80,13 @@ impl GridSpec {
 }
 
 /// 由 `Conf.xml` + 数据范围推导网格。`bounds` 为 `conf.cdi` 包络（缓存 CRS 单位）。
-pub fn derive(info: &CacheInfo, id: &str, bounds: Option<[f64; 4]>) -> Result<GridSpec, String> {
+pub fn derive(info: &CacheDefinition, id: &str, bounds: Option<[f64; 4]>) -> Result<GridSpec, String> {
     derive_inner(info, id, bounds, None)
 }
 
 /// `probe`：`conf.cdi` 缺失时，用 bundle 目录名探测出的最大行列回推范围。
 pub fn derive_with_probe(
-    info: &CacheInfo,
+    info: &CacheDefinition,
     id: &str,
     bounds: Option<[f64; 4]>,
     probe: Option<(u32, u32, u32)>,
@@ -95,7 +95,7 @@ pub fn derive_with_probe(
 }
 
 fn derive_inner(
-    info: &CacheInfo,
+    info: &CacheDefinition,
     id: &str,
     bounds: Option<[f64; 4]>,
     probe: Option<(u32, u32, u32)>,
@@ -381,12 +381,12 @@ pub fn parse_custom_grid_xml(text: &str) -> Result<EmittedGrid, String> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::arcgis_cache::conf::CacheInfo;
+    use crate::arcgis_cache::definition::CacheDefinition;
 
     /// E 盘真实缓存（TD_DZZHYHD_G_2025_GCS2000）的 Conf.xml 关键参数固化。
-    fn real_info() -> CacheInfo {
+    fn real_info() -> CacheDefinition {
         let text = std::fs::read_to_string(concat!(env!("CARGO_MANIFEST_DIR"), "/tests/data/TD_Conf.xml")).unwrap();
-        CacheInfo::from_xml(&text).unwrap()
+        CacheDefinition::from_xml(&text).unwrap()
     }
 
     const CDI: [f64; 4] = [102.23285257581954, 24.438884054211364, 102.83157693, 24.757753353357];

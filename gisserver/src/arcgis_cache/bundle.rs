@@ -40,7 +40,9 @@ use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{Arc, Mutex};
 
-use crate::arcgis_cache::conf::{CacheDocs, ImageType};
+use crate::arcgis_cache::conf::CacheDocs;
+use crate::arcgis_cache::definition::ImageType;
+use crate::arcgis_cache::definition::CacheDefinition;
 use crate::arcgis_cache::grid::{self, GridSpec};
 
 /// bundle 头长度（v1 的 `.bundlx`、v2 的 `.bundle` 各取自身格式的头）。
@@ -141,8 +143,9 @@ impl ArcgisCache {
     /// 打开缓存：`dir` 为缓存服务目录（或其上层，含一级图层子目录）。
     pub fn open(dir: &Path) -> Result<ArcgisCache, String> {
         let docs = CacheDocs::load(dir)?;
-        check_packet(docs.info.packet_size)?;
-        let allayers = find_alllayers(&docs.cache_dir)?;
+        check_packet(docs.def.packet_size)?;
+        // 瓦片根目录名由定义记录给出（`_alllayers` / `tile`）。
+        let allayers = find_alllayers(&docs.cache_dir, &docs.def)?;
         let version = detect_version(&docs, &allayers)?;
         let probe = probe_alllayers(&allayers);
         Ok(ArcgisCache {
@@ -193,8 +196,16 @@ impl ArcgisCache {
         }
     }
 
-    pub fn info(&self) -> &crate::arcgis_cache::conf::CacheInfo {
-        &self.docs.info
+    pub fn info(&self) -> &CacheDefinition {
+        &self.docs.def
+    }
+
+    /// 本次打开是否**引用了已有的**定义记录（内容一致，未新建）。
+    ///
+    /// 管理面导入 tpk 时要把这个结论回给用户（「这份缓存的网格方案与已有缓存
+    /// 完全一致，已直接引用，未新建记录」），因此不能只在登记表内部知道。
+    pub fn docs_reused(&self) -> bool {
+        self.docs.reused
     }
 
     pub fn version(&self) -> CacheVersion {
@@ -478,11 +489,16 @@ fn actual_case(p: &Path) -> PathBuf {
     p.to_path_buf()
 }
 
-/// 在缓存根目录（`Conf.xml` 所在目录，即 [`crate::arcgis_cache::conf::find_conf` 的父目录）
-/// 里按不区分大小写的名字找 `_alllayers`；管理面体检（map-api `admin::check`）
-/// 与打开路径共用同一套定位规则，避免两侧判定不一致。
-pub fn find_alllayers(cache_dir: &Path) -> Result<PathBuf, String> {
-    let want = "_alllayers";
+/// 在缓存根目录（配置文件所在目录）里定位瓦片根目录。
+///
+/// 目录名由**定义记录**给出：`Conf.xml` 形态是 `_alllayers`（ArcGIS Server 紧凑
+/// 缓存），`.tpkx` 形态是 `tile`（`root.json` 的 `tileBundlesPath`）。两者内部
+/// 结构相同（`L{zz}/R{rrrr}C{cccc}.bundle`），因此读瓦片的逻辑完全一致。
+///
+/// 管理面体检（map-api `admin::check`）与打开路径共用同一套定位规则，避免两侧
+/// 判定不一致。
+pub fn find_alllayers(cache_dir: &Path, def: &CacheDefinition) -> Result<PathBuf, String> {
+    let want = def.tile_root.as_str();
     if let Ok(entries) = std::fs::read_dir(cache_dir) {
         for e in entries.flatten() {
             let p = e.path();
@@ -495,7 +511,7 @@ pub fn find_alllayers(cache_dir: &Path) -> Result<PathBuf, String> {
             }
         }
     }
-    Err(format!("{} 下未找到 _alllayers 目录", cache_dir.display()))
+    Err(format!("{} 下未找到 {} 目录", cache_dir.display(), want))
 }
 
 /// 版本判定：优先 Conf.xml 的显式 `BundleVersion`，否则看 `.bundlx` 是否存在，
@@ -503,7 +519,7 @@ pub fn find_alllayers(cache_dir: &Path) -> Result<PathBuf, String> {
 fn detect_version(docs: &CacheDocs, allayers: &Path) -> Result<CacheVersion, String> {
     // WTC v1 优先：magic 是格式自描述的权威判据，必须先看文件头，
     // 否则 Conf.xml 里若带 BundleVersion=2 会把 WTC 误判成 V2。
-    for z in docs.info.min_zoom()..=docs.info.max_zoom() {
+    for z in docs.def.min_zoom()..=docs.def.max_zoom() {
         let dir = allayers.join(format!("L{z:02}"));
         if !dir.is_dir() { continue; }
         let Ok(entries) = std::fs::read_dir(&dir) else { continue };
@@ -521,16 +537,16 @@ fn detect_version(docs: &CacheDocs, allayers: &Path) -> Result<CacheVersion, Str
             }
         }
     }
-    if let Some(v) = docs.info.bundle_version {
+    if let Some(v) = docs.def.bundle_version {
         return match v {
             1 | 0 => Ok(CacheVersion::V1),
             _ => Ok(CacheVersion::V2),
         };
     }
-    let packet = docs.info.packet_size;
+    let packet = docs.def.packet_size;
     let expect_v1 = (HDR_V1_BUNDLX as usize) + (packet * packet * 5) as usize + 16;
     let mut saw_bundle = false;
-    for z in docs.info.min_zoom()..=docs.info.max_zoom() {
+    for z in docs.def.min_zoom()..=docs.def.max_zoom() {
         let dir = allayers.join(format!("L{z:02}"));
         if !dir.is_dir() {
             continue;

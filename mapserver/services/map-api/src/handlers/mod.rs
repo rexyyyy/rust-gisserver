@@ -314,6 +314,11 @@ pub fn admin_router(state: Arc<AppState>) -> Router {
             "/tile-grid",
             axum::routing::post(crate::admin::tile_grid::tile_grid),
         )
+        // 导入 ArcGIS 缓存包（.tpk / .tpkx）→ data_root 下的可发布缓存目录
+        .route(
+            "/import-tpk",
+            axum::routing::post(crate::admin::import_tpk::import_tpk),
+        )
         .route(
             "/components",
             get(crate::admin::catalog_admin::components),

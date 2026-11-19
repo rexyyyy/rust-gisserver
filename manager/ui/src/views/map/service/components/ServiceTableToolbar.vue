@@ -14,6 +14,8 @@
         <el-icon><Plus /></el-icon>
         {{ $t('map.auto.text200') }}
       </el-button>
+      <!-- Page-specific buttons, placed after the shared actions -->
+      <slot name="actions-tail" />
     </div>
   </div>
 </template>

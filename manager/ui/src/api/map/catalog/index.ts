@@ -12,6 +12,8 @@ import {
   ImportShpBody,
   ImportShpProgress,
   ImportShpResp,
+  ImportTpkBody,
+  ImportTpkResp,
   PgConnectBody,
   PgQueryResp,
   PublishBody,
@@ -56,6 +58,15 @@ export function listWorkspaceDirs(params: { workspaceId: number; path?: string }
 export function parseTileGrid(data: { workspaceId: number; path: string }): AxiosPromise<TileGridParseResp> {
   return request({
     url: '/map/catalog/tile-grid',
+    method: 'post',
+    data
+  });
+}
+
+// 导入 ArcGIS 缓存包（.tpk / .tpkx）→ 解到工作空间数据根下，成为可发布的缓存目录
+export function importTpk(data: ImportTpkBody): AxiosPromise<ImportTpkResp> {
+  return request({
+    url: '/map/catalog/import-tpk',
     method: 'post',
     data
   });

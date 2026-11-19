@@ -10,12 +10,12 @@
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
-use axum::extract::State;
+use axum::extract::{RawQuery, State};
 use axum::http::StatusCode;
 use axum::response::Response;
 use serde_json::{json, Value};
 
-use crate::admin::discover::guard_data_root_laxed;
+use crate::admin::discover::{guard_data_root_laxed_with, query_data_root};
 use crate::admin::http::{authorize, json as json_resp};
 use crate::state::AppState;
 
@@ -23,6 +23,7 @@ use crate::state::AppState;
 pub async fn tile_grid(
     State(state): State<Arc<AppState>>,
     headers: axum::http::HeaderMap,
+    RawQuery(qs): RawQuery,
     axum::extract::Json(body): axum::extract::Json<Value>,
 ) -> Response {
     if let Err(r) = authorize(&state, &headers) {
@@ -52,7 +53,8 @@ pub async fn tile_grid(
         raw_path.clone()
     };
 
-    let dir = match guard_data_root_laxed(&state, &dir) {
+    let override_root = query_data_root(qs.as_deref());
+    let dir = match guard_data_root_laxed_with(&state, &dir, override_root.as_deref()) {
         Ok(p) => p,
         Err(r) => return r,
     };
@@ -63,7 +65,7 @@ pub async fn tile_grid(
     let (cache_dir, info, bounds) = match gisserver::arcgis_cache::conf::CacheDocs::load(&dir) {
         Ok(d) => {
             let b = d.cdi.as_ref().map(|c| c.bounds);
-            (d.cache_dir, d.info, b)
+            (d.cache_dir, d.def.as_ref().clone(), b)
         }
         Err(e) => {
             if raw_path.is_file() && raw_path.extension().map(|x| x.eq_ignore_ascii_case("xml")).unwrap_or(false) {
@@ -164,7 +166,7 @@ fn read_xml_file(path: &Path) -> Result<String, String> {
 /// 缺少 `conf.cdi` / bundle 探测时的包络兜底：经纬度 CRS（4326/4490/4214/4258）
 /// 按全球经纬度范围；其余投影 CRS 按最细级瓦片跨度对齐到 origin 的满幅网格。
 /// 返回 `[minx, miny, maxx, maxy]`。
-fn fallback_bounds(info: &gisserver::arcgis_cache::conf::CacheInfo) -> Option<[f64; 4]> {
+fn fallback_bounds(info: &gisserver::arcgis_cache::definition::CacheDefinition) -> Option<[f64; 4]> {
     let [ox, oy] = info.origin;
     if gisserver::wms_common::crs::is_geographic(&info.crs) {
         return Some([ox.min(-180.0), oy.min(-90.0), 180.0, 90.0]);

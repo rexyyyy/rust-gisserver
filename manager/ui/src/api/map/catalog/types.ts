@@ -223,6 +223,57 @@ export interface DiscoverResp {
   resources: ResourceVO[];
 }
 
+/** POST /map/catalog/import-tpk —— 导入 ArcGIS 缓存包（.tpk / .tpkx） */
+export interface ImportTpkBody {
+  /** 工作空间 id */
+  workspaceId: number;
+  /** 服务器上 .tpk / .tpkx 包的绝对路径（须在工作空间数据根内） */
+  path: string;
+  /** 落点目录名，缺省取包名去扩展名 */
+  name?: string;
+}
+
+/** 导入结果：解压落点 + 缓存定义记录（网格方案） */
+export interface ImportTpkResp {
+  /** 源包路径 */
+  source: string;
+  /** 解压落点目录（本身即一份标准 ArcGIS 缓存目录） */
+  dir: string;
+  /** 配置文件（conf.xml / root.json）路径 */
+  config_file: string;
+  /** 包类型：tpk | tpkx */
+  package_kind: string;
+  /** 解出的条目数 */
+  entries: number;
+  /** 定义记录编号 */
+  definition_id: number;
+  /** 是否复用了已有定义记录（内容完全一致，未新建） */
+  definition_reused: boolean;
+  /** 配置来源形态：conf.xml | root.json */
+  config_kind: string;
+  crs: string;
+  wkid: number;
+  origin: number[];
+  tile_cols: number;
+  tile_rows: number;
+  dpi: number;
+  packet_size: number;
+  storage_format: string;
+  /** 瓦片根目录名：_alllayers | tile */
+  tile_root: string;
+  min_zoom: number;
+  max_zoom: number;
+  lods: NativeGridLevel[];
+  /** 数据范围（缓存 CRS 单位） */
+  bounds: number[] | null;
+  /** 缓存字节格式：v1 | v2 | wtc */
+  cache_version: string;
+  /** 实际存在的层级 */
+  levels: number[];
+  max_col: number;
+  max_row: number;
+}
+
 /** POST /map/catalog/stores/{id}/import-shp —— 把工作空间内的 Shapefile 导入 PostGIS */
 export interface ImportShpBody {
   /** 工作空间数据根目录内的 .shp 绝对路径 */

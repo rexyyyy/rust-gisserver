@@ -86,6 +86,8 @@ pub fn routes() -> Router<Arc<AppState>> {
         .route("/map/catalog/dirs", get(dir_list))
         // Publish wizard 'select tile config XML': parse server-side ArcGIS Conf.xml → grid params
         .route("/map/catalog/tile-grid", post(tile_grid_parse))
+        // Import an ArcGIS cache package (.tpk / .tpkx) → unpack into the data root as a publishable cache dir
+        .route("/map/catalog/import-tpk", post(import_tpk))
         // Data store
         .route("/map/catalog/stores", get(store_list).post(store_add))
         // 'Test connection' for new data source: no existing store id needed; probe directly with form params.
@@ -447,21 +449,7 @@ pub async fn dir_list(
 ) -> AppResult<Json<Resp<Value>>> {
     let workspace_id = query_i64(qs.as_deref(), "workspaceId")
         .ok_or_else(|| AppError::Param("缺少 workspaceId".to_string()))?;
-    let c = conn(&state.pool).await?;
-    let row = c
-        .query_opt(
-            "SELECT coalesce(data_root,'') FROM sys_workspace WHERE id = $1 AND del_flag = 0",
-            &[&workspace_id],
-        )
-        .await?;
-    let data_root = row
-        .ok_or_else(|| AppError::Param(format!("工作空间不存在：{workspace_id}")))?
-        .get::<_, String>(0);
-    let data_root = data_root.trim().to_string();
-    if data_root.is_empty() {
-        return Err(AppError::Param("该工作空间未配置数据根目录".to_string()));
-    }
-    drop(c);
+    let data_root = workspace_data_root(&state, workspace_id).await?;
 
     let requested_raw = query_pairs(qs.as_deref())
         .into_iter()
@@ -481,7 +469,11 @@ pub async fn dir_list(
         )));
     }
 
-    let q = format!("path={}", qs_encode(&requested));
+    let q = format!(
+        "path={}&data_root={}",
+        qs_encode(&requested),
+        qs_encode(&data_root)
+    );
     let data = upstream_json(&state, reqwest::Method::GET, "/admin/browse", Some(&q), None).await?;
     Ok(Resp::ok(data))
 }
@@ -493,6 +485,73 @@ pub struct TileGridBody {
     pub workspace_id: i64,
     #[serde(default)]
     pub path: String,
+}
+
+/// `POST /map/catalog/import-tpk` — Import an ArcGIS cache package (.tpk / .tpkx): unpack it into the
+/// workspace's data root, landing in `{data_root}/arcgis_tpk/explode_tpk/<name>_tpk/`, which is
+/// itself a standard ArcGIS cache directory (conf.xml + _alllayers/, or root.json + tile/) and
+/// can therefore be published directly as an ArcGIS tile service.
+///
+/// The engine reuses the same "cache definition record" logic (grid / coordinate / LOD are all
+/// read from the config file), so the returned CRS / LOD are exactly what the runtime will use.
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ImportTpkBody {
+    #[serde(default)]
+    pub workspace_id: i64,
+    /// Server-side path of the .tpk / .tpkx package (within the workspace data root).
+    #[serde(default)]
+    pub path: String,
+    /// Landing directory name; defaults to the package filename without extension.
+    #[serde(default)]
+    pub name: String,
+}
+
+pub async fn import_tpk(
+    State(state): State<Arc<AppState>>,
+    Json(form): Json<ImportTpkBody>,
+) -> AppResult<Json<Resp<Value>>> {
+    if form.workspace_id <= 0 {
+        return Err(AppError::Param("缺少 workspaceId".to_string()));
+    }
+    let raw = form.path.trim();
+    if raw.is_empty() {
+        return Err(AppError::Param("请选择要导入的 .tpk / .tpkx 包".to_string()));
+    }
+    let data_root = workspace_data_root(&state, form.workspace_id).await?;
+    if !lexical_inside(raw, &data_root) {
+        return Err(AppError::Param(format!(
+            "路径超出工作空间数据根目录：{}（根：{}）",
+            raw, data_root
+        )));
+    }
+    // Extension pre-check: catch obvious non-packages early (the engine re-checks authoritatively).
+    let ext = std::path::Path::new(raw)
+        .extension()
+        .and_then(|e| e.to_str())
+        .unwrap_or("")
+        .to_ascii_lowercase();
+    if ext != "tpk" && ext != "tpkx" {
+        return Err(AppError::Param(
+            "请选择 .tpk 或 .tpkx 格式的 ArcGIS 缓存包".to_string(),
+        ));
+    }
+
+    let q = format!("data_root={}", qs_encode(&data_root));
+    let mut body = json!({ "path": raw });
+    let name = form.name.trim();
+    if !name.is_empty() {
+        body["name"] = json!(name);
+    }
+    let data = upstream_json(
+        &state,
+        reqwest::Method::POST,
+        "/admin/import-tpk",
+        Some(&q),
+        Some(body),
+    )
+    .await?;
+    Ok(Resp::ok(data))
 }
 
 /// `POST /map/catalog/tile-grid` — Parse server-side ArcGIS `Conf.xml`, return the grid params the publish
@@ -509,20 +568,7 @@ pub async fn tile_grid_parse(
     if raw.is_empty() {
         return Err(AppError::Param("请选择或填写 Conf.xml 路径".to_string()));
     }
-    let c = conn(&state.pool).await?;
-    let row = c
-        .query_opt(
-            "SELECT coalesce(data_root,'') FROM sys_workspace WHERE id = $1 AND del_flag = 0",
-            &[&form.workspace_id],
-        )
-        .await?;
-    let data_root = row
-        .ok_or_else(|| AppError::Param(format!("工作空间不存在：{}", form.workspace_id)))?
-        .get::<_, String>(0);
-    let data_root = data_root.trim().to_string();
-    if data_root.is_empty() {
-        return Err(AppError::Param("该工作空间未配置数据根目录".to_string()));
-    }
+    let data_root = workspace_data_root(&state, form.workspace_id).await?;
     if !lexical_inside(raw, &data_root) {
         return Err(AppError::Param(format!(
             "路径超出工作空间数据根目录：{}（根：{}）",
@@ -537,13 +583,13 @@ pub async fn tile_grid_parse(
             ));
         }
     }
-    drop(c);
 
+    let q = format!("data_root={}", qs_encode(&data_root));
     let data = upstream_json(
         &state,
         reqwest::Method::POST,
         "/admin/tile-grid",
-        None,
+        Some(&q),
         Some(json!({ "path": raw })),
     )
     .await?;
@@ -720,6 +766,26 @@ async fn load_store(state: &AppState, id: i64) -> AppResult<StoreRow> {
         AppError::Msg(format!("数据存储不存在：{id}"))
     })?;
     decrypt_store_dsn(state, row)
+}
+
+/// 读取工作空间当前数据根（UI 可运行时修改，不能被 map-api 启动配置缓存住）。
+async fn workspace_data_root(state: &AppState, workspace_id: i64) -> AppResult<String> {
+    let c = conn(&state.pool).await?;
+    let row = c
+        .query_opt(
+            "SELECT coalesce(data_root,'') FROM sys_workspace WHERE id = $1 AND del_flag = 0",
+            &[&workspace_id],
+        )
+        .await?;
+    let root = row
+        .ok_or_else(|| AppError::Param(format!("工作空间不存在：{workspace_id}")))?
+        .get::<_, String>(0)
+        .trim()
+        .to_string();
+    if root.is_empty() {
+        return Err(AppError::Param("该工作空间未配置数据根目录".to_string()));
+    }
+    Ok(root)
 }
 
 /// `sys_store.pg_dsn` 以密文落库，读出后统一在这里解密（历史明文原样返回）。
@@ -1136,10 +1202,12 @@ pub async fn store_connect(
         )
         .await
     } else {
+        let data_root = workspace_data_root(&state, store.workspace_id).await?;
         let q = format!(
-            "path={}&data_type={}&depth=1",
+            "path={}&data_type={}&depth=1&data_root={}",
             qs_encode(&store.base_path),
-            qs_encode(&store.store_type)
+            qs_encode(&store.store_type),
+            qs_encode(&data_root)
         );
         upstream_json(&state, reqwest::Method::GET, "/admin/discover", Some(&q), None).await
     };
@@ -1462,12 +1530,14 @@ pub async fn store_discover(
         .await?;
         arr_of(&data, "tables")
     } else {
+        let data_root = workspace_data_root(&state, store.workspace_id).await?;
         let depth = b.depth.unwrap_or(1).clamp(1, 4).to_string();
         let q = format!(
-            "path={}&data_type={}&depth={}",
+            "path={}&data_type={}&depth={}&data_root={}",
             qs_encode(&store.base_path),
             qs_encode(&store.store_type),
-            depth
+            depth,
+            qs_encode(&data_root)
         );
         let data =
             upstream_json(&state, reqwest::Method::GET, "/admin/discover", Some(&q), None).await?;
@@ -1798,7 +1868,12 @@ pub async fn resource_refresh(
             .find(|e| str_field(e, "name") == res.name)
             .ok_or_else(|| AppError::Msg(format!("PostGIS 中未找到表：{}", res.name)))?
     } else {
-        let q = format!("path={}", qs_encode(&res.source));
+        let data_root = workspace_data_root(&state, store.workspace_id).await?;
+        let q = format!(
+            "path={}&data_root={}",
+            qs_encode(&res.source),
+            qs_encode(&data_root)
+        );
         upstream_json(
             &state,
             reqwest::Method::GET,
@@ -2566,11 +2641,13 @@ pub async fn publish(
     // Reject when same-name service already exists on engine (avoids overwriting someone else's config).
     ensure_name_free(&state, &layer_name).await?;
 
+    let data_root = workspace_data_root(&state, store.workspace_id).await?;
+    let q = format!("data_root={}", qs_encode(&data_root));
     let data = upstream_json(
         &state,
         reqwest::Method::POST,
         "/admin/services",
-        None,
+        Some(&q),
         Some(body),
     )
     .await?;
@@ -2848,7 +2925,9 @@ pub async fn published_update(
         bbox.as_ref(),
         grid.as_ref(),
     )?;
-    let data = upstream_json(&state, reqwest::Method::POST, "/admin/services", None, Some(body))
+    let data_root = workspace_data_root(&state, store.workspace_id).await?;
+    let q = format!("data_root={}", qs_encode(&data_root));
+    let data = upstream_json(&state, reqwest::Method::POST, "/admin/services", Some(&q), Some(body))
         .await
         .map_err(|e| enrich(&e, &extra))?;
     if data.get("served").and_then(|v| v.as_bool()) != Some(true) {
