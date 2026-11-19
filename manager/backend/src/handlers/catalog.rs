@@ -730,6 +730,24 @@ fn decrypt_store_dsn(state: &AppState, mut row: StoreRow) -> AppResult<StoreRow>
     Ok(row)
 }
 
+/// Number of published layers linked to this store's resources. `state <> 'deleted'`
+/// matches the现有 "在线服务" 口径：stopped/paused 仍占用服务注册，不允许改数据源。
+async fn store_published_count(state: &AppState, store_id: i64) -> AppResult<i64> {
+    let c = conn(&state.pool).await?;
+    let n: i64 = c
+        .query(
+            "SELECT count(*) FROM sys_published_layer p \
+             JOIN sys_resource r ON r.id = p.resource_id \
+             WHERE r.store_id = $1 AND p.del_flag = 0 AND p.state <> 'deleted'",
+            &[&store_id],
+        )
+        .await?
+        .first()
+        .map(|r| r.get(0))
+        .unwrap_or(0);
+    Ok(n)
+}
+
 /// Store form validation: legal type + required locator fields (dir needs path, PostGIS needs DSN).
 fn validate_store(b: &StoreBody, caps: &Caps) -> AppResult<StoreRow> {
     let name = validate_ident(&b.name, "Store 名", 128)?;
@@ -874,7 +892,10 @@ pub async fn store_list(
          coalesce(s.remark,''), s.del_flag, \
          (SELECT count(*) FROM sys_resource r WHERE r.store_id = s.id AND r.del_flag = 0), \
          (SELECT count(*) FROM sys_resource r WHERE r.store_id = s.id AND r.del_flag = 0 \
-          AND r.publishable = 1) \
+          AND r.publishable = 1), \
+         (SELECT count(*) FROM sys_published_layer p \
+          JOIN sys_resource r ON r.id = p.resource_id \
+          WHERE r.store_id = s.id AND p.del_flag = 0 AND p.state <> 'deleted') \
          FROM sys_store s WHERE ($1::bigint = 0 OR s.workspace_id = $1) \
          AND ($2::int = 1 OR s.del_flag = 0) ORDER BY s.workspace_id, s.id",
     );
@@ -900,6 +921,7 @@ pub async fn store_list(
                     "delFlag": r.get::<_, i16>(8),
                     "resourceCount": r.get::<_, i64>(9),
                     "publishableCount": r.get::<_, i64>(10),
+                    "publishedCount": r.get::<_, i64>(11),
                 })),
             )
         })
@@ -983,11 +1005,26 @@ pub async fn store_update(
     AxumPath(id): AxumPath<i64>,
     Json(body): Json<StoreBody>,
 ) -> AppResult<Json<Resp<Value>>> {
+    let cur = load_store(&state, id).await?;
+    let published = store_published_count(&state, id).await?;
+    if published > 0 {
+        return Err(AppError::Msg(format!(
+            "数据源下仍有 {published} 个已发布图层，请先停止或删除相关服务后再修改"
+        )));
+    }
+    // PostGIS 数据源建成后只能改连接信息；类型、名称、工作空间一律锁定。
+    if cur.store_type == STORE_TYPE_POSTGIS {
+        if body.store_type.trim() != STORE_TYPE_POSTGIS {
+            return Err(AppError::Param("PostGIS 数据源类型不可修改".into()));
+        }
+        if body.workspace_id != cur.workspace_id || body.name.trim() != cur.name {
+            return Err(AppError::Param("PostGIS 数据源仅可修改连接信息（DSN/Schema）".into()));
+        }
+    }
     let caps = load_caps(&state).await?;
     let mut row = validate_store(&body, &caps)?;
     if row.store_type == STORE_TYPE_POSTGIS && row.pg_dsn.is_empty() {
-        let cur = load_store(&state, id).await?;
-        if cur.store_type != STORE_TYPE_POSTGIS || cur.pg_dsn.trim().is_empty() {
+        if cur.pg_dsn.trim().is_empty() {
             return Err(AppError::Param("PostGIS Store 必须填写连接串（pgDsn）".into()));
         }
         row.pg_dsn = cur.pg_dsn;
@@ -1028,6 +1065,12 @@ pub async fn store_remove(
     AxumPath(id): AxumPath<i64>,
 ) -> AppResult<Json<Resp<Value>>> {
     let store = load_store(&state, id).await?;
+    let published = store_published_count(&state, id).await?;
+    if published > 0 {
+        return Err(AppError::Msg(format!(
+            "数据源下仍有 {published} 个已发布图层，请先停止或删除相关服务后再删除"
+        )));
+    }
     let c = conn(&state.pool).await?;
     let n = c
         .execute(

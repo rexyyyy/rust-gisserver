@@ -1,11 +1,7 @@
 <template>
   <div class="p-2">
     <!-- 红线提示：这里只登记命名空间容器，不含任何数据本体 -->
-    <el-alert type="info" :closable="false" show-icon class="mb-[10px]">
-      <template #title>
-        {{ $t('map.auto.yesof') }}<b>{{ $t('map.auto.text95') }}</b>。{{ $t('map.auto.deleteInServiceHour') }}
-      </template>
-    </el-alert>
+    <el-alert type="info" :closable="false" show-icon class="mb-[10px]" :title="$t('map.auto.workspaceTopHint')" />
 
     <el-card shadow="hover">
       <CatalogToolbar>
@@ -80,7 +76,7 @@
 
     <!-- 新增 / 编辑 -->
     <el-dialog v-model="dlg.visible" :title="dlg.isEdit ? $t('map.auto.text100') : $t('map.auto.text96')" width="480px" append-to-body>
-      <el-form ref="formRef" :model="form" :rules="rules" label-width="90px">
+      <el-form ref="formRef" :model="form" :rules="rules" label-width="130px">
         <el-form-item :label="$t('map.auto.name')" prop="name">
           <el-input v-model="form.name" :placeholder="$t('map.auto.ws1')" :disabled="dlg.isEdit && form.name === 'ws1'" />
         </el-form-item>

@@ -119,8 +119,8 @@
     </el-card>
 
     <!-- 新增/编辑对话框 -->
-    <el-dialog v-model="dlg.visible" :title="dlg.isEdit ? $t('map.auto.text111') : $t('map.auto.text112')" width="560px" append-to-body>
-      <el-form ref="formRef" :model="form" :rules="rules" label-width="100px">
+    <el-dialog v-model="dlg.visible" :title="dlg.isEdit ? $t('map.auto.text111') : $t('map.auto.text112')" width="620px" append-to-body>
+      <el-form ref="formRef" :model="form" :rules="rules" label-width="140px">
         <el-form-item :label="$t('map.auto.id')" prop="engineId">
           <el-input v-model="form.engineId" :disabled="dlg.isEdit" :placeholder="$t('map.auto.mapApi2')" />
         </el-form-item>

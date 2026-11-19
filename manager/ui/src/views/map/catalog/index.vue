@@ -1,12 +1,7 @@
 <template>
   <div class="p-2">
     <!-- 红线提示：目录层只存指针与元数据，不碰数据本体 -->
-    <el-alert type="info" :closable="false" show-icon class="mb-[10px]">
-      <template #title>
-        {{ $t('map.auto.text174') }}<b>{{ $t('map.auto.text45') }}</b>{{ $t('map.auto.of2') }}<b>{{ $t('map.auto.text46') }}</b>：{{ $t('map.auto.text175') }}/ {{ $t('map.auto.text176') }}/ geometry_columns，
-        {{ $t('map.auto.of4') }}Layer / TilesetService {{ $t('map.auto.importData2') }}
-      </template>
-    </el-alert>
+    <el-alert type="info" :closable="false" show-icon class="mb-[10px]" :title="$t('map.auto.catalogIndexHint')" />
 
     <!-- 功能入口：工作空间 / 数据源 / 图层分工 -->
     <el-row :gutter="10" class="mb-[10px]">

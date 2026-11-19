@@ -14,8 +14,8 @@ export const useAppStore = defineStore('app', () => {
   const device = ref<string>('desktop');
   const size = useStorage<'large' | 'default' | 'small'>('size', 'default');
 
-  // 语言
-  const language = useStorage('language', 'zh_CN');
+  // 界面显示语言（与 GIS_ENCODING_REGION 用户所在区域相互独立）
+  const language = useStorage('language', 'en_US');
   const languageObj: any = {
     en_US: enUS,
     zh_CN: zhCN

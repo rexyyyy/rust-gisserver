@@ -4,7 +4,6 @@
     <el-alert type="info" :closable="false" show-icon class="mb-[10px]">
       <template #title>
         {{ $t('map.auto.storeAlertHint') }}
-        {{ $t('map.auto.importData4') }}
       </template>
     </el-alert>
 
@@ -22,6 +21,7 @@
         <template #actions>
           <el-button icon="Refresh" @click="load">{{ $t('map.auto.refresh') }}</el-button>
           <el-button v-hasPermi="['map:catalog:edit']" type="primary" plain icon="Plus" @click="openAdd">{{ $t('map.auto.text76') }}</el-button>
+          <el-button v-hasPermi="['map:catalog:edit']" type="success" plain icon="Plus" @click="openPgAdd">{{ $t('map.auto.newPostgisDatasource') }}</el-button>
         </template>
       </CatalogToolbar>
 
@@ -63,7 +63,8 @@
               link
               type="primary"
               icon="Edit"
-              :disabled="row.delFlag === 1"
+              :disabled="row.delFlag === 1 || (row.publishedCount || 0) > 0"
+              :title="(row.publishedCount || 0) > 0 ? $t('map.auto.publishedStoreLocked') : ''"
               @click="openEdit(row)"
             >
               {{ $t('map.auto.text99') }}
@@ -110,6 +111,8 @@
               link
               type="danger"
               icon="Delete"
+              :disabled="(row.publishedCount || 0) > 0"
+              :title="(row.publishedCount || 0) > 0 ? $t('map.auto.publishedStoreLocked') : ''"
               @click="handleRemove(row)"
             >
               {{ $t('map.auto.delete6') }}
@@ -160,7 +163,7 @@
 
           <!-- 右侧：编辑表单 -->
           <div class="store-add-right">
-            <el-form ref="addFormRef" :model="addForm" :rules="addRules" label-width="100px">
+            <el-form ref="addFormRef" :model="addForm" :rules="addRules" label-width="140px">
               <el-form-item :label="$t('map.auto.name')" prop="name">
                 <el-input v-model="addForm.name" :placeholder="$t('map.auto.wuhanCog')" />
               </el-form-item>
@@ -242,20 +245,21 @@
     </el-dialog>
 
     <!-- 编辑数据源（保持原有对话框） -->
-    <el-dialog v-model="editDlg.visible" :title="$t('map.auto.text84')" width="580px" append-to-body>
-      <el-form ref="editFormRef" :model="editForm" :rules="editRules" label-width="110px">
+    <el-dialog v-model="editDlg.visible" :title="$t('map.auto.text84')" width="680px" append-to-body>
+      <el-form ref="editFormRef" :model="editForm" :rules="editRules" label-width="150px">
         <el-form-item :label="$t('map.auto.text51')" prop="workspaceId">
-          <el-select v-model="editForm.workspaceId" style="width: 100%">
+          <el-select v-model="editForm.workspaceId" style="width: 100%" :disabled="isEditPgStore">
             <el-option v-for="w in workspaces" :key="w.id" :label="`${w.name}${w.title ? ' — ' + w.title : ''}`" :value="w.id" />
           </el-select>
         </el-form-item>
         <el-form-item :label="$t('map.auto.name')" prop="name">
-          <el-input v-model="editForm.name" :placeholder="$t('map.auto.wuhanCog')" />
+          <el-input v-model="editForm.name" :placeholder="$t('map.auto.wuhanCog')" :disabled="isEditPgStore" />
         </el-form-item>
         <el-form-item :label="$t('map.auto.type')" prop="storeType">
-          <el-select v-model="editForm.storeType" style="width: 100%" @change="onEditTypeChange">
+          <el-select v-model="editForm.storeType" style="width: 100%" :disabled="isEditPgStore" @change="onEditTypeChange">
             <el-option v-for="t in storeTypeOptions" :key="t.value" :label="t.label" :value="t.value" />
           </el-select>
+          <span v-if="isEditPgStore" class="text-xs text-gray-400">{{ $t('map.auto.postgisEditOnlyConnection') }}</span>
         </el-form-item>
         <el-form-item v-if="!isEditPgStore" :label="$t('map.auto.catalog2')" prop="basePath">
           <el-input v-model="editForm.basePath" :placeholder="$t('map.auto.dataRootOfCatalogDDataCog')" />
@@ -276,7 +280,7 @@
           </el-form-item>
         </template>
         <el-form-item :label="$t('map.auto.remark')" prop="remark">
-          <el-input v-model="editForm.remark" type="textarea" :rows="2" />
+          <el-input v-model="editForm.remark" type="textarea" :rows="2" :disabled="isEditPgStore" />
         </el-form-item>
       </el-form>
       <template #footer>
@@ -291,6 +295,14 @@
       :store="importDlg.store"
       :data-root="wsDataRoot(importDlg.store)"
       @imported="onShpImported"
+    />
+
+    <!-- 专用新建 PostGIS 数据源弹窗 -->
+    <PgDatasourceDlg
+      v-model="pgDlg.visible"
+      :workspaces="workspaces"
+      :default-workspace-id="wsId || workspaces[0]?.id || 0"
+      @created="onPgCreated"
     />
   </div>
 </template>
@@ -313,6 +325,7 @@ import { DirEntry, ImportShpResp, StoreBody, StoreVO, WorkspaceVO } from '@/api/
 import CatalogToolbar from './components/CatalogToolbar.vue';
 import DirTree from './components/DirTree.vue';
 import ImportShpDialog from './components/ImportShpDialog.vue';
+import PgDatasourceDlg from './components/pg_datasource_dlg.vue';
 import { useCaps } from './composables/useCatalog';
 
 const { proxy } = getCurrentInstance() as ComponentInternalInstance;
@@ -337,6 +350,15 @@ watch([wsId, includeDeleted], () => {
   load();
 });
 const busy = ref<{ row: number; kind: string }>({ row: 0, kind: '' });
+const pgDlg = reactive({ visible: false });
+
+const openPgAdd = () => {
+  pgDlg.visible = true;
+};
+
+const onPgCreated = async () => {
+  await load();
+};
 
 const wsName = (id: number) => workspaces.value.find((w) => w.id === id)?.name || `#${id}`;
 

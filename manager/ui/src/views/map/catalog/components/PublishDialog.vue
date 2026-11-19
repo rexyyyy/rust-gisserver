@@ -1,7 +1,7 @@
 <template>
   <!-- 发布 / 修改发布信息 向导：服务协议的可选项一律取自引擎能力矩阵 -->
   <el-dialog v-model="visible" :title="isEdit ? $t('map.auto.editinfo') : $t('map.auto.text31')" width="640px" append-to-body>
-    <el-form ref="formRef" :model="form" :rules="rules" label-width="110px">
+    <el-form ref="formRef" :model="form" :rules="rules" label-width="140px">
       <el-alert
         v-if="form.crsAlert"
         :title="form.crsAlertTitle"

@@ -50,9 +50,12 @@ copy /Y "%MANAGER_EXE%" "%INSTALL_DIR%\bin\manager.exe"   >nul
 REM ---- 3/6 PROJ libs (linear scan, NO nested parens) ----
 echo [3/6] Copying PROJ runtime...
 set "PROJ_SRC="
-if exist "%~dp0..\..\..\build"                         set "PROJ_SRC=%~dp0..\..\..\build"
+REM Prefer the DLL set produced by the local Rust build (known-compatible).
+if exist "%~dp0..\..\mapserver\target\debug"            set "PROJ_SRC=%~dp0..\..\mapserver\target\debug"
+if "%PROJ_SRC%"=="" if exist "%~dp0..\..\..\r-mapserver" set "PROJ_SRC=%~dp0..\..\..\r-mapserver"
+if "%PROJ_SRC%"=="" if exist "%~dp0..\..\..\build"      set "PROJ_SRC=%~dp0..\..\..\build"
 if "%PROJ_SRC%"=="" if exist "%~dp0..\..\..\dist"       set "PROJ_SRC=%~dp0..\..\..\dist"
-if "%PROJ_SRC%"=="" if exist "%~dp0..\..\..\thirdparty\GDAL3.13\dll" set "PROJ_SRC=%~dp0..\..\..\thirdparty\GDAL3.13\dll"
+if "%PROJ_SRC%"=="" if exist "%~dp0..\..\..\GDAL3.13\dll" set "PROJ_SRC=%~dp0..\..\..\GDAL3.13\dll"
 
 set "PROJ_DLL_FOUND=0"
 for %%D in (proj_9 sqlite3 libcurl tiff zlib libssh2 brotlidec brotlicommon jpeg62 libcrypto-3-x64) do (
@@ -71,9 +74,11 @@ if "%PROJ_DLL_FOUND%"=="1" (
 
 REM proj.db
 set "PROJ_DB_SRC="
-if exist "%~dp0..\..\..\build\share\proj.db"                    set "PROJ_DB_SRC=%~dp0..\..\..\build\share\proj.db"
+if exist "%~dp0..\..\..\r-mapserver\share\proj\proj.db"            set "PROJ_DB_SRC=%~dp0..\..\..\r-mapserver\share\proj\proj.db"
+if "%PROJ_DB_SRC%"=="" if exist "%~dp0..\..\mapserver\target\debug\share\proj.db" set "PROJ_DB_SRC=%~dp0..\..\mapserver\target\debug\share\proj.db"
+if "%PROJ_DB_SRC%"=="" if exist "%~dp0..\..\..\build\share\proj.db" set "PROJ_DB_SRC=%~dp0..\..\..\build\share\proj.db"
 if "%PROJ_DB_SRC%"=="" if exist "%~dp0..\..\..\dist\share\proj.db" set "PROJ_DB_SRC=%~dp0..\..\..\dist\share\proj.db"
-if "%PROJ_DB_SRC%"=="" if exist "%~dp0..\..\..\thirdparty\GDAL3.13\share\proj.db" set "PROJ_DB_SRC=%~dp0..\..\..\thirdparty\GDAL3.13\share\proj.db"
+if "%PROJ_DB_SRC%"=="" if exist "%~dp0..\..\..\GDAL3.13\share\proj.db" set "PROJ_DB_SRC=%~dp0..\..\..\GDAL3.13\share\proj.db"
 if not "%PROJ_DB_SRC%"=="" (
     copy /Y "%PROJ_DB_SRC%" "%INSTALL_DIR%\share\proj\proj.db" >nul
     echo [OK] proj.db copied
@@ -136,7 +141,8 @@ echo # ^(already created by install.bat^). Set DATA_ROOT only when the COG /
 echo # vector / mbtiles / pmtiles / 3dtiles data lives on another drive.
 echo # DATA_ROOT=E:\data\1
 echo.
-echo # Legacy filename encoding region: zh-CN / zh-TW / en / ko / ja
+echo # User region for legacy path/filename encoding: zh-CN / zh-TW / en / ko / ja
+echo # Independent from the UI display language (browser LangSelect).
 echo GIS_ENCODING_REGION=zh-CN
 echo # e2e conversion fixture root ^(demo layers only^)
 echo # TESTDATA_ROOT=

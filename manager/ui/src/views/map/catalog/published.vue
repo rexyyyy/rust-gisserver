@@ -1,12 +1,7 @@
 <template>
   <div class="p-2">
     <!-- 红线提示：账本与引擎配置同源，生命周期只动引擎登记簿 -->
-    <el-alert type="info" :closable="false" show-icon class="mb-[10px]">
-      <template #title>
-        {{ $t('map.auto.publishedLedgerHint') }}
-        {{ $t('map.auto.text181')}} / {{ $t('map.auto.text43') }} / {{ $t('map.auto.deleteDelete') }}
-      </template>
-    </el-alert>
+    <el-alert type="info" :closable="false" show-icon class="mb-[10px]" :title="$t('map.auto.publishedLedgerHint')" />
 
     <el-card shadow="hover">
       <CatalogToolbar>

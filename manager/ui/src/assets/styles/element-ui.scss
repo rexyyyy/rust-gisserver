@@ -136,10 +136,15 @@
   color: var(--el-color-primary) !important;
 }
 
+/* Form labels: keep translated labels on one line */
+.el-form-item__label {
+  white-space: nowrap;
+}
+
 /* 当 el-form 的 inline 属性为 true 时 */
-/* 设置 label 的宽度默认为 68px */
+/* 设置 label 的宽度为 110px，避免英文标签换行 */
 .el-form--inline .el-form-item__label {
-  width: 68px;
+  width: 110px;
 }
 
 /* 设置 el-select 的宽度默认为 240px */

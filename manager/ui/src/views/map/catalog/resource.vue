@@ -1,12 +1,7 @@
 <template>
   <div class="p-2">
     <!-- 红线提示：这里是「发现」出来的元数据清单，不是数据本体 -->
-    <el-alert type="info" :closable="false" show-icon class="mb-[10px]">
-      <template #title>
-        {{ $t('map.auto.catalogLegend') }}
-        Layer / TilesetService {{ $t('map.auto.importData3') }}
-      </template>
-    </el-alert>
+    <el-alert type="info" :closable="false" show-icon class="mb-[10px]" :title="$t('map.auto.catalogResourceHint')" />
 
     <el-card shadow="hover">
       <div class="catalog-split">

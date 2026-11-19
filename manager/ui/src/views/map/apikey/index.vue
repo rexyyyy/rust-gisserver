@@ -117,8 +117,8 @@
     </el-card>
 
     <!-- 生成 / 编辑 -->
-    <el-dialog v-model="formOpen" :title="formMode === 'create' ? $t('map.auto.apiKey') : $t('map.auto.apiKey2')" width="560px" append-to-body>
-      <el-form ref="formRef" :model="form" :rules="formRules" label-width="100px">
+    <el-dialog v-model="formOpen" :title="formMode === 'create' ? $t('map.auto.apiKey') : $t('map.auto.apiKey2')" width="680px" append-to-body>
+      <el-form ref="formRef" :model="form" :rules="formRules" label-width="140px">
         <el-form-item :label="$t('map.auto.name')" prop="keyName">
           <el-input v-model="form.keyName" :placeholder="$t('map.auto.clientManager')" maxlength="50" show-word-limit />
         </el-form-item>
@@ -165,9 +165,9 @@
     </el-dialog>
 
     <!-- 新 Key 一次性醒目展示（生成 / 重置） -->
-    <el-dialog v-model="createdOpen" :title="$t('map.auto.key')" width="620px" append-to-body>
+    <el-dialog v-model="createdOpen" :title="$t('map.auto.key')" width="680px" append-to-body>
       <el-alert type="warning" show-icon :closable="false" class="mb-3" :title="$t('map.auto.keyHour')" />
-      <el-form label-width="110px">
+      <el-form label-width="150px">
         <el-form-item :label="$t('map.auto.name')">{{ created?.keyName }}</el-form-item>
         <el-form-item :label="$t('map.auto.text')">{{ created?.purposeName }}</el-form-item>
         <el-form-item label="API Key">
@@ -196,7 +196,7 @@
     </el-dialog>
 
     <!-- 用法 / 下发说明 -->
-    <el-dialog v-model="usageOpen" :title="$t('map.auto.apiKey3')" width="620px" append-to-body>
+    <el-dialog v-model="usageOpen" :title="$t('map.auto.apiKey3')" width="680px" append-to-body>
       <el-form label-width="110px" v-if="usageTarget">
         <el-form-item :label="$t('map.auto.name')">{{ usageTarget.keyName }}</el-form-item>
         <el-form-item label="API Key">

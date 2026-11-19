@@ -111,7 +111,7 @@
 
     <!-- 上传/替换 -->
     <el-dialog v-model="uploadVisible" :title="$t('map.auto.sldStyle')" width="720px" append-to-body @closed="resetUpload">
-      <el-form label-width="90px">
+      <el-form label-width="130px">
         <el-form-item :label="$t('map.auto.style3')" required>
           <el-input v-model="uploadName" :placeholder="$t('map.auto.buildings')" />
         </el-form-item>

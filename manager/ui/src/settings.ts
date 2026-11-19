@@ -63,7 +63,7 @@ const setting: DefaultSettings = {
   /**
    * 默认语言
    */
-  language: LanguageEnum.zh_CN,
+  language: LanguageEnum.en_US,
 
   /**
    * 默认大小

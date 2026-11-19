@@ -79,6 +79,8 @@ export interface StoreVO {
   delFlag: number;
   resourceCount: number;
   publishableCount: number;
+  /** 已发布（未移入回收站）的数据图层数量；>0 时数据源禁止修改/删除 */
+  publishedCount: number;
 }
 
 export interface StoreListResp {

@@ -14,7 +14,7 @@
     <div class="sje-layout">
       <!-- ========= LEFT: FORM ========= -->
       <div class="sje-left">
-        <el-form label-width="72px" size="default">
+        <el-form label-width="120px" size="default">
           <!-- POINT -->
           <el-card v-if="showSection('point')" shadow="never" class="sje-card">
             <template #header><b>{{ $t('map.auto.point') }}</b></template>
