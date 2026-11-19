@@ -155,7 +155,13 @@ if exist "%~dp0..\..\mapserver\config\env" (
 )
 
 REM ---- generate start scripts ----
+REM Switch to ANSI codepage 936 before writing .bat files, so that any
+REM content (ASCII or future Chinese) lands as GBK/ANSI on disk and is
+REM interpreted correctly when the user double-clicks it (default 936).
+REM install.bat itself uses chcp 65001 above for the .env.example heredoc.
 echo Generating startup scripts...
+
+chcp 936 >nul
 
 (
 echo @echo off
@@ -178,6 +184,8 @@ echo set "PROJ_DATA=%%~dp0share\proj"
 echo echo Starting manager on port 6180...
 echo bin\manager.exe
 ) > "%INSTALL_DIR%\start-manager.bat"
+
+chcp 65001 >nul
 
 echo.
 echo ============================================
