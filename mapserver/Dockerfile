@@ -54,8 +54,28 @@ RUN cargo build --release --manifest-path ./mapserver/Cargo.toml -p map-api
 FROM debian:bookworm-slim AS runtime
 
 RUN apt-get update \
- && apt-get install -y --no-install-recommends ca-certificates gettext-base \
+ && apt-get install -y --no-install-recommends \
+      ca-certificates gettext-base \
+      libproj25 proj-data \
  && rm -rf /var/lib/apt/lists/*
+
+# PROJ 由运行期 dlopen 加载（不参与链接），库名按平台不同：
+#   Windows proj_9.dll / Unix libproj.so。
+# Debian 只装出 libproj.so.25（裸名软链 libproj.so 在 -dev 包里），而代码按裸名
+# "libproj.so" 查找。这里建固定路径的软链并显式给出 PROJ_DLL —— 绝对路径 dlopen
+# 不依赖 ld.so 搜索路径，也不受架构 triplet（x86_64-linux-gnu / aarch64-linux-gnu）
+# 影响。PROJ_DATA 指向 proj-data 的安装目录（PROJ 9.1+ 的正式变量名）。
+# proj.db 由 proj-data 提供，与 libproj25 同源同版本（Debian bookworm 9.1.1），
+# 不会出现 Windows 侧那种 LAYOUT.MINOR 版本错配。
+RUN LIBPROJ="$(dpkg -L libproj25 | grep -E '/libproj\.so\.[0-9]+\.[0-9.]+$' | head -1)" \
+ && test -n "$LIBPROJ" \
+ && mkdir -p /usr/local/lib \
+ && ln -sf "$LIBPROJ" /usr/local/lib/libproj.so \
+ && ldconfig \
+ && test -f /usr/share/proj/proj.db
+
+ENV PROJ_DLL=/usr/local/lib/libproj.so \
+    PROJ_DATA=/usr/share/proj
 
 WORKDIR /app
 

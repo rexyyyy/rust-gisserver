@@ -5,7 +5,7 @@
 -- 中文 msg 动态译成英文，DB 必须种中文源文本）：
 --   system.sql  —— 系统管理与监控板块建表 + 种子
 --   map.sql     —— 地图/数据服务板块建表 + 菜单（依赖 system.sql 先跑）
--- 不进自动初始化：*.en_US.sql（英文环境见 ../deploy_en）、
+-- 不进自动初始化：*.en_US.sql（英文环境见 ../deploy_en/{win,linux}）、
 -- switch_to_*.sql（存量库语言切换补丁）、cleanup.sql / clear_seed.sql（破坏性）。
 -- ============================================================================
 \set ON_ERROR_STOP on

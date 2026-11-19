@@ -5,9 +5,10 @@
 # Any FAIL -> exit code 1 (consumed by start.ps1 / CI).
 #
 # Usage:
-#   pwsh -File validate.ps1                       # default: local 8080/6180/5434
-#   pwsh -File validate.ps1 -CheckDataRoot        # also verify data_root (default ./data) and TESTDATA_ROOT
-#   pwsh -File validate.ps1 -AdminToken 'xxx'     # when map-api has admin.token configured
+#   pwsh -File validate.ps1                              # default: local 8080/6180/5434
+#   pwsh -File validate.ps1 -Dir ..\deploy_zh-cn\win -CheckDataRoot   # verify that platform dir's gisdata
+#   pwsh -File validate.ps1 -AdminToken 'xxx'             # when map-api has admin.token configured
+# Linux hosts use validate.sh (same checks, bash + curl).
 # ============================================================================
 param(
     [string]$MapApiBase = 'http://localhost:8080',
@@ -47,6 +48,22 @@ Add 'PostGIS TCP' ($(if ($ok) { 'PASS' } else { 'FAIL' })) "$DbHost`:$DbPort"
 
 # 2) map-api /health
 $null = Probe 'map-api /health' "$MapApiBase/health"
+
+# 2b) PROJ backend (the `proj` field of /health): cross-CRS reprojection
+# (EPSG:4490 / Gauss-Kruger 45xx / UTM) needs the PROJ library + proj.db.
+# proj=false does not block startup but cross-CRS requests will fail -> WARN.
+# The real usability criterion is whether proj_create_crs_to_crs succeeds
+# (see mapserver/THIRD-PARTY-NOTICES.md §2.2).
+try {
+    $hj = Invoke-RestMethod -Uri "$MapApiBase/health" -Headers $headers -TimeoutSec 10
+    if ($hj.proj -eq $true) {
+        Add 'PROJ backend' 'PASS' 'proj_loaded=true (cross-CRS reprojection available)'
+    } else {
+        Add 'PROJ backend' 'WARN' 'proj_loaded=false: PROJ lib or proj.db missing in container; cross-CRS requests will fail'
+    }
+} catch {
+    Add 'PROJ backend' 'INFO' 'could not read proj field from /health'
+}
 
 # 3) map-api WMS GetCapabilities (data plane)
 $cap = Probe 'map-api WMS GetCapabilities' "$MapApiBase/wms?service=WMS&version=1.3.0&request=GetCapabilities"
