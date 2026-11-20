@@ -35,4 +35,8 @@ installscript/数据库/
 # Runtime cache and compiled artifacts (do not track)
 /cache/foyer/
 /run-env/
+
+# Generated deploy archives (do not track)
+/dist/*.zip
+/manager/deploy.zip
 /installscript/nssm
