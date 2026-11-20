@@ -16,6 +16,7 @@ Thumbs.db
 installscript/rust-gisserver_Setup.exe
 installscript/compile*.log
 installscript/*.exe
+installscript/*.zip
 installscript/nssm/101.zip
 installscript/nssm/nssm224.zip
 
