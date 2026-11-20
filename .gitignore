@@ -40,3 +40,12 @@ installscript/数据库/
 /dist/*.zip
 /manager/deploy.zip
 /installscript/nssm
+
+# installscript: keep only numbered PDFs and install.nsi; drop duplicated sources/docs
+/installscript/package.json
+/installscript/package-lock.json
+/installscript/*.md
+/installscript/*.html
+/installscript/*.mjs
+/installscript/installation-docs.pdf
+/installscript/README-install.pdf
