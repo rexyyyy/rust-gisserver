@@ -37,6 +37,9 @@ RequestExecutionLevel admin
 ; 源：项目的 run-env 目录（扁平化部署结构）
 !define SRC "D:\mycomputor\documents\gis-wt\thirdparty\rust-gisserver\run-env"
 
+; SQL 初始化脚本目录
+!define SQL_DIR "D:\mycomputor\documents\gis-wt\thirdparty\rust-gisserver\installscript\sql"
+
 ; NSSM 位置
 !define NSSM_DIR "D:\mycomputor\documents\gis-wt\thirdparty\rust-gisserver\installscript\nssm"
 !define NSSM_SRC "${NSSM_DIR}\nssm.exe"
@@ -384,6 +387,16 @@ Section "InstallFiles" SEC_FILES
 
   ; logs 目录（空）
   CreateDirectory "$INSTDIR\logs"
+
+  ; sql 初始化脚本目录
+  ${IfNot} ${FileExists} "${SQL_DIR}\system.sql"
+    !warning "SQL 目录不存在：${SQL_DIR}（跳过打包，用户需自备数据库初始化脚本）"
+  ${Else}
+    CreateDirectory "$INSTDIR\sql"
+    SetOutPath "$INSTDIR\sql"
+    File "${SQL_DIR}\*.sql"
+    File "${SQL_DIR}\*.ps1"
+  ${EndIf}
 
   ; env 多语言配置目录（如果存在）
   ${IfNot} ${FileExists} "${SRC}\env"
