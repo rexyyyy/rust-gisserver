@@ -1,4 +1,4 @@
-; =============================================================================
+﻿; =============================================================================
 ;  rust-gisserver  Windows 安装程序
 ; -----------------------------------------------------------------------------
 ;  功能：
@@ -412,11 +412,11 @@ Section "Configure" SEC_CONFIG
       ; 写入临时 ps1 脚本到 %TEMP%
       GetTempFileName $R9
       FileOpen $0 $R9 w
-      FileWrite $0 "$$c = [IO.File]::ReadAllText(''$INSTDIR\.env'')$\r$\n"
-      FileWrite $0 "$$c = [regex]::Replace($$c, ''^MAPSRV_PORT=.*$'', ''MAPSRV_PORT=$MapPort'', ''M'')$\r$\n"
-      FileWrite $0 "$$c = [regex]::Replace($$c, ''^MAPSERVER_MANAGER_URL=.*$'', ''MAPSERVER_MANAGER_URL=http://127.0.0.1:$MgrPort'', ''M'')$\r$\n"
-      FileWrite $0 "[IO.File]::WriteAllText(''$INSTDIR\.env'', $$c)$\r$\n"
-      FileWrite $0 "Write-Output ''.env updated''$\r$\n"
+      FileWrite $0 "$$c = [IO.File]::ReadAllText('$INSTDIR\.env')$\r$\n"
+      FileWrite $0 "$$c = $$c -replace '^MAPSRV_PORT=.*$', 'MAPSRV_PORT=$MapPort'$\r$\n"
+      FileWrite $0 "$$c = $$c -replace '^MAPSERVER_MANAGER_URL=.*$', 'MAPSERVER_MANAGER_URL=http://127.0.0.1:$MgrPort'$\r$\n"
+      FileWrite $0 "[IO.File]::WriteAllText('$INSTDIR\.env', $$c)$\r$\n"
+      FileWrite $0 "Write-Output '.env updated'$\r$\n"
       FileClose $0
       nsExec::ExecToStack 'powershell.exe -NoProfile -ExecutionPolicy Bypass -File "$R9"'
       Pop $0
