@@ -32,6 +32,7 @@ installscript/数据库/
 # 测试输出
 2026-11-12/
 
-# Runtime cache and built web assets (do not track)
+# Runtime cache and compiled artifacts (do not track)
 /cache/foyer/
-/run-env/web/
+/run-env/
+/installscript/nssm

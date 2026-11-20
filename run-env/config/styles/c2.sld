@@ -1,1 +1,0 @@
-<StyledLayerDescriptor version="1.0.0" xmlns="http://www.opengis.net/sld"><NamedLayer><Name>c2</Name><UserStyle><Name>s2</Name><FeatureTypeStyle><Rule><Name>r1</Name><LineSymbolizer><Stroke><SvgParameter name="stroke">#00ff00</SvgParameter></Stroke></LineSymbolizer></Rule></FeatureTypeStyle></UserStyle></NamedLayer></StyledLayerDescriptor>

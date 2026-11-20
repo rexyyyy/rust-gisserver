@@ -1,1 +1,0 @@
-<StyledLayerDescriptor version="1.0.0" xmlns="http://www.opengis.net/sld"><NamedLayer><Name>c1</Name><UserStyle><Name>s1</Name><FeatureTypeStyle><Rule><Name>r1</Name><PolygonSymbolizer><Fill><SvgParameter name="fill">#ff0000</SvgParameter></Fill></PolygonSymbolizer></Rule></FeatureTypeStyle></UserStyle></NamedLayer></StyledLayerDescriptor>

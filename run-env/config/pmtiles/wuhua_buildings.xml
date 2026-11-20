@@ -1,7 +1,0 @@
-<?xml version="1.0" encoding="UTF-8"?>
-<layer name="wuhua_pmtiles" title="五华区建筑 PMTiles 打包 MVT" src_crs="EPSG:3857" tile_px="256">
-  <source type="pmtiles" path="data/pmtiles/wuhua_buildings.pmtiles"/>
-  <grids>
-    <item>WebMercatorQuad</item>
-  </grids>
-</layer>

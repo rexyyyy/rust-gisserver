@@ -1,7 +1,0 @@
-<?xml version="1.0" encoding="UTF-8"?>
-<layer name="test-vector" title="MBTiles gzip pbf fixture" src_crs="EPSG:3857" tile_px="256">
-  <source type="mbtiles" path="data/mbtiles/test-vector.mbtiles"/>
-  <grids>
-    <item>WebMercatorQuad</item>
-  </grids>
-</layer>
