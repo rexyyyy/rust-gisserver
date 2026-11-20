@@ -1,1 +1,0 @@
-const e="data:image/svg+xml,%3csvg%20xmlns='http://www.w3.org/2000/svg'%20viewBox='0%200%2024%2024'%20fill='none'%3e%3ccircle%20cx='12'%20cy='12'%20r='9'%20stroke='currentColor'%20stroke-width='1.8'/%3e%3cpath%20d='M3%2012h18M12%203c3%203.5%203%2014%200%2018M12%203c-3%203.5-3%2014%200%2018'%20stroke='currentColor'%20stroke-width='1.8'/%3e%3c/svg%3e";export{e as default};

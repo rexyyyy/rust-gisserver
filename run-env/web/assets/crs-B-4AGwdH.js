@@ -1,1 +1,0 @@
-const R="坐标系三层能力：① 内置 EPSG:4326 / CRS:84 / EPSG:3857（自写 Web Mercator，不依赖 PROJ）；② 请求 CRS 与源 CRS 相同时走恒等直出，CGCS2000（EPSG:4490）与高斯-克吕格分带图层无 PROJ 也能出图；③ 跨 CRS 互转需运行时 PROJ ≥ 8（环境变量 PROJ_DLL / PROJ_DATA）。",S="PROJ 未加载：跨 CRS 互转不可用（这类请求回 400，不是 500）；内置 4326 / CRS:84 / 3857 与「请求 CRS == 源 CRS」的原生产物直出不受影响。";export{R as C,S as P};

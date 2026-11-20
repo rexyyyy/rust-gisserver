@@ -1,1 +1,0 @@
-import{d as a,o as e,c,j as s,$ as t}from"./index-CENQYFjh.js";const l={class:"catalog-toolbar"},_={class:"catalog-toolbar__filters"},r={class:"catalog-toolbar__actions"},n=a({name:"CatalogToolbar"}),f=a({...n,setup(i){return(o,d)=>(e(),c("div",l,[s("div",_,[t(o.$slots,"filters")]),s("div",r,[t(o.$slots,"actions")])]))}});export{f as _};
