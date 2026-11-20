@@ -28,7 +28,7 @@ RequestExecutionLevel admin
 !define APP_VERSION    "1.0.0.0"
 
 ; 服务名（NSSM 注册用，实际进程 mapserve.exe / manager.exe）
-!define SVC_MAP_NAME   "map-serve"
+!define SVC_MAP_NAME   "mapserve"
 !define SVC_MGR_NAME   "map-manager"
 
 ;--------------------------------
@@ -328,7 +328,7 @@ Function FinishCreate
   SendMessage $0 ${WM_SETFONT} $hFontBody 0
 
   ${If} $WantService == 1
-    ${NSD_CreateLabel} 0 148u 100% 18u "服务已注册为 Windows 服务（map-serve / map-manager），开机自动启动。"
+    ${NSD_CreateLabel} 0 148u 100% 18u "服务已注册为 Windows 服务（mapserve / map-manager），开机自动启动。"
     Pop $0
   ${Else}
     ${NSD_CreateLabel} 0 148u 100% 18u "未注册 Windows 服务，可通过 start-manager.bat / start-mapserver.bat 手动启动。"
@@ -438,7 +438,7 @@ Section "RegisterServices" SEC_SERVICE
     ${If} $WantService == 1
       StrCpy $SvcErr 0
 
-      ; ---- map-serve (mapserve.exe) ----
+      ; ---- mapserve (mapserve.exe) ----
       DetailPrint "注册服务 ${SVC_MAP_NAME} ..."
       !insertmacro NSSM 'stop "${SVC_MAP_NAME}"'
       !insertmacro NSSM 'remove "${SVC_MAP_NAME}" confirm'

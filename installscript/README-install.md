@@ -1,4 +1,4 @@
-# r-mapserver 安装说明（Windows）
+# mapserve 安装说明（Windows）
 
 ## 一、前置条件
 
@@ -8,11 +8,11 @@
 
 ## 二、安装
 
-1. 双击 `r-mapserver_Setup.exe`（需管理员权限）
-2. 选择安装目录（默认 `C:\Program Files\r-mapserver`）
+1. 双击 `mapserve_Setup.exe`（需管理员权限）
+2. 选择安装目录（默认 `C:\Program Files\mapserve`）
 3. 配置页填写：
    - **map-api 端口**（默认 8080）
-   - **r-manager 端口**（默认 6180）
+   - **map-manager 端口**（默认 6180）
    - **数据根目录 DATA_ROOT**（默认 `E:\data`）
    - 勾选「注册为 Windows 服务」→ NSSM 开机自启
 4. 完成安装；安装器会自动写入端口/数据目录到配置文件
@@ -20,7 +20,7 @@
 安装后目录结构：
 
 ```
-r-mapserver/
+mapserve/
 ├─ .env                       ← 环境变量（DB 口令 / JWT 密钥 / DATA_ROOT / MAPSRV_PORT）
 ├─ config/
 │  ├─ mapserver/mapserver.xml ← 地图引擎主配置（端口 / data_root / 令牌）
@@ -62,21 +62,21 @@ MANAGER_DB_NAME=mapserver_manager
 
 MANAGER_JWT_SECRET=325346b44985...  ← 必须换掉（随便起个 64 位十六进制串）
 
-MAPSRV_HOST=127.0.0.1                ← r-manager 回连 map-api 的客户端 URL（不是 bind 地址，见下节）
+MAPSRV_HOST=127.0.0.1                ← map-manager 回连 map-api 的客户端 URL（不是 bind 地址，见下节）
 MAPSRV_PORT=8080                    ← 同上，安装器已按配置页写入
 DATA_ROOT=E:\data                   ← 安装器已按配置页写入，一般不用动
 ```
 
 > **⚠ 别把 `MAPSRV_HOST` 当绑定地址**：
 > - **map-api 的实际 bind**：`config/mapserver/mapserver.xml` 里 `<server host="0.0.0.0" ...>`，默认已监听所有网卡，外部机器可直接访问。
-> - **`.env` 的 `MAPSRV_HOST`**：只被 `manager.xml` 的 `<mapsvc base_url="http://${MAPSRV_HOST:-127.0.0.1}:${MAPSRV_PORT:-8080}"/>` 消费，用于 r-manager 作为**客户端**回连 map-api。同机部署保持 `127.0.0.1`；跨机部署改填 map-api 所在机器的实际 IP 或主机名，**不能填 `0.0.0.0`**（Windows 上会当 loopback 处理，Linux 上直接失败）。
+> - **`.env` 的 `MAPSRV_HOST`**：只被 `manager.xml` 的 `<mapsvc base_url="http://${MAPSRV_HOST:-127.0.0.1}:${MAPSRV_PORT:-8080}"/>` 消费，用于 map-manager 作为**客户端**回连 map-api。同机部署保持 `127.0.0.1`；跨机部署改填 map-api 所在机器的实际 IP 或主机名，**不能填 `0.0.0.0`**（Windows 上会当 loopback 处理，Linux 上直接失败）。
 
 ### 2. `config/mapserver/mapserver.xml`（**按需**，启用鉴权 / 改绑定时改）
 
 - `<server host="0.0.0.0" port="8080" data_root="${DATA_ROOT}">`：端口与数据目录安装器已写入；bind 默认全网卡
   - 想只监听本机 → `host="127.0.0.1"`；想只走某张网卡 → 填该网卡 IP
 - **要开启数据面鉴权**：取消注释 `<data_token>changeme</data_token>` 并改为实际口令
-- **要开启管理面鉴权**：`<admin token="...">` 内填主令牌；后续 r-manager 生成的 API Key 会自动加入共享库 `sys_api_key` 一起生效
+- **要开启管理面鉴权**：`<admin token="...">` 内填主令牌；后续 map-manager 生成的 API Key 会自动加入共享库 `sys_api_key` 一起生效
 
 ### 3. `config/manager/manager.xml`（**一般不用动**）
 
@@ -89,8 +89,8 @@ DATA_ROOT=E:\data                   ← 安装器已按配置页写入，一般�
 
 - **注册了服务**：开机自启；手动控制
   ```
-  net stop r-mapserver & net stop r-manager
-  net start r-mapserver  & net start r-manager
+  net stop mapserve & net stop map-manager
+  net start mapserve  & net start map-manager
   ```
 - **未注册服务**：双击 `start_mapapi.bat` / `start_manager.bat`；`stop_all.bat` 停止
 
@@ -103,12 +103,12 @@ DATA_ROOT=E:\data                   ← 安装器已按配置页写入，一般�
 
 | 改的文件 | 需要重启 |
 |---|---|
-| `.env` | r-mapserver + r-manager 两个服务都重启 |
-| `config/mapserver/mapserver.xml` | r-mapserver |
-| `config/manager/manager.xml` | r-manager |
+| `.env` | mapserve + map-manager 两个服务都重启 |
+| `config/mapserver/mapserver.xml` | mapserve |
+| `config/manager/manager.xml` | map-manager |
 | `config/{cog,postgis,arcgis,3dtiles}/*.xml` 图层 | 不用重启，管理后台点「热重载」即可 |
 
 ## 七、卸载
 
-控制面板 → 卸载 `r-mapserver`；或运行 `$INSTDIR\Uninstall.exe`。
+控制面板 → 卸载 `mapserve`；或运行 `$INSTDIR\Uninstall.exe`。
 自动删除程序文件与服务，**保留** `config/` `data/` `logs/` `.env`。

@@ -1,8 +1,8 @@
 # rust-gisserver_Setup 安装指南（Windows）
 
-> **目标读者**：刚完成 PostgreSQL + PostGIS 安装、数据库 `mapserver-manager` 已初始化的用户
+> **目标读者**：刚完成 PostgreSQL + PostGIS 安装、数据库 `mapservemap-manager` 已初始化的用户
 > **数据库端口**：**5432**（PostgreSQL 默认端口，与前一篇指南保持一致）
-> **数据库名**：`mapserver-manager`
+> **数据库名**：`mapservemap-manager`
 > **安装包**：`installscript\rust-gisserver_Setup.exe`
 
 ---
@@ -30,7 +30,7 @@
 |---|---|---|
 | 1 | PostgreSQL 16.7 已安装并运行 | `services.msc` → `postgresql-x64-16` 状态"正在运行" |
 | 2 | PostGIS 3.5.2 已启用 | psql 执行 `SELECT postgis_full_version();` 返回 `3.5.2` |
-| 3 | 数据库 `mapserver-manager` 已创建 | psql 执行 `\l` 列表里能看到 |
+| 3 | 数据库 `mapservemap-manager` 已创建 | psql 执行 `\l` 列表里能看到 |
 | 4 | 数据库已初始化（system.sql + map.sql） | `SELECT count(*) FROM sys_user;` 返回非零 |
 | 5 | 端口 5432 可用 | PostgreSQL 监听 5432 |
 
@@ -56,7 +56,7 @@
    - 如果影像/瓦片/PMTiles/3D Tiles 等数据在其他盘（例如 `E:\gisdata\`），**现在就填完整绝对路径**
    - 后续改 DATA_ROOT 也可以（见第 4.2 节）
 5. **NSSM 服务**：勾选 **"注册为 Windows 服务（开机自启）"**
-   - 服务名：`r-mapserver`（map-api）和 `r-manager`（管理后台）
+   - 服务名：`mapserve`（map-api）和 `map-manager`（管理后台）
    - 以 `LocalSystem` 账户运行，数据目录需要对 LocalSystem 有读权限
 6. 下一步 → 安装 → 完成
 
@@ -158,17 +158,17 @@ GIS_ENCODING_REGION=zh-CN                ← 路径/文件名编码区域
 
 **manager.xml 第 21 行**：
 ```xml
-<database url="postgresql://postgres:${MANAGER_DB_PASSWORD}@${MANAGER_DB_HOST:-localhost}:${MANAGER_DB_PORT:-5434}/mapserver-manager" pool_max="16"/>
+<database url="postgresql://postgres:${MANAGER_DB_PASSWORD}@${MANAGER_DB_HOST:-localhost}:${MANAGER_DB_PORT:-5434}/mapservemap-manager" pool_max="16"/>
 ```
 
 **mapserver.xml 第 88 行**：
 ```xml
-<admin dsn="postgresql://postgres:${MAPSERVER_DB_PASSWORD}@${MAPSERVER_DB_HOST:-localhost}:${MAPSERVER_DB_PORT:-5434}/mapserver-manager"/>
+<admin dsn="postgresql://postgres:${MAPSERVER_DB_PASSWORD}@${MAPSERVER_DB_HOST:-localhost}:${MAPSERVER_DB_PORT:-5434}/mapservemap-manager"/>
 ```
 
 当 `.env` 配好后，最终渲染出来的 DSN 类似：
 ```
-postgresql://postgres:YourPassword123!@localhost:5432/mapserver-manager
+postgresql://postgres:YourPassword123!@localhost:5432/mapservemap-manager
 ```
 
 ### 4.2 配置 data_root（数据根目录）
@@ -238,15 +238,15 @@ DATA_ROOT=E:\data\1
 
 **必须管理员 PowerShell / cmd**（非管理员会报 "Access is denied"）：
 ```powershell
-net stop map-serve
+net stop mapserve
 net stop map-manager
-net start map-serve
+net start mapserve
 net start map-manager
 ```
 
 或者用 NSSM（同样需要管理员）：
 ```powershell
-D:\rust-gisserver\tools\nssm.exe restart map-serve
+D:\rust-gisserver\tools\nssm.exe restart mapserve
 D:\rust-gisserver\tools\nssm.exe restart map-manager
 ```
 
@@ -363,21 +363,21 @@ MAPSERVER_MANAGER_URL=http://192.168.1.101:6180
 
 ```powershell
 # 停止两个服务
-net stop r-manager
-net stop r-mapserver
+net stop map-manager
+net stop mapserve
 
 # 启动两个服务
-net start r-manager
-net start r-mapserver
+net start map-manager
+net start mapserve
 
 # 查看服务状态
-sc query r-manager
-sc query r-mapserver
+sc query map-manager
+sc query mapserve
 ```
 
 > ⚠️ 改 `.env` 需要**两个服务都重启**（manager 和 map-api 各读各自的 .env 变量）。
-> 改 `config/manager.xml` 只需重启 `r-manager`。
-> 改 `config/mapserver.xml` 只需重启 `r-mapserver`。
+> 改 `config/manager.xml` 只需重启 `map-manager`。
+> 改 `config/mapserver.xml` 只需重启 `mapserve`。
 > 改图层 XML（`config/cog/*.xml` 等）**不用重启**，在管理后台点"热重载"即可。
 
 ---
@@ -387,8 +387,8 @@ sc query r-mapserver
 ### 6.1 检查服务状态
 
 ```powershell
-sc query r-manager | findstr STATE
-sc query r-mapserver | findstr STATE
+sc query map-manager | findstr STATE
+sc query mapserve | findstr STATE
 ```
 
 预期输出：`STATE : 4 RUNNING`。
@@ -407,7 +407,7 @@ sc query r-mapserver | findstr STATE
 
 ```powershell
 cd /d "D:\PostgreSQL\16\bin"
-psql -U postgres -p 5432 -d "mapserver-manager"
+psql -U postgres -p 5432 -d "mapservemap-manager"
 ```
 
 ```sql
@@ -425,17 +425,17 @@ SELECT count(*) FROM map_datasource;
 ### 启停服务
 
 ```powershell
-net stop r-manager
-net stop r-mapserver
-net start r-manager
-net start r-mapserver
+net stop map-manager
+net stop mapserve
+net start map-manager
+net start mapserve
 ```
 
 ### 查看服务状态
 
 ```powershell
-sc query r-manager
-sc query r-mapserver
+sc query map-manager
+sc query mapserve
 ```
 
 ### 实时看日志
@@ -466,12 +466,12 @@ New-NetFirewallRule -DisplayName "rust-gisserver Map-API" -Direction Inbound `
 <安装目录>\tools\nssm.exe list
 
 # 编辑服务启动参数（弹出 GUI）
-<安装目录>\tools\nssm.exe edit r-manager
-<安装目录>\tools\nssm.exe edit r-mapserver
+<安装目录>\tools\nssm.exe edit map-manager
+<安装目录>\tools\nssm.exe edit mapserve
 
 # 移除服务（卸载时用）
-<安装目录>\tools\nssm.exe remove r-manager confirm
-<安装目录>\tools\nssm.exe remove r-mapserver confirm
+<安装目录>\tools\nssm.exe remove map-manager confirm
+<安装目录>\tools\nssm.exe remove mapserve confirm
 ```
 
 ### 切换手动启动模式
@@ -479,8 +479,8 @@ New-NetFirewallRule -DisplayName "rust-gisserver Map-API" -Direction Inbound `
 如果不想让它开机自启，或想让 NSSM 启动时有机会修改环境：
 
 ```powershell
-sc config r-manager start= demand
-sc config r-mapserver start= demand
+sc config map-manager start= demand
+sc config mapserve start= demand
 ```
 
 ---
@@ -490,7 +490,7 @@ sc config r-mapserver start= demand
 运行 `<安装目录>\Uninstall.exe` 或控制面板 → 程序和功能 → rust-gisserver → 卸载。
 
 卸载程序会：
-- 删除 Windows 服务（r-manager、r-mapserver）
+- 删除 Windows 服务（map-manager、mapserve）
 - 删除 NSSM 注册表项
 - 删除程序可执行文件
 
@@ -501,7 +501,7 @@ sc config r-mapserver start= demand
 - `<安装目录>\logs\` （日志）
 - `<安装目录>\.env` （环境变量）
 
-如需**彻底清除**，卸载后手动删除剩余目录即可。数据库 `mapserver-manager` 不受影响（不在安装目录内）。
+如需**彻底清除**，卸载后手动删除剩余目录即可。数据库 `mapservemap-manager` 不受影响（不在安装目录内）。
 
 ---
 
@@ -528,12 +528,12 @@ sc config r-mapserver start= demand
 检查 3 点：
 
 1. `.env` 里 `DATA_ROOT=E:\gisdata` 有没有加？（没加就是空值，XML 回退到相对路径 `data`）
-2. 加了后有没有**重启 r-mapserver 服务**？（只有 NSSM 启动的服务会读 .env，手工 exe 启动读的是系统环境变量）
+2. 加了后有没有**重启 mapserve 服务**？（只有 NSSM 启动的服务会读 .env，手工 exe 启动读的是系统环境变量）
 3. 绝对路径对不对？用 psql 或 PowerShell `Test-Path "E:\gisdata\pmtiles\..."` 验证文件真的在那个位置
 
 ### Q5：JWT secret 忘记了 / 需要重置
 
-重新生成一个随机值覆盖 `.env` 里的 `MANAGER_JWT_SECRET`，重启 r-manager 服务。所有已签发的 token 立刻失效，用户需要重新登录——这是预期行为。
+重新生成一个随机值覆盖 `.env` 里的 `MANAGER_JWT_SECRET`，重启 map-manager 服务。所有已签发的 token 立刻失效，用户需要重新登录——这是预期行为。
 
 ### Q6：Windows 服务启动后几秒钟自动退出
 
@@ -555,7 +555,7 @@ sc config r-mapserver start= demand
 
 LocalSystem 账户对网络共享（UNC 路径 `\\server\share\`）和其他机器的 PostgreSQL 没有访问权限。两种解决方案：
 
-- **推荐**：在安装器里选指定账户（installer 支持配置服务登录账户），或安装后用 `nssm.exe edit r-manager` / `nssm.exe edit r-mapserver` 改服务账户
+- **推荐**：在安装器里选指定账户（installer 支持配置服务登录账户），或安装后用 `nssm.exe edit map-manager` / `nssm.exe edit mapserve` 改服务账户
 - **临时**：所有网络路径映射为本地盘符（`net use E: \\server\share`），但 LocalSystem 也看不到用户的盘符映射
 
 ---
@@ -594,7 +594,7 @@ LocalSystem 账户对网络共享（UNC 路径 `\\server\share\`）和其他机�
 如果前两篇文档都按步骤走通了，现在 rust-gisserver 应该已经：
 - ✅ PostgreSQL 16.7 运行在端口 5432
 - ✅ PostGIS 3.5.2 已启用
-- ✅ 数据库 `mapserver-manager` 已初始化
+- ✅ 数据库 `mapservemap-manager` 已初始化
 - ✅ rust-gisserver_Setup 已安装并配置好 `.env`
 - ✅ 两个服务都以 RUNNING 状态运行
 

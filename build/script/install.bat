@@ -15,11 +15,11 @@ if not "%1"=="" set "INSTALL_DIR=%~1"
 echo Install directory: %INSTALL_DIR%
 
 REM ---- source exes ----
-set "MAPSERVER_EXE=%~dp0..\target\release\map-api.exe"
+set "MAPSERVER_EXE=%~dp0..\target\release\mapserve.exe"
 set "MANAGER_EXE=%~dp0..\target\release\manager.exe"
 
 if not exist "%MAPSERVER_EXE%" (
-    echo [ERROR] map-api.exe not found: %MAPSERVER_EXE%
+    echo [ERROR] mapserve.exe not found: %MAPSERVER_EXE%
     echo         Run build_all.bat first
     exit /b 1
 )
@@ -44,7 +44,7 @@ if not exist "%INSTALL_DIR%\storage\avatar" mkdir "%INSTALL_DIR%\storage\avatar"
 
 REM ---- 2/6 exes ----
 echo [2/6] Copying executables...
-copy /Y "%MAPSERVER_EXE%" "%INSTALL_DIR%\bin\map-api.exe" >nul
+copy /Y "%MAPSERVER_EXE%" "%INSTALL_DIR%\bin\mapserve.exe" >nul
 copy /Y "%MANAGER_EXE%" "%INSTALL_DIR%\bin\manager.exe"   >nul
 
 REM ---- 3/6 PROJ libs (linear scan, NO nested parens) ----
@@ -52,7 +52,7 @@ echo [3/6] Copying PROJ runtime...
 set "PROJ_SRC="
 REM Prefer the DLL set produced by the local Rust build (known-compatible).
 if exist "%~dp0..\..\mapserver\target\debug"            set "PROJ_SRC=%~dp0..\..\mapserver\target\debug"
-if "%PROJ_SRC%"=="" if exist "%~dp0..\..\..\r-mapserver" set "PROJ_SRC=%~dp0..\..\..\r-mapserver"
+if "%PROJ_SRC%"=="" if exist "%~dp0..\..\..\mapserve" set "PROJ_SRC=%~dp0..\..\..\mapserve"
 if "%PROJ_SRC%"=="" if exist "%~dp0..\..\..\build"      set "PROJ_SRC=%~dp0..\..\..\build"
 if "%PROJ_SRC%"=="" if exist "%~dp0..\..\..\dist"       set "PROJ_SRC=%~dp0..\..\..\dist"
 if "%PROJ_SRC%"=="" if exist "%~dp0..\..\..\GDAL3.13\dll" set "PROJ_SRC=%~dp0..\..\..\GDAL3.13\dll"
@@ -74,7 +74,7 @@ if "%PROJ_DLL_FOUND%"=="1" (
 
 REM proj.db
 set "PROJ_DB_SRC="
-if exist "%~dp0..\..\..\r-mapserver\share\proj\proj.db"            set "PROJ_DB_SRC=%~dp0..\..\..\r-mapserver\share\proj\proj.db"
+if exist "%~dp0..\..\..\mapserve\share\proj\proj.db"            set "PROJ_DB_SRC=%~dp0..\..\..\mapserve\share\proj\proj.db"
 if "%PROJ_DB_SRC%"=="" if exist "%~dp0..\..\mapserver\target\debug\share\proj.db" set "PROJ_DB_SRC=%~dp0..\..\mapserver\target\debug\share\proj.db"
 if "%PROJ_DB_SRC%"=="" if exist "%~dp0..\..\..\build\share\proj.db" set "PROJ_DB_SRC=%~dp0..\..\..\build\share\proj.db"
 if "%PROJ_DB_SRC%"=="" if exist "%~dp0..\..\..\dist\share\proj.db" set "PROJ_DB_SRC=%~dp0..\..\..\dist\share\proj.db"
@@ -177,7 +177,7 @@ echo set "PROJ_LIB="
 echo set "PROJ_DLL=%%~dp0bin\proj_9.dll"
 echo set "PROJ_DATA=%%~dp0share\proj"
 echo echo Starting map-api on port 8080...
-echo bin\map-api.exe serve
+echo bin\mapserve.exe serve
 ) > "%INSTALL_DIR%\start-mapserver.bat"
 
 (

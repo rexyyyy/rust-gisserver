@@ -1,8 +1,8 @@
 # rust-gisserver_Setup Installation Guide (Windows)
 
-> **Target Audience**: Users who have just finished installing PostgreSQL + PostGIS and initialized the `mapserver-manager` database.
+> **Target Audience**: Users who have just finished installing PostgreSQL + PostGIS and initialized the `mapservemap-manager` database.
 > **Database Port**: **5432** (PostgreSQL default, matches the previous PostgreSQL guide)
-> **Database Name**: `mapserver-manager`
+> **Database Name**: `mapservemap-manager`
 > **Installer**: `installscript\rust-gisserver_Setup.exe`
 
 ---
@@ -30,7 +30,7 @@ Before starting the installer, **all** of the following must be done:
 |---|---|---|
 | 1 | PostgreSQL 16.7 is installed and running | `services.msc` → `postgresql-x64-16` shows "Running" |
 | 2 | PostGIS 3.5.2 is enabled | In psql: `SELECT postgis_full_version();` returns `3.5.2` |
-| 3 | Database `mapserver-manager` created | In psql: `\l` lists it |
+| 3 | Database `mapservemap-manager` created | In psql: `\l` lists it |
 | 4 | Database initialized (system.sql + map.sql) | In psql: `SELECT count(*) FROM sys_user;` returns non-zero |
 | 5 | Port 5432 is listening | PostgreSQL binds to 5432 |
 
@@ -56,7 +56,7 @@ Run `installscript\rust-gisserver_Setup.exe` as **Administrator**. Follow the wi
    - If your imagery/tiles/PMTiles/3D Tiles live on another drive (e.g. `E:\gisdata\`), **fill in the full absolute path now**
    - You can also change it later (see Section 4.2)
 5. **NSSM Service**: Check **"Register as Windows service (auto-start on boot)"**
-   - Service names: `r-mapserver` (map-api) and `r-manager` (admin backend)
+   - Service names: `mapserve` (map-api) and `map-manager` (admin backend)
    - Runs as `LocalSystem`. The data directory must be readable by this account.
 6. Next → Install → Finish
 
@@ -158,17 +158,17 @@ GIS_ENCODING_REGION=zh-CN                ← path/filename encoding region
 
 **manager.xml line 21**:
 ```xml
-<database url="postgresql://postgres:${MANAGER_DB_PASSWORD}@${MANAGER_DB_HOST:-localhost}:${MANAGER_DB_PORT:-5434}/mapserver-manager" pool_max="16"/>
+<database url="postgresql://postgres:${MANAGER_DB_PASSWORD}@${MANAGER_DB_HOST:-localhost}:${MANAGER_DB_PORT:-5434}/mapservemap-manager" pool_max="16"/>
 ```
 
 **mapserver.xml line 88**:
 ```xml
-<admin dsn="postgresql://postgres:${MAPSERVER_DB_PASSWORD}@${MAPSERVER_DB_HOST:-localhost}:${MAPSERVER_DB_PORT:-5434}/mapserver-manager"/>
+<admin dsn="postgresql://postgres:${MAPSERVER_DB_PASSWORD}@${MAPSERVER_DB_HOST:-localhost}:${MAPSERVER_DB_PORT:-5434}/mapservemap-manager"/>
 ```
 
 After `.env` is filled, the rendered DSN looks like:
 ```
-postgresql://postgres:YourPassword123!@localhost:5432/mapserver-manager
+postgresql://postgres:YourPassword123!@localhost:5432/mapservemap-manager
 ```
 
 ### 4.2 Configure data_root
@@ -240,15 +240,15 @@ DATA_ROOT=E:\data\1
 
 Non-admin PowerShell will report "Access is denied". Use an **elevated** PowerShell / cmd:
 ```powershell
-net stop map-serve
+net stop mapserve
 net stop map-manager
-net start map-serve
+net start mapserve
 net start map-manager
 ```
 
 Or via NSSM (also needs admin):
 ```powershell
-D:\rust-gisserver\tools\nssm.exe restart map-serve
+D:\rust-gisserver\tools\nssm.exe restart mapserve
 D:\rust-gisserver\tools\nssm.exe restart map-manager
 ```
 
@@ -364,21 +364,21 @@ After editing `.env` or XML configs, **restart the Windows services** to reload.
 
 ```powershell
 # Stop both services
-net stop r-manager
-net stop r-mapserver
+net stop map-manager
+net stop mapserve
 
 # Start both services
-net start r-manager
-net start r-mapserver
+net start map-manager
+net start mapserve
 
 # Check status
-sc query r-manager
-sc query r-mapserver
+sc query map-manager
+sc query mapserve
 ```
 
 > ⚠️ Editing `.env` requires **both** services to be restarted (manager and map-api each read their own subset of env vars).
-> Editing `config/manager.xml` only needs `r-manager` restarted.
-> Editing `config/mapserver.xml` only needs `r-mapserver` restarted.
+> Editing `config/manager.xml` only needs `map-manager` restarted.
+> Editing `config/mapserver.xml` only needs `mapserve` restarted.
 > Editing per-layer XMLs (`config/cog/*.xml`, etc.) does **NOT** need a restart — use "Hot Reload" in the admin UI.
 
 ---
@@ -388,8 +388,8 @@ sc query r-mapserver
 ### 6.1 Service Status Check
 
 ```powershell
-sc query r-manager | findstr STATE
-sc query r-mapserver | findstr STATE
+sc query map-manager | findstr STATE
+sc query mapserve | findstr STATE
 ```
 
 Expected output: `STATE : 4 RUNNING`.
@@ -408,7 +408,7 @@ If you changed ports during install, use the actual ports you configured.
 
 ```powershell
 cd /d "D:\PostgreSQL\16\bin"
-psql -U postgres -p 5432 -d "mapserver-manager"
+psql -U postgres -p 5432 -d "mapservemap-manager"
 ```
 
 ```sql
@@ -426,17 +426,17 @@ If every query returns a number cleanly → the DB connection works. Service sta
 ### Start / Stop Services
 
 ```powershell
-net stop r-manager
-net stop r-mapserver
-net start r-manager
-net start r-mapserver
+net stop map-manager
+net stop mapserve
+net start map-manager
+net start mapserve
 ```
 
 ### Check Service Status
 
 ```powershell
-sc query r-manager
-sc query r-mapserver
+sc query map-manager
+sc query mapserve
 ```
 
 ### Real-time Log Tail
@@ -467,12 +467,12 @@ New-NetFirewallRule -DisplayName "rust-gisserver Map-API" -Direction Inbound `
 <INSTALLDIR>\tools\nssm.exe list
 
 # Edit service startup parameters (opens GUI)
-<INSTALLDIR>\tools\nssm.exe edit r-manager
-<INSTALLDIR>\tools\nssm.exe edit r-mapserver
+<INSTALLDIR>\tools\nssm.exe edit map-manager
+<INSTALLDIR>\tools\nssm.exe edit mapserve
 
 # Remove services (used during uninstall)
-<INSTALLDIR>\tools\nssm.exe remove r-manager confirm
-<INSTALLDIR>\tools\nssm.exe remove r-mapserver confirm
+<INSTALLDIR>\tools\nssm.exe remove map-manager confirm
+<INSTALLDIR>\tools\nssm.exe remove mapserve confirm
 ```
 
 ### Switch to Manual Startup
@@ -480,8 +480,8 @@ New-NetFirewallRule -DisplayName "rust-gisserver Map-API" -Direction Inbound `
 To disable auto-start and start services manually when needed:
 
 ```powershell
-sc config r-manager start= demand
-sc config r-mapserver start= demand
+sc config map-manager start= demand
+sc config mapserve start= demand
 ```
 
 ---
@@ -491,7 +491,7 @@ sc config r-mapserver start= demand
 Run `<INSTALLDIR>\Uninstall.exe` or Control Panel → Programs and Features → rust-gisserver → Uninstall.
 
 The uninstaller:
-- Removes Windows services (`r-manager`, `r-mapserver`)
+- Removes Windows services (`map-manager`, `mapserve`)
 - Removes NSSM registry entries
 - Deletes program executables
 
@@ -502,7 +502,7 @@ The uninstaller:
 - `<INSTALLDIR>\logs\` (logs)
 - `<INSTALLDIR>\.env` (env vars)
 
-For **complete cleanup**, manually delete the remaining directory after uninstall. The PostgreSQL database `mapserver-manager` is unaffected (it lives outside the install directory).
+For **complete cleanup**, manually delete the remaining directory after uninstall. The PostgreSQL database `mapservemap-manager` is unaffected (it lives outside the install directory).
 
 ---
 
@@ -529,12 +529,12 @@ One of `MANAGER_DB_HOST`, `MAPSERVER_DB_HOST`, `MANAGER_DB_PORT`, `MAPSERVER_DB_
 Check 3 things:
 
 1. Is `DATA_ROOT=E:\gisdata` actually in `.env`? (If missing, XML falls back to relative path `data`)
-2. After adding it, did you **restart the r-mapserver service**? (Services read `.env` at startup only)
+2. After adding it, did you **restart the mapserve service**? (Services read `.env` at startup only)
 3. Is the absolute path correct? Verify with PowerShell `Test-Path "E:\gisdata\pmtiles\..."`
 
 ### Q5: Forgot JWT secret / need to reset
 
-Generate a new random value, overwrite `MANAGER_JWT_SECRET` in `.env`, restart `r-manager`. All previously issued tokens immediately become invalid — users will need to log in again. This is expected.
+Generate a new random value, overwrite `MANAGER_JWT_SECRET` in `.env`, restart `map-manager`. All previously issued tokens immediately become invalid — users will need to log in again. This is expected.
 
 ### Q6: Service exits a few seconds after starting
 
@@ -556,7 +556,7 @@ The exe crashed on startup. Diagnose directly:
 
 LocalSystem has no permissions to reach network shares (`\\server\share\`) or other machines' PostgreSQL. Two solutions:
 
-- **Recommended**: Use `nssm.exe edit r-manager` / `nssm.exe edit r-mapserver` to change the service account to a domain or local user account
+- **Recommended**: Use `nssm.exe edit map-manager` / `nssm.exe edit mapserve` to change the service account to a domain or local user account
 - **Workaround**: Map all network paths to drive letters (`net use E: \\server\share`), but LocalSystem won't see user-mapped drives
 
 ---
@@ -595,7 +595,7 @@ LocalSystem has no permissions to reach network shares (`\\server\share\`) or ot
 If you followed both PostgreSQL and setup guides correctly, rust-gisserver should now be:
 - ✅ PostgreSQL 16.7 running on port 5432
 - ✅ PostGIS 3.5.2 enabled
-- ✅ Database `mapserver-manager` initialized
+- ✅ Database `mapservemap-manager` initialized
 - ✅ rust-gisserver_Setup installed with `.env` filled in
 - ✅ Both services in RUNNING state
 
