@@ -79,7 +79,7 @@ update sys_dict_type set dict_name = 'System Yes/No', remark = 'System Yes/No li
 update sys_dict_type set dict_name = 'Notice Type', remark = 'Notice type list' where dict_id = 7;
 update sys_dict_type set dict_name = 'Notice Status', remark = 'Notice status list' where dict_id = 8;
 update sys_dict_type set dict_name = 'Operation type', remark = 'Operation type List' where dict_id = 9;
-update sys_engine set remark = 'Local rust-gisserver service plane (seed value; change base_url per environment)' where engine_id = 'map-api';
+update sys_engine set remark = 'Local rust-gisserver service plane (seed value; change base_url per environment)' where engine_id = 'mapserve';
 update sys_menu set menu_name = 'System Administration', remark = 'System Administration' where menu_id = '1';
 update sys_menu set menu_name = 'User Management', remark = 'User Management' where menu_id = '100';
 update sys_menu set menu_name = 'Query User' where menu_id = '1001';

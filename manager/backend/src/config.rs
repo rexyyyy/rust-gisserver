@@ -21,16 +21,16 @@ pub struct Config {
     /// 本地文件存储配置（头像等）。
     #[serde(default)]
     pub storage: StorageCfg,
-    /// map-api（rust-gisserver 服务面）管理代理配置。
+    /// mapserve（rust-gisserver 服务面）管理代理配置。
     #[serde(default)]
     pub mapsvc: MapSvcCfg,
 }
 
-/// map-api 管理面连接配置：rust-gisserver 后端是唯一调用方，
+/// mapserve 管理面连接配置：rust-gisserver 后端是唯一调用方，
 /// 通过它代理前端对 map-api `/admin/*` 与 `/api/usage` 的访问。
 #[derive(Debug, Clone, serde::Deserialize)]
 pub struct MapSvcCfg {
-    /// map-api 基地址（不含尾斜杠）。
+    /// mapserve 基地址（不含尾斜杠）。
     #[serde(default = "default_mapsvc_base")]
     pub base_url: String,
     /// 与 map-api `admin.token` 一致的可选共享密钥（X-Admin-Token）。

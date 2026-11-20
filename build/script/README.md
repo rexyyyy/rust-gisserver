@@ -26,7 +26,7 @@ rust-gisserver/                 <- 仓库根（下文称 <repo>）
 │  │  └─ PROJ_RUNTIME_MANIFEST.csv  <- PROJ 运行期 DLL / 数据清单（不入库，仅记录）
 │  └─ target/                   <- ★ 编译产物（CARGO_TARGET_DIR 重定向到此）
 │     └─ release\
-│        ├─ map-api.exe
+│        ├─ mapserve.exe
 │        └─ manager.exe
 └─ (上层) gis-wt\thirdparty\rmap_target   <- ★ 默认安装目录（<repo> 往上 3 级）
 ```
@@ -82,7 +82,7 @@ cd <repo>\build\script
 ```
 - `build_all.bat` 设 `CARGO_TARGET_DIR=<repo>\build\target`，产物落在 `build\target\release\`。
 - 内部依次：`mapserver`（`cargo build --release -p mapserver`）、`manager`（`cargo build --release` in `manager/backend`）。
-- 成功标志：`build\target\release\map-api.exe` 与 `manager.exe` 生成。
+- 成功标志：`build\target\release\mapserve.exe` 与 `manager.exe` 生成。
 
 ### 3.2 安装
 ```powershell
@@ -93,7 +93,7 @@ cd <repo>\build\script
 ```
 安装流程（install.bat 内部 6 步）：
 1. 建目录结构（bin/config/data/cache/logs/share/proj）。
-2. 拷贝 `map-api.exe`、`manager.exe` → `bin\`。
+2. 拷贝 `mapserve.exe`、`manager.exe` → `bin\`。
 3. 拷贝 PROJ：`proj_9.dll` + 9 个传递依赖 DLL → `bin\`（按 §1 候选源逐级查找）；`proj.db` → `share\proj\`。
 4. 拷贝配置：`mapserver\config` → `config\`；`manager\backend\config` → `config\manager\`，并复制一份 `manager.xml` 到 `config\` 根；随后调用 `fix_staticdir.ps1` 把 `static_dir` 改写为 `web`。
 5. 拷贝前端：`manager\ui\dist` → `web\`（未构建则 WARN，UI 会 404）。
@@ -140,7 +140,7 @@ cd <安装目录>
 
 ### 3.5 注册为 Windows 服务（可选，NSSM）
 ```powershell
-nssm install map-api  "<安装目录>\bin\map-api.exe"
+nssm install map-api  "<安装目录>\bin\mapserve.exe"
 nssm install manager "<安装目录>\bin\manager.exe"
 nssm set map-api AppDirectory "<安装目录>"
 nssm set manager AppDirectory "<安装目录>"
@@ -195,7 +195,7 @@ nssm start manager
 
 | 文件 | 来源 crate | 说明 |
 |------|-----------|------|
-| `map-api.exe` | `mapserver` | 地图/瓦片服务主程序 |
+| `mapserve.exe` | `mapserver` | 地图/瓦片服务主程序 |
 | `manager.exe` | `manager/backend` | 管理后台服务 |
 
 > 其余各 crate 的 `.rlib` / 中间产物也落在 `build\target\`（不再散落 `mapserver/target`、`manager/target`）。
@@ -210,7 +210,7 @@ nssm start manager
 ```
 rmap_target/
 ├─ bin\
-│  ├─ map-api.exe              # 主服务
+│  ├─ mapserve.exe              # 主服务
 │  ├─ manager.exe              # 管理后台
 │  ├─ proj_9.dll               # PROJ 9 主库（坐标变换引擎）
 │  ├─ sqlite3.dll              # proj.db 底层存储
@@ -272,7 +272,7 @@ cd <repo>\build\script
 # 或指定：
 .\uninstall.bat D:\some\path\rmap_target
 ```
-会先 `taskkill` 停止 `map-api.exe` / `manager.exe`，确认后 `rmdir /S /Q` 删除整个安装目录。
+会先 `taskkill` 停止 `mapserve.exe` / `manager.exe`，确认后 `rmdir /S /Q` 删除整个安装目录。
 
 ---
 

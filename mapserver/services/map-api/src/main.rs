@@ -13,7 +13,7 @@ use tracing::{info, Level};
 use tracing_subscriber::FmtSubscriber;
 
 #[derive(Parser, Debug)]
-#[command(name = "map-api")]
+#[command(name = "mapserve")]
 #[command(about = "rust-gisserver: WMS / WMTS / TMS / WFS / OGC API-Features / OGC API-Tiles / MVT / PMTiles / MBTiles / COG tile services")]
 struct Cli {
     #[command(subcommand)]
@@ -444,7 +444,7 @@ fn run_pmtiles_pack(args: &PmtilesPackArgs) -> anyhow::Result<()> {
     if let Some(parent) = args.output.parent() {
         std::fs::create_dir_all(parent)?;
     }
-    gisserver::pmtiles::pack::pack_tiles(&args.output, &tiles, tile_type, compression, "map-api")
+    gisserver::pmtiles::pack::pack_tiles(&args.output, &tiles, tile_type, compression, "mapserve")
         .map_err(|e| anyhow::anyhow!(e))?;
     println!("packed {} tiles -> {}", tiles.len(), args.output.display());
     Ok(())

@@ -1,0 +1,49 @@
+{
+  "type": "FeatureCollection",
+  "name": "sample-places",
+  "features": [
+    {
+      "type": "Feature",
+      "properties": { "name": "Kunming", "kind": "city", "pop": 8460088 },
+      "geometry": { "type": "Point", "coordinates": [102.8329, 24.8801] }
+    },
+    {
+      "type": "Feature",
+      "properties": { "name": "Chengdu", "kind": "city", "pop": 20937757 },
+      "geometry": { "type": "Point", "coordinates": [104.0665, 30.5723] }
+    },
+    {
+      "type": "Feature",
+      "properties": { "name": "Guiyang", "kind": "city", "pop": 5987018 },
+      "geometry": { "type": "Point", "coordinates": [106.6302, 26.6470] }
+    },
+    {
+      "type": "Feature",
+      "properties": { "name": "Nanning", "kind": "city", "pop": 8832800 },
+      "geometry": { "type": "Point", "coordinates": [108.3665, 22.8170] }
+    },
+    {
+      "type": "Feature",
+      "properties": { "name": "Yunnan-Guizhou Plateau", "kind": "region" },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [[
+          [98.5, 28.0], [104.5, 28.5], [107.0, 27.0], [109.0, 25.0],
+          [106.0, 22.5], [102.0, 21.5], [99.0, 23.5], [97.5, 25.5],
+          [98.5, 28.0]
+        ]]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": { "name": "Kunming-Chengdu corridor", "kind": "route" },
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [102.83, 24.88], [103.30, 25.60], [104.20, 26.60],
+          [105.20, 27.80], [104.07, 30.57]
+        ]
+      }
+    }
+  ]
+}

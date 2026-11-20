@@ -48,7 +48,7 @@ pwsh -File ..\deploy\start.ps1 -Dir ..\deploy_en
 | map-api   | 仓库根上下文 + `mapserver/Dockerfile` | 8080     | WMS/WMTS/WFS/MVT/COG/PMTiles… |
 | manager   | `..`（manager/，backend + ui）        | 6180     | 管理平面 + 前端静态资源     |
 
-容器网络内互访用服务名：manager→`http://map-api:8080`，两服务→`postgis:5432`。
+容器网络内互访用服务名：manager→`http:// mapserve:8080`，两服务→`postgis:5432`。
 
 ## 环境变量（用户可配项）
 

@@ -142,7 +142,7 @@ pub struct AppState {
     pub captcha: Arc<crate::captcha::CaptchaStore>,
     /// 头像存储根目录（启动时已解析为绝对路径），供上传与静态回显共用。
     pub avatar_root: std::path::PathBuf,
-    /// map-api 管理面 HTTP 客户端（reqwest Client 内部连接池，克隆廉价）。
+    /// mapserve 管理面 HTTP 客户端（reqwest Client 内部连接池，克隆廉价）。
     pub map_http: reqwest::Client,
     /// DSN 落库加解密（des 默认 / sm4 可配置）。
     pub dsn: Arc<crate::dsn_crypto::DsnCipher>,

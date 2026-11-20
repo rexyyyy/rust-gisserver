@@ -54,7 +54,7 @@ start-manager.bat     # 端口 6180
 ```
 rmap_target/
 ├── bin/
-│   ├── map-api.exe      # rust-gisserver 主程序
+│   ├── mapserve.exe      # rust-gisserver 主程序
 │   ├── rust-gisserver.exe    # rust-gisserver 管理后台
 │   └── proj_9.dll       # PROJ 坐标转换库
 ├── config/              # 配置文件
@@ -90,7 +90,7 @@ rust-gisserver 支持 file-sidecar 模式，无需数据库即可运行。
 使用 NSSM (Non-Sucking Service Manager):
 
 ```cmd
-nssm install rust-gisserver "[安装目录]\bin\map-api.exe"
+nssm install rust-gisserver "[安装目录]\bin\mapserve.exe"
 nssm install rust-gisserver "[安装目录]\bin\rust-gisserver.exe"
 
 nssm start rust-gisserver
@@ -117,7 +117,7 @@ share\proj\*
 
 端口**不通过 `.env` 配置**（`MAPSERVER_PORT` / `MANAGER_PORT` 已失效，代码不读取），改配置文件：
 
-- map-api：`config\mapserver.xml` 的 `<server port="8080" ...>`；或启动时用 `map-api.exe serve --listen 127.0.0.1:8081`。
+- map-api：`config\mapserver.xml` 的 `<server port="8080" ...>`；或启动时用 `mapserve.exe serve --listen 127.0.0.1:8081`。
 - manager：`config\manager.xml` 的 `<server addr="0.0.0.0:6180" ...>`。
 - 改了 map-api 端口后，同步 `config\manager\manager.xml` 的 `<mapsvc base_url>`（或 `.env` 的 `MAPSRV_PORT`）。
 

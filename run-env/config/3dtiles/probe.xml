@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<TilesetService>
+  <Name>probe</Name>
+  <Title>3D Tiles Probe</Title>
+  <Root>data/3dtiles/3dtiles-probe</Root>
+</TilesetService>

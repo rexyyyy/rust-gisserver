@@ -176,7 +176,7 @@ echo if exist .env ^( for /f "usebackq tokens=1,* delims== eol=#" %%%%a in ^(".e
 echo set "PROJ_LIB="
 echo set "PROJ_DLL=%%~dp0bin\proj_9.dll"
 echo set "PROJ_DATA=%%~dp0share\proj"
-echo echo Starting map-api on port 8080...
+echo echo Starting mapserve on port 8080...
 echo bin\mapserve.exe serve
 ) > "%INSTALL_DIR%\start-mapserver.bat"
 

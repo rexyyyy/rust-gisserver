@@ -323,7 +323,7 @@ pub async fn apply(
         .await?;
     let engine_id: String = match engine {
         Some(r) => r.get("engine_id"),
-        None => "map-api".to_string(),
+        None => "mapserve".to_string(),
     };
     let n = c
         .execute(

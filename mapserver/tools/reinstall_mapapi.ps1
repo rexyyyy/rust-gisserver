@@ -1,7 +1,7 @@
-# Replace the installed map-api.exe with a fresh release build and restart the 8080 service
+# Replace the installed mapserve.exe with a fresh release build and restart the 8080 service
 $install = "D:\mycomputor\documents\gis-wt\thirdparty\rust-gisserver-install"
-$src     = "D:\mycomputor\documents\gis-wt\thirdparty\rust-gisserver\target\release\map-api.exe"
-$dst     = "$install\map-api\map-api.exe"
+$src     = "D:\mycomputor\documents\gis-wt\thirdparty\rust-gisserver\target\release\mapserve.exe"
+$dst     = "$install\map-api\mapserve.exe"
 
 # 1) Stop the old process holding port 8080
 $conn = Get-NetTCPConnection -LocalPort 8080 -State Listen -ErrorAction SilentlyContinue | Select-Object -First 1
@@ -26,7 +26,7 @@ if (Test-Path "$install\.env") {
 # Do not inject DATA_ROOT here; set it only for an external data drive.
 $env:PROJ_DLL  = "$install\map-api\share\proj_9.dll"
 $env:PROJ_DATA = "$install\map-api\share\proj"
-$p = Start-Process -FilePath "$install\map-api\map-api.exe" `
+$p = Start-Process -FilePath "$install\map-api\mapserve.exe" `
      -ArgumentList "serve","--config","config\mapserver\mapserver.xml" `
      -WorkingDirectory $install -WindowStyle Hidden `
      -RedirectStandardOutput "$install\logs\mapapi_out.log" `

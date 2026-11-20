@@ -22,7 +22,7 @@ if not exist "%INSTALL_DIR%" (
 
 REM Stop running services
 echo [1/3] Stopping services...
-taskkill /F /IM map-api.exe 2>nul
+taskkill /F /IM mapserve.exe 2>nul
 taskkill /F /IM manager.exe 2>nul
 
 REM Ask for confirmation

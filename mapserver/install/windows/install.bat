@@ -15,7 +15,7 @@ if not "%1"=="" set INSTALL_DIR=%1
 echo Install directory: %INSTALL_DIR%
 
 REM Check if executables exist
-set MAPSERVER_EXE=%~dp0..\..\target\release\map-api.exe
+set MAPSERVER_EXE=%~dp0..\..\target\release\mapserve.exe
 set MANAGER_EXE=%~dp0..\..\..\manager\target\release\manager.exe
 
 if not exist "%MAPSERVER_EXE%" (
@@ -43,11 +43,11 @@ if not exist "%INSTALL_DIR%\share\proj" mkdir "%INSTALL_DIR%\share\proj"
 
 REM Copy executables
 echo [2/6] Copying executables...
-copy /Y "%MAPSERVER_EXE%" "%INSTALL_DIR%\bin\map-api.exe"
+copy /Y "%MAPSERVER_EXE%" "%INSTALL_DIR%\bin\mapserve.exe"
 copy /Y "%MANAGER_EXE%" "%INSTALL_DIR%\bin\manager.exe"
 
 REM Copy PROJ DLL and data
-REM Layout: proj_9.dll and its 12 transitive deps go into bin\ (same dir as map-api.exe) because
+REM Layout: proj_9.dll and its 12 transitive deps go into bin\ (same dir as mapserve.exe) because
 REM LoadLibraryExW(LOAD_WITH_ALTERED_SEARCH_PATH) resolves proj_9.dll's imports only from
 REM proj_9.dll's own directory. proj.db goes to share\proj (referenced by PROJ_DATA).
 REM
@@ -179,7 +179,7 @@ echo set "PROJ_LIB=" >> "%INSTALL_DIR%\start-mapserver.bat"
 echo set "PROJ_DLL=%%~dp0bin\proj_9.dll" >> "%INSTALL_DIR%\start-mapserver.bat"
 echo set "PROJ_DATA=%%~dp0share\proj" >> "%INSTALL_DIR%\start-mapserver.bat"
 echo echo Starting rust-gisserver on port 8080... >> "%INSTALL_DIR%\start-mapserver.bat"
-echo bin\map-api.exe serve >> "%INSTALL_DIR%\start-mapserver.bat"
+echo bin\mapserve.exe serve >> "%INSTALL_DIR%\start-mapserver.bat"
 
 echo @echo off > "%INSTALL_DIR%\start-manager.bat"
 echo cd /d "%%~dp0" >> "%INSTALL_DIR%\start-manager.bat"

@@ -1,0 +1,99 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  PostGIS 动态矢量瓦片图层：五华区建筑（51192 栋，EPSG:4543）
+  附加 custom_grids：CGCS2000 投影带网格（4543 + 4522），使 /tiles/{layer}/{grid}/...
+  和 WMTS 的 TILEMATRIXSET 能按各投影带自身单位切片，不再强转 3857。
+-->
+<layer name="wuhua_buildings" title="五华区建筑（PostGIS 动态矢量瓦片，EPSG:4543）" src_crs="EPSG:4543">
+  <source type="postgis" dsn="postgres://postgres:123456@localhost:5434/gis" table="wuhua_buildings" srid="4543" geometry_column="geom" id_column="gid" maxzoom="22">
+    <properties>
+      <item>height</item>
+    </properties>
+    <simplify under_zoom="12" tile_units="2"/>
+  </source>
+  <grids>
+    <item>WebMercatorQuad</item>
+    <item>CGCS2000_3dCM102E</item>
+    <item>CGCS2000_3dCM102E_zone34</item>
+  </grids>
+  <custom_grids>
+    <!-- EPSG:4543 CGCS2000 / 3-degree Gauss-Kruger CM 102E (false_easting=500000)
+         投影带有效范围 lon=100.5~103.5° lat=-5~55° => x=[333633,666367] y=[-553075,6098260] -->
+    <item id="CGCS2000_3dCM102E" crs="EPSG:4543" tile_px="256">
+      <origin>
+        <item>333633.10</item>
+        <item>6098259.65</item>
+      </origin>
+      <extent>
+        <item>333633.10</item>
+        <item>-553075.29</item>
+        <item>666366.90</item>
+        <item>6098259.65</item>
+      </extent>
+      <resolutions>
+        <item>156543.033928041</item>
+        <item>78271.5169640205</item>
+        <item>39135.7584820102</item>
+        <item>19567.8792410051</item>
+        <item>9783.93962050256</item>
+        <item>4891.96981025128</item>
+        <item>2445.98490512564</item>
+        <item>1222.99245256282</item>
+        <item>611.49622628141</item>
+        <item>305.748113140705</item>
+        <item>152.874056570353</item>
+        <item>76.4370282851763</item>
+        <item>38.2185141425881</item>
+        <item>19.1092570712941</item>
+        <item>9.55462853564703</item>
+        <item>4.77731426782352</item>
+        <item>2.38865713391176</item>
+        <item>1.19432856695588</item>
+        <item>0.597164283477939</item>
+        <item>0.29858214173897</item>
+        <item>0.149291070869485</item>
+        <item>0.0746455354347424</item>
+        <item>0.0373227677173712</item>
+      </resolutions>
+    </item>
+    <!-- EPSG:4522 CGCS2000 / 3-degree Gauss-Kruger zone 34 (false_easting=34500000)
+         投影带有效范围 lon=100.5~103.5° lat=-5~55° => x=[34333633,34666367] y=[-553075,6098260] -->
+    <item id="CGCS2000_3dCM102E_zone34" crs="EPSG:4522" tile_px="256">
+      <origin>
+        <item>34333633.10</item>
+        <item>6098259.65</item>
+      </origin>
+      <extent>
+        <item>34333633.10</item>
+        <item>-553075.29</item>
+        <item>34666366.90</item>
+        <item>6098259.65</item>
+      </extent>
+      <resolutions>
+        <item>156543.033928041</item>
+        <item>78271.5169640205</item>
+        <item>39135.7584820102</item>
+        <item>19567.8792410051</item>
+        <item>9783.93962050256</item>
+        <item>4891.96981025128</item>
+        <item>2445.98490512564</item>
+        <item>1222.99245256282</item>
+        <item>611.49622628141</item>
+        <item>305.748113140705</item>
+        <item>152.874056570353</item>
+        <item>76.4370282851763</item>
+        <item>38.2185141425881</item>
+        <item>19.1092570712941</item>
+        <item>9.55462853564703</item>
+        <item>4.77731426782352</item>
+        <item>2.38865713391176</item>
+        <item>1.19432856695588</item>
+        <item>0.597164283477939</item>
+        <item>0.29858214173897</item>
+        <item>0.149291070869485</item>
+        <item>0.0746455354347424</item>
+        <item>0.0373227677173712</item>
+      </resolutions>
+    </item>
+  </custom_grids>
+</layer>

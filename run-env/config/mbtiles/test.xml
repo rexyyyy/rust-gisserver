@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<layer name="test" title="MBTiles PNG fixture" src_crs="EPSG:3857" tile_px="256">
+  <source type="mbtiles" path="data/mbtiles/test.mbtiles"/>
+  <grids>
+    <item>WebMercatorQuad</item>
+  </grids>
+</layer>

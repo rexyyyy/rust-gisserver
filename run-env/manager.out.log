@@ -1,0 +1,5 @@
+[2m2026-11-19T07:30:13.327431Z[0m [32m INFO[0m [2mmanager[0m[2m:[0m 已连接 PostgreSQL: PostgreSQL 16.7
+[2m2026-11-19T07:30:13.337716Z[0m [32m INFO[0m [2mmanager[0m[2m:[0m 头像存储目录: \\?\D:\mycomputor\documents\gis-wt\thirdparty\rust-gisserver\run-env\storage\avatar
+[2m2026-11-19T07:30:13.344877Z[0m [33m WARN[0m [2mmanager::dsn_crypto[0m[2m:[0m security.dsn_key 未配置，DSN 加密密钥由 jwt_secret 派生；生产环境请显式配置
+[2m2026-11-19T07:30:13.350307Z[0m [32m INFO[0m [2mmanager[0m[2m:[0m 系统管理后端启动: http://0.0.0.0:6180/manager-api
+[2m2026-11-19T07:30:13.354808Z[0m [32m INFO[0m [2mmanager::staticfiles[0m[2m:[0m 静态资源: 已启用，根目录 \\?\D:\mycomputor\documents\gis-wt\thirdparty\rust-gisserver\run-env\web（SPA fallback → index.html）

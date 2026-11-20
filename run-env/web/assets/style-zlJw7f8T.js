@@ -1,0 +1,1 @@
+import{N as r}from"./index-BxRDu1FR.js";function v(t,e){return r.get(`/map/services/${t}/${e}/mvt-style`)}function i(t,e,s){return r.put(`/map/services/${t}/${e}/mvt-style`,{style:s})}export{v as g,i as p};

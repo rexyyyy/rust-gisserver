@@ -21,7 +21,7 @@ if not exist "%INSTALL_DIR%" (
 
 REM Stop running services
 echo [1/3] Stopping services...
-taskkill /F /IM map-api.exe 2>/dev/null
+taskkill /F /IM mapserve.exe 2>/dev/null
 taskkill /F /IM rust-gisserver.exe 2>/dev/null
 
 REM Ask for confirmation

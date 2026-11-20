@@ -15,7 +15,7 @@ path = "src/lib.rs"
 [[bin]]
 # Keep the executable name stable: start/install scripts and the NSIS
 # service registration all refer to map-api.exe.
-name = "map-api"
+name = "mapserve"
 path = "src/main.rs"
 
 [dependencies]

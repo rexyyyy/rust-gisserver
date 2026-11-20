@@ -353,7 +353,7 @@ pub async fn usage(
 }
 
 /// `GET /map/logs?page=&pageSize=&status=2xx..5xx&kind=&name=&q=` — 访问日志审计查询。
-/// map-api 的 access-logs 仅支持 limit（无 offset），故 manager 侧强制拉满（limit=2000）
+/// mapserve 的 access-logs 仅支持 limit（无 offset），故 manager 侧强制拉满（limit=2000）
 /// 后在 manager 端按 page/pageSize 切片，返回 `{rows,total,...}` 满足前端“后端分页”契约。
 pub async fn logs(
     State(state): State<Arc<AppState>>,

@@ -22,5 +22,5 @@
   "err.captcha": "验证码错误",
   "err.accountDisabled": "账号已停用",
   "err.engineUnreachable": "引擎不可达",
-  "err.mapApiUnreachable": "map-api 服务不可达"
+  "err.mapApiUnreachable": "mapserve 服务不可达"
 }

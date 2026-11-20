@@ -56,7 +56,7 @@ use std::sync::OnceLock;
 use flate2::read::DeflateDecoder;
 
 /// 解压根目录（注入的目录即解压根，包落在 `<cache_root>/<stem>-<hash>`）。
-/// map-api 启动时用 [`set_cache_root`] 注入服务级缓存目录（`cache/tpk`）；
+/// mapserve 启动时用 [`set_cache_root`] 注入服务级缓存目录（`cache/tpk`）；
 /// 未注入（如单独跑本 crate 的测试）退回系统临时目录下的 `tpk`，功能一致只是落点不同。
 static CACHE_ROOT: OnceLock<PathBuf> = OnceLock::new();
 

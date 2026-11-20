@@ -42,7 +42,7 @@ if errorlevel 1 (
     echo [ERROR] rust-gisserver build failed
     exit /b 1
 )
-echo [OK] rust-gisserver built: target\release\map-api.exe
+echo [OK] rust-gisserver built: target\release\mapserve.exe
 
 REM Build rust-gisserver
 echo [4/4] Building rust-gisserver (release)...
@@ -75,6 +75,6 @@ echo.
 echo ============================================
 echo Build complete!
 echo ============================================
-echo rust-gisserver: %~dp0..\..\target\release\map-api.exe
+echo rust-gisserver: %~dp0..\..\target\release\mapserve.exe
 echo manager:   %~dp0..\..\..\manager\target\release\manager.exe
 endlocal

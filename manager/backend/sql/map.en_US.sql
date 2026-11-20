@@ -202,9 +202,9 @@ comment on table sys_engine is 'Engine registry: admin proxy forwards to the def
 comment on column sys_engine.engine_type is 'Engine type (currently rust-gisserver; extensible)';
 comment on column sys_engine.is_default is 'Default engine: admin proxy /map/* forward target; falls back to manager.xml mapsvc when unset';
 
--- Seed: local map-api (idempotent; base_url does not overwrite existing env config)
+-- Seed: local mapserve (idempotent; base_url does not overwrite existing env config)
 insert into sys_engine (engine_id, engine_name, engine_type, base_url, status, is_default, sort, remark)
-values ('map-api', 'rust-gisserver map-api', 'rust-gisserver', 'http://map-api:8080', '0', '1', 0,
+values ('mapserve', 'rust-gisserver mapserve', 'rust-gisserver', 'http://map-api:8080', '0', '1', 0,
         'Local rust-gisserver service plane (seed value; change base_url per environment)')
 on conflict (engine_id) do nothing;
 

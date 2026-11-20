@@ -55,7 +55,7 @@ if errorlevel 1 (
     echo [ERROR] mapserver build failed
     exit /b 1
 )
-for %%F in ("%CARGO_TARGET_DIR%\release\map-api.exe") do echo [OK] map-api.exe - %%~zF bytes
+for %%F in ("%CARGO_TARGET_DIR%\release\mapserve.exe") do echo [OK] mapserve.exe - %%~zF bytes
 
 REM ---- build manager ----
 echo.
@@ -104,6 +104,6 @@ echo.
 echo ============================================
 echo Build done!
 echo ============================================
-echo   %CARGO_TARGET_DIR%\release\map-api.exe
+echo   %CARGO_TARGET_DIR%\release\mapserve.exe
 echo   %CARGO_TARGET_DIR%\release\manager.exe
 cd /d "%~dp0"

@@ -1,0 +1,1 @@
+NSSM全称是the Non-Sucking Service Manager，是一款免安装的服务管理软件，能够将exe应用封装成windows服务软件，即将普通exe程序封装成服务使之像windows服务可以设置自动启动等，并且可以监控程序运行状态，程序异常中断后自动启动，实现守护进程的功能

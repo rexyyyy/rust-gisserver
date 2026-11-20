@@ -79,7 +79,7 @@ update sys_dict_type set dict_name = '系统是否', remark = '系统是否列�
 update sys_dict_type set dict_name = '通知类型', remark = '通知类型列表' where dict_id = 7;
 update sys_dict_type set dict_name = '通知状态', remark = '通知状态列表' where dict_id = 8;
 update sys_dict_type set dict_name = '操作类型', remark = '操作类型列表' where dict_id = 9;
-update sys_engine set remark = '本地 rust-gisserver 服务面（种子值，生产按环境改 base_url）' where engine_id = 'map-api';
+update sys_engine set remark = '本地 rust-gisserver 服务面（种子值，生产按环境改 base_url）' where engine_id = 'mapserve';
 update sys_menu set menu_name = '系统管理', remark = '系统管理目录' where menu_id = '1';
 update sys_menu set menu_name = '用户管理', remark = '用户管理菜单' where menu_id = '100';
 update sys_menu set menu_name = '用户查询' where menu_id = '1001';

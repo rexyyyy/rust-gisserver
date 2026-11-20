@@ -197,7 +197,7 @@ python tools/mgr_probe.py http://127.0.0.1:6180/manager-api out.txt
 ```bash
 # 1) 起 map-api（rust-gisserver 仓库根目录，监听 :8080）
 #    瓦片链路务必用 release 构建，debug 下解码/编码慢一个数量级
-target\release\map-api.exe serve --config config/mapserver.xml
+target\release\mapserve.exe serve --config config/mapserver.xml
 # 2) 起 manager（backend 目录，监听 :6180，代理到 sys_engine 默认引擎）
 target\debug\manager.exe
 # 3) 跑联合功能测试

@@ -202,9 +202,9 @@ comment on table sys_engine is '地图服务引擎注册表：管理代理转发
 comment on column sys_engine.engine_type is '引擎类型（当前 rust-gisserver；预留扩展）';
 comment on column sys_engine.is_default is '默认引擎：管理代理 /map/* 转发目标；无默认时回落 manager.xml mapsvc';
 
--- 种子：本地 map-api（幂等；base_url 不覆盖已有环境配置）
+-- 种子：本地 mapserve（幂等；base_url 不覆盖已有环境配置）
 insert into sys_engine (engine_id, engine_name, engine_type, base_url, status, is_default, sort, remark)
-values ('map-api', 'rust-gisserver map-api', 'rust-gisserver', 'http://map-api:8080', '0', '1', 0,
+values ('mapserve', 'rust-gisserver mapserve', 'rust-gisserver', 'http://map-api:8080', '0', '1', 0,
         '本地 rust-gisserver 服务面（种子值，生产按环境改 base_url）')
 on conflict (engine_id) do nothing;
 

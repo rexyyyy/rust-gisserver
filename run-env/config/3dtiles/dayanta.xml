@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<TilesetService>
+  <Name>dayanta</Name>
+  <Title>Dayanta Photogrammetry</Title>
+  <Root>data/3dtiles/dayanta_photogrammetry</Root>
+</TilesetService>
