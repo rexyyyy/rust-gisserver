@@ -118,7 +118,7 @@ notepad .env
 | 可选 | `MAPSRV_HOST` / `MAPSRV_PORT` | manager 反代 map-api | 默认 `127.0.0.1` / `8080` |
 | 可选 | `MAPSERVER_MANAGER_URL` | map-api 回连 manager（跨机部署） | 默认 `http://127.0.0.1:6180` |
 | 可选 | `GIS_ENCODING_REGION` / `GIS_ENCODING_LOCALE` | `gisserver::encoding` | 默认 `zh-CN` |
-| 可选 | `DATA_ROOT` | `<server data_root>` 及 `archives` 路径前缀 | **默认 `data`**，即启动工作目录下的 `data\`（安装脚本已创建）；仅当数据放在外置盘时才需要设，例如 `DATA_ROOT=E:\data\1` |
+| 可选 | `DATA_ROOT` | `<server data_root>` 及 `archives` 路径前缀 | **默认 `data`**，即启动工作目录下的 `data\`（安装脚本已创建）；仅当数据放在外置盘时才需要设，例如 `DATA_ROOT=<数据根目录>` |
 | 可选 | `TESTDATA_ROOT` / `SHPPGSQL_BIN` | e2e 数据根 / shp2pgsql 路径 | 不影响正常服务 |
 
 - `data_root` 写的是 `${DATA_ROOT:-data}`：不设变量即以相对路径 `data` 生效。`start-*.bat`

@@ -92,7 +92,7 @@ MBTiles 同时支持 PNG/JPEG/WebP 栅格与 gzip pbf 矢量包，TMS 行号自�
 - **双坐标接口**：`/{z}/{x}/{y}.pbf`（EPSG:3857）与 `/{srid}/{z}/{x}/{y}.pbf`（源 CRS 自身单位，如 4543 米、4326 度，服务端不做 `ST_Transform`）；TileJSON 按接口分别宣告 bounds/crs/grid。
 - **为高并发而设计**：按 DSN 共享连接池，版本预检 PG≥11 / PostGIS≥3.0，启动自检 GiST 索引；编码前按瓦片 bbox 预过滤，低 z 用 `ST_SimplifyPreserveTopology` 分级简化；输出缓存命中约 16–25ms，可选磁盘 L2 跨重启保留。
 - **免落表发布**：`from` 表达式直接发布 SQL / 视图图层；bounds/count 走统计估计，缺失自动回退精确扫描。
-- **传统矢量资产同路上云**：Shapefile 走管理后台「导入 SHP」（`shp2pgsql`，从 `.prj` 自动识别 CGCS2000 / WGS84）；FileGDB 用 **Esri 官方开源的 FileGDB API**（[Esri/file-geodatabase-api](https://github.com/Esri/file-geodatabase-api)，Apache-2.0，跨平台 C++，当前 1.5.5）直接读取 `.gdb` 的 schema / 要素 / 属性与空间查询，**不经 GDAL 转换、不落中间文件**，由导入器直连写入 PostGIS。二者入库后统一变成 `postgis_table`，可发布动态 MVT / WFS / OAF。FileGDB API 只在导入链路按需接入，核心库零重型 C 绑定的原则不变。
+- **传统矢量资产同路上云**：Shapefile 走管理后台「导入 SHP」（`shp2pgsql`，从 `.prj` 自动识别 CGCS2000 / WGS84）；FileGDB 通过**专用转换工具**转为 PostGIS 表（读取端可基于 Esri 开源 FileGDB API）。二者入库后统一为 `postgis_table`，可发布动态 MVT / WFS / OAF；转换在服务外完成，服务端只消费转换结果，核心库保持纯 Rust。
 
 发布与调优见 [MVT 指南](docs/services/mvt.zh-CN.md) 与 [架构说明](docs/architecture.md)。
 
@@ -102,27 +102,27 @@ MBTiles 同时支持 PNG/JPEG/WebP 栅格与 gzip pbf 矢量包，TMS 行号自�
 
 ## 数据格式与目录对照
 
-系统按 catalog 的 kind 组织目录：`cog/`、`vector/`、`pmtiles/`、`mbtiles/`、`postgis/`、`3dtiles/`、`terrain/`、`arcgis/`；`mvt/`、`osgb/`、`styles/` 为预留/辅目录。作者本机测试数据集 `E:\data\1`（其 `README.md` §1.1 有逐格式说明）覆盖下列资产，可作为格式迁移的实测参考：
+系统按 catalog 的 kind 组织目录：`cog/`、`vector/`、`pmtiles/`、`mbtiles/`、`postgis/`、`3dtiles/`、`terrain/`、`arcgis/`；`mvt/`、`osgb/`、`styles/` 为预留/辅目录。常见格式与系统支持状态如下：
 
-| 格式 / 资产 | 系统支持 | 可发布服务 | 样本位置（`E:\data\1`） |
+| 格式 / 资产 | 系统支持 | 可发布服务 | 说明 |
 | --- | --- | --- | --- |
-| COG / BigTIFF（`.tif`） | ✅ 原生 | WMS / WMTS / XYZ | `cog/`（EPSG:4326 真实影像 + fixture） |
-| GeoJSON | ✅ 原生（→ `vector/`） | MVT / WMS / WMTS / XYZ / WFS / OAF | `geojson/`、`recon/` |
-| MBTiles（栅格 / 矢量） | ✅ 原生 | 栅格 → WMTS/XYZ；矢量 → MVT | `mbtiles/`、`recon/` |
-| PMTiles（栅格 / 矢量） | ✅ 原生 | 栅格 → WMTS/XYZ；矢量 → MVT | `pmtiles/` |
-| ArcGIS Server 缓存（compact v1 / v2） | ✅ 原生（→ `arcgis/`） | WMTS / XYZ | `arcgis_cache/`（3×v1 + 1×v2） |
-| `.tpk` / `.tpkx` 紧凑瓦片包 | ✅ 原生（→ `arcgis/`） | 导入后 WMTS / XYZ | `arcgis_tpk/`、`arcgis_cache/` |
-| 3D Tiles（`tileset.json` + `.b3dm`） | ✅ 原生 | `/3dtiles` 直通 | `3dtiles/`（recon / kmczc / kmczc_full） |
-| Quantized-Mesh（`.terrainpack`） | ✅ 原生直通 | `/terrain/{name}/layer.json` | `terrain/` |
-| PostGIS 空间表 / 视图 | ✅ 原生 | **动态 MVT** / WMS / WFS / OAF | `postgis/`（pg_dump + 视图导出） |
-| 静态 `z/x/y` 瓦片目录 | ⚠️ 需打包 | 打包为 PMTiles/MBTiles 后 WMTS/XYZ | `xyz-tms/`（样本待补） |
-| OSGB 原始倾斜摄影 | ⚠️ 需转换 | 转 3D Tiles 后发布 | `osgb/`（样本待补） |
-| **Shapefile（`.shp`）** | ✅ 导入 PostGIS | **动态 MVT** / WMS / WFS / OAF；管理后台「导入 SHP」→ `postgis_table` | `shapefile/` |
-| **FileGDB（`.gdb`）** | ✅ 导入 PostGIS | **动态 MVT** / WMS / WFS / OAF；Esri FileGDB API 直读 `.gdb` → 直连写入 PostGIS | 业务 gdb 待补；缓存内 `Status.gdb` 是状态库非数据源 |
-| 静态 MVT 瓦片目录 | ⚠️ 仅发现 | **不可发布**（无 SourceKind） | `mvt/`（预留） |
-| Esri `.mmpk` | ❌ 不支持 | 需取出内部 COG | `cog/cog.mmpk` |
+| COG / BigTIFF（`.tif`） | ✅ 原生 | WMS / WMTS / XYZ | `cog/` 目录 |
+| GeoJSON | ✅ 原生（→ `vector/`） | MVT / WMS / WMTS / XYZ / WFS / OAF | 平面文件目录 |
+| MBTiles（栅格 / 矢量） | ✅ 原生 | 栅格 → WMTS/XYZ；矢量 → MVT | `mbtiles/` 目录 |
+| PMTiles（栅格 / 矢量） | ✅ 原生 | 栅格 → WMTS/XYZ；矢量 → MVT | `pmtiles/` 目录 |
+| ArcGIS Server 缓存（compact v1 / v2） | ✅ 原生（→ `arcgis/`） | WMTS / XYZ | 支持 Server 缓存目录 |
+| `.tpk` / `.tpkx` 紧凑瓦片包 | ✅ 原生（→ `arcgis/`） | 导入后 WMTS / XYZ | 先导入数据根 |
+| 3D Tiles（`tileset.json` + `.b3dm`） | ✅ 原生 | `/3dtiles` 直通 | `3dtiles/` 目录 |
+| Quantized-Mesh（`.terrainpack`） | ✅ 原生直通 | `/terrain/{name}/layer.json` | `terrain/` 目录 |
+| PostGIS 空间表 / 视图 | ✅ 原生 | **动态 MVT** / WMS / WFS / OAF | PostGIS 数据源 |
+| 静态 `z/x/y` 瓦片目录 | ⚠️ 需打包 | 打包为 PMTiles/MBTiles 后 WMTS/XYZ | — |
+| OSGB 原始倾斜摄影 | ⚠️ 需转换 | 转 3D Tiles 后发布 | — |
+| **Shapefile（`.shp`）** | ✅ 导入 PostGIS | **动态 MVT** / WMS / WFS / OAF | 管理后台「导入 SHP」→ `postgis_table` |
+| **FileGDB（`.gdb`）** | ✅ 转换入 PostGIS | **动态 MVT** / WMS / WFS / OAF | 专用转换工具 → `postgis_table`；缓存内 `Status.gdb` 是状态库非数据源 |
+| 静态 MVT 瓦片目录 | ⚠️ 仅发现 | **不可发布**（无 SourceKind） | — |
+| Esri `.mmpk` | ❌ 不支持 | 需取出内部 COG | — |
 
-> 格式能力以 `GET /admin/capabilities` 的 `data_type_caps` 为权威矩阵（描述**静态数据源**的直接发布）。Shapefile / FileGDB 走「导入 PostGIS → 动态 MVT」迁移链路，入库后按 `postgis_table` 参与发布矩阵；FileGDB 读取采用 Esri 官方开源 API（Apache-2.0），不走 GDAL 转换。
+> 格式能力以 `GET /admin/capabilities` 的 `data_type_caps` 为权威矩阵（描述**静态数据源**的直接发布）。Shapefile / FileGDB 走「转入 PostGIS → 动态 MVT」迁移链路，入库后按 `postgis_table` 参与发布矩阵。
 
 ---
 
@@ -291,7 +291,7 @@ HTTP (axum 0.8 / tokio)     mapserver/services/map-api
 | **3D Tiles**           | `tileset.json` 目录（OSGB 需先转 3D Tiles）     | [3D Tiles 指南](docs/services/3dtiles.zh-CN.md)      | [发布步骤](docs/services/3dtiles.zh-CN.md#操作说明管理后台)      |
 | **ArcGIS 缓存**          | `Conf.xml` 缓存目录、`.tpk`、`.tpkx`           | [ArcGIS 缓存指南](docs/services/arcgis-cache.zh-CN.md) | [发布步骤](docs/services/arcgis-cache.zh-CN.md#操作说明管理后台) |
 
-> 静态 Shapefile / FileGDB 目录本身不能直接发布：Shapefile 经管理后台「导入 SHP」（`shp2pgsql`），FileGDB 经 Esri 官方 FileGDB API 直读并直连写入 PostGIS，之后按 `postgis_table` 发布**动态 MVT** / WMS / WFS / OAF；静态 MVT 瓦片目录仍只发现不发布；PostGIS 普通表（无 geometry 列）仅数据查询。权威矩阵来自 `GET /admin/capabilities`。
+> 静态 Shapefile / FileGDB 目录本身不能直接发布：Shapefile 经管理后台「导入 SHP」（`shp2pgsql`），FileGDB 经**专用转换工具**转为 PostGIS 表，之后按 `postgis_table` 发布**动态 MVT** / WMS / WFS / OAF；静态 MVT 瓦片目录仍只发现不发布；PostGIS 普通表（无 geometry 列）仅数据查询。权威矩阵来自 `GET /admin/capabilities`。
 
 全部指南索引：[中文](docs/services/README.zh-CN.md) / [English](docs/services/README.en-US.md)。协议矩阵、请求样例与限制见 [mapserver/README.md](mapserver/README.md)。
 
@@ -302,7 +302,7 @@ HTTP (axum 0.8 / tokio)     mapserver/services/map-api
 以下为路线图方向，不承诺具体时间表：
 
 1. **换机不碎（P1）**：运行期发布的服务把 `source.path` 规约为 `${DATA_ROOT}` 相对存储，serve 端按 `data_root` 拼接；files 与 db 两种后端统一。详见 [manager/deploy/data-root.md](manager/deploy/data-root.md)。
-2. **更多数据源**：Shapefile / FileGDB 经导入 PostGIS 发布动态 MVT（FileGDB 走 Esri 官方开源 FileGDB API 直读直写）；下一步接入该 FileGDB 读取链路，并补齐 GeoPackage、ArcGIS 缓存发布链路增强、COG JPEG/WEBP 瓦片解码与写入。
+2. **更多数据源**：Shapefile / FileGDB 经转入 PostGIS 后发布动态 MVT；下一步补齐原生读取（免转换）、GeoPackage、ArcGIS 缓存发布链路增强、COG JPEG/WEBP 瓦片解码与写入。
 3. **安全与治理**：数据面鉴权/RBAC、TLS 终结、集群部署与监控告警；当前版本建议置于反向代理之后。
 4. **OGC 完整性**：WMS 多图层合成、SLD 更多符号与过滤能力、更多 conformance class 与自动化测试。
 5. **性能持续调优**：重采样/调色板并行化、WMS GetMap 输出缓存、rayon 池与 MBTiles 连接池可配置化。

@@ -58,7 +58,7 @@ pwsh -File ..\deploy\start.ps1 -Dir ..\deploy_en
 | `POSTGRES_USER`         | `postgres`  | PG 超级用户名；注入 DB 初始化与两服务 DSN（envsubst 渲染 config 模板）|
 | `MAPSERVER_DB_PASSWORD` | `123456`    | PG 口令（默认 = 本机开发口径；共享环境务必改强口令）                 |
 | `MAPSERVER_DB_PORT`     | `5434`      | PostGIS 暴露到宿主机的端口                                           |
-| `GISDATA_DIR`           | `./gisdata` | gisdata 挂载点（宿主目录）：**只挂到 map-api** 的 `/app/data`（只读）；manager 不挂数据卷，所有数据操作经 map-api 接口执行。默认工作区 ws1 的 `data_root` 即此目录；Windows 外置盘路径请用正斜杠 `E:/data/gisdata` |
+| `GISDATA_DIR`           | `./gisdata` | gisdata 挂载点（宿主目录）：**只挂到 map-api** 的 `/app/data`（只读）；manager 不挂数据卷，所有数据操作经 map-api 接口执行。默认工作区 ws1 的 `data_root` 即此目录；Windows 外置盘路径请用正斜杠（如 `X:/gisdata`）|
 
 ## 密钥去哪了（P0-3）
 

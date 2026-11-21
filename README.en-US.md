@@ -92,7 +92,7 @@ Format details: [docs/arcgis-cache-formats.md](docs/arcgis-cache-formats.md). Pu
 - **Dual CRS endpoints**: `/{z}/{x}/{y}.pbf` (EPSG:3857) and `/{srid}/{z}/{x}/{y}.pbf` (source CRS units, e.g. 4543 metres or 4326 degrees, with no server-side `ST_Transform`); TileJSON declares bounds/crs/grid per endpoint.
 - **Built for concurrency**: connection pools shared per DSN, PG≥11 / PostGIS≥3.0 version preflight, GiST index self-check at startup; bbox pre-filtering before encoding, `ST_SimplifyPreserveTopology` at low zooms; output-cache hits around 16–25 ms with optional disk L2 surviving restarts.
 - **Publish without new tables**: `from` expressions publish SQL/view layers directly; bounds/count use statistics estimates with automatic fallback to exact scans.
-- **Legacy vectors take the same road**: Shapefiles go through the admin "Import SHP" action (`shp2pgsql`, reading EPSG from `.prj` for CGCS2000 / WGS84). FileGDB is read by **Esri's official open-source FileGDB API** ([Esri/file-geodatabase-api](https://github.com/Esri/file-geodatabase-api), Apache-2.0, cross-platform C++, currently 1.5.5) — schemas, features, attributes and spatial queries are read directly from `.gdb` and written straight into PostGIS, **with no GDAL conversion or intermediate files**. Both become `postgis_table` and can publish dynamic MVT / WFS / OAF. The FileGDB API is linked only in the import path, so the core library stays free of heavy C bindings.
+- **Legacy vectors take the same road**: Shapefiles go through the admin "Import SHP" action (`shp2pgsql`, reading EPSG from `.prj` for CGCS2000 / WGS84). FileGDB is converted into PostGIS tables by a **dedicated conversion tool** (the reader can be based on Esri's open-source FileGDB API). Both end up as `postgis_table` and can publish dynamic MVT / WFS / OAF. Conversion happens outside the server; the server only consumes the result and the core library stays pure Rust.
 
 Publishing and tuning: [MVT guide](docs/services/mvt.en-US.md) and [architecture notes](docs/architecture.md).
 
@@ -102,27 +102,27 @@ Publishing and tuning: [MVT guide](docs/services/mvt.en-US.md) and [architecture
 
 ## Data formats and directory mapping
 
-The system organizes catalogs by source kind: `cog/`, `vector/`, `pmtiles/`, `mbtiles/`, `postgis/`, `3dtiles/`, `terrain/` and `arcgis/`; `mvt/`, `osgb/` and `styles/` are reserved/auxiliary directories. A local test dataset on the author's machine (`E:\data\1`, with a per-format breakdown in its `README.md` §1.1) covers the assets below as migration test cases:
+The system organizes catalogs by source kind: `cog/`, `vector/`, `pmtiles/`, `mbtiles/`, `postgis/`, `3dtiles/`, `terrain/` and `arcgis/`; `mvt/`, `osgb/` and `styles/` are reserved/auxiliary directories. Common formats and their support status are listed below:
 
-| Format / asset | Support | Publishable services | Sample location (`E:\data\1`) |
+| Format / asset | Support | Publishable services | Notes |
 | --- | --- | --- | --- |
-| COG / BigTIFF (`.tif`) | ✅ native | WMS / WMTS / XYZ | `cog/` (real EPSG:4326 imagery + fixture) |
-| GeoJSON | ✅ native (→ `vector/`) | MVT / WMS / WMTS / XYZ / WFS / OAF | `geojson/`, `recon/` |
-| MBTiles (raster / vector) | ✅ native | raster → WMTS/XYZ; vector → MVT | `mbtiles/`, `recon/` |
-| PMTiles (raster / vector) | ✅ native | raster → WMTS/XYZ; vector → MVT | `pmtiles/` |
-| ArcGIS Server cache (compact v1 / v2) | ✅ native (→ `arcgis/`) | WMTS / XYZ | `arcgis_cache/` (3×v1 + 1×v2) |
-| `.tpk` / `.tpkx` compact tile packages | ✅ native (→ `arcgis/`) | WMTS / XYZ after import | `arcgis_tpk/`, `arcgis_cache/` |
-| 3D Tiles (`tileset.json` + `.b3dm`) | ✅ native | `/3dtiles` pass-through | `3dtiles/` (recon / kmczc / kmczc_full) |
-| Quantized-Mesh (`.terrainpack`) | ✅ native pass-through | `/terrain/{name}/layer.json` | `terrain/` |
-| PostGIS spatial tables / views | ✅ native | **Dynamic MVT** / WMS / WFS / OAF | `postgis/` (pg_dump + view export) |
-| Static `z/x/y` tile trees | ⚠️ pack first | WMTS/XYZ after packing to PMTiles/MBTiles | `xyz-tms/` (sample pending) |
-| Raw OSGB photogrammetry | ⚠️ convert first | Publish as 3D Tiles | `osgb/` (sample pending) |
-| **Shapefile (`.shp`)** | ✅ import into PostGIS | **Dynamic MVT** / WMS / WFS / OAF; admin "Import SHP" → `postgis_table` | `shapefile/` |
-| **FileGDB (`.gdb`)** | ✅ import into PostGIS | **Dynamic MVT** / WMS / WFS / OAF; Esri FileGDB API reads `.gdb` directly → writes straight into PostGIS | Business gdb pending; `Status.gdb` in caches is a state store, not a data source |
-| Static MVT tile directories | ⚠️ discover only | **Not publishable** (no SourceKind) | `mvt/` (reserved) |
-| Esri `.mmpk` | ❌ unsupported | Extract the inner COG first | `cog/cog.mmpk` |
+| COG / BigTIFF (`.tif`) | ✅ native | WMS / WMTS / XYZ | `cog/` directory |
+| GeoJSON | ✅ native (→ `vector/`) | MVT / WMS / WMTS / XYZ / WFS / OAF | Flat-file directory |
+| MBTiles (raster / vector) | ✅ native | raster → WMTS/XYZ; vector → MVT | `mbtiles/` directory |
+| PMTiles (raster / vector) | ✅ native | raster → WMTS/XYZ; vector → MVT | `pmtiles/` directory |
+| ArcGIS Server cache (compact v1 / v2) | ✅ native (→ `arcgis/`) | WMTS / XYZ | Server cache directories |
+| `.tpk` / `.tpkx` compact tile packages | ✅ native (→ `arcgis/`) | WMTS / XYZ after import | Import into the data root first |
+| 3D Tiles (`tileset.json` + `.b3dm`) | ✅ native | `/3dtiles` pass-through | `3dtiles/` directory |
+| Quantized-Mesh (`.terrainpack`) | ✅ native pass-through | `/terrain/{name}/layer.json` | `terrain/` directory |
+| PostGIS spatial tables / views | ✅ native | **Dynamic MVT** / WMS / WFS / OAF | PostGIS data source |
+| Static `z/x/y` tile trees | ⚠️ pack first | WMTS/XYZ after packing to PMTiles/MBTiles | — |
+| Raw OSGB photogrammetry | ⚠️ convert first | Publish as 3D Tiles | — |
+| **Shapefile (`.shp`)** | ✅ import into PostGIS | **Dynamic MVT** / WMS / WFS / OAF; admin "Import SHP" → `postgis_table` | Standard import path |
+| **FileGDB (`.gdb`)** | ✅ convert into PostGIS | **Dynamic MVT** / WMS / WFS / OAF | Dedicated conversion tool → `postgis_table`; `Status.gdb` in caches is a state store, not a data source |
+| Static MVT tile directories | ⚠️ discover only | **Not publishable** (no SourceKind) | — |
+| Esri `.mmpk` | ❌ unsupported | Extract the inner COG first | — |
 
-> The authoritative matrix is `data_type_caps` behind `GET /admin/capabilities` (it describes **direct** publishing from static data sources). Shapefile / FileGDB follow the "import into PostGIS → dynamic MVT" migration path and join the matrix as `postgis_table` once loaded; FileGDB reading uses Esri's official open-source API (Apache-2.0), not a GDAL conversion.
+> The authoritative matrix is `data_type_caps` behind `GET /admin/capabilities` (it describes **direct** publishing from static data sources). Shapefile / FileGDB follow the "load into PostGIS → dynamic MVT" migration path and join the matrix as `postgis_table` once loaded.
 
 ---
 
@@ -292,7 +292,7 @@ Recommended flow: **workspace → data-source Store → discover data layer → 
 | **3D Tiles** | `tileset.json` directories (convert OSGB first) | [3D Tiles guide](docs/services/3dtiles.en-US.md) | [Steps](docs/services/3dtiles.en-US.md#operation-guide-admin-ui) |
 | **ArcGIS cache** | `Conf.xml` cache dirs, `.tpk`, `.tpkx` | [ArcGIS cache guide](docs/services/arcgis-cache.en-US.md) | [Steps](docs/services/arcgis-cache.en-US.md#operation-guide-admin-ui) |
 
-> Static Shapefile / FileGDB directories cannot be published directly: Shapefiles via the admin "Import SHP" action (`shp2pgsql`), FileGDB via Esri's official FileGDB API reading `.gdb` directly and writing straight into PostGIS. Both then publish as **dynamic MVT** / WMS / WFS / OAF under `postgis_table`. Static MVT tile directories remain discover-only; plain PostGIS tables without a geometry column are data-query only. The authoritative matrix is `GET /admin/capabilities`.
+> Static Shapefile / FileGDB directories cannot be published directly: Shapefiles via the admin "Import SHP" action (`shp2pgsql`), FileGDB via a dedicated conversion tool into PostGIS. Both then publish as **dynamic MVT** / WMS / WFS / OAF under `postgis_table`. Static MVT tile directories remain discover-only; plain PostGIS tables without a geometry column are data-query only. The authoritative matrix is `GET /admin/capabilities`.
 
 All guides: [中文](docs/services/README.zh-CN.md) / [English](docs/services/README.en-US.md). Protocol matrix, request samples and limits: [mapserver/README.md](mapserver/README.md).
 
@@ -303,7 +303,7 @@ All guides: [中文](docs/services/README.zh-CN.md) / [English](docs/services/RE
 Roadmap directions, without a fixed schedule:
 
 1. **Portable deployments (P1)**: store runtime-published `source.path` as `${DATA_ROOT}`-relative paths and resolve them against `data_root` at serve time, for both file and DB backends. See [manager/deploy/data-root.md](manager/deploy/data-root.md).
-2. **More data sources**: Shapefile / FileGDB publish dynamic MVT via PostGIS import (FileGDB through Esri's official open-source FileGDB API, read-and-write directly); next up is wiring in that FileGDB reader, plus GeoPackage, stronger ArcGIS-cache publishing, and COG JPEG/WEBP tile decoding and writing.
+2. **More data sources**: Shapefile / FileGDB publish dynamic MVT after conversion into PostGIS; next up are native readers (no conversion step), GeoPackage, stronger ArcGIS-cache publishing, and COG JPEG/WEBP tile decoding and writing.
 3. **Security and governance**: data-plane auth/RBAC, TLS termination, clustered deployment, monitoring and alerting. The current version should sit behind a reverse proxy.
 4. **OGC completeness**: WMS multi-layer composition, broader SLD symbol/filter support, more conformance classes and automated tests.
 5. **Performance**: parallelize resampling/palette loops, add an output cache for WMS GetMap, make rayon and MBTiles pool sizes configurable.

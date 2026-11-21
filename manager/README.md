@@ -183,7 +183,7 @@ python tools/mgr_probe.py http://127.0.0.1:6180/manager-api out.txt
 ## 端到端功能测试（与 rust-gisserver 联动）
 
 `tools/func_test.py` 针对**已运行的两个实例**做接口级走查（68 项），数据源为真实
-图层目录（`rust-gisserver/config/*` + `E:\data\1` + PostGIS `gis` 库），覆盖：
+图层目录（配置目录、数据根目录与 PostGIS 空间库），覆盖：
 
 - **map-api 数据面**：COG（WMS 1.1.1/1.3.0、WMTS 两套 TileMatrixSet、XYZ、`/cog` 直读）、
   矢量（WFS、OGC API Features/Tiles、`/mvt`）、PostGIS 动态 MVT（3857 与原投影双接口）、

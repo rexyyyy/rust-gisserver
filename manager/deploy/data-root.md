@@ -35,11 +35,11 @@ rust-gisserver（管理平面, :6180）
   文本先跑 `expand_env` 再 `from_str`——所以 `${DATA_ROOT}` 占位在**磁盘 XML 与
   PG 库**里等价生效，`db` 后端与其「零语义差异」的约定名副其实。绝对路径不含
   `${`，不受影响（纯增量）。
-- **两个根**（本机存在两处数据）：
+- **两个根**（数据根目录与测试数据根目录）：
   | 占位 | 含义 | 典型值 |
   |---|---|---|
-  | `${DATA_ROOT:-data}` | 真实数据根（cog/vector/mbtiles/pmtiles/3dtiles + archives） | 默认 `data`（相对启动工作目录）；外置盘如 `E:\data\1` |
-  | `${TESTDATA_ROOT}` | e2e 转换产物根 | `<…>\gis-wt\.testdata` |
+  | `${DATA_ROOT:-data}` | 真实数据根（cog/vector/mbtiles/pmtiles/3dtiles + archives） | 默认 `data`（相对启动工作目录）；也可设为任意绝对路径 |
+  | `${TESTDATA_ROOT}` | e2e 转换产物根 | 按测试环境设置 |
 - **默认值语义（2026-11-14 起）**：`mapserver.xml` 用
   `data_root="${DATA_ROOT:-data}"`，不设 env 即以相对路径 `data` 生效，等价于
   安装目录 `data\`（`start-*.bat` 会先 `cd /d` 到安装目录；源码开发从
@@ -58,14 +58,14 @@ rust-gisserver（管理平面, :6180）
 `${DATA_ROOT:-data}` → 工作目录下 `data\`。把 COG / 瓦片放进该目录即可。
 配置加载器不读 `.env`；只有数据在外置盘、或跑 e2e fixture 时才在会话注入：
 ```powershell
-$env:DATA_ROOT     = 'E:\data\1'   # 可选覆盖，默认 .\data
-$env:TESTDATA_ROOT = 'D:\mycomputor\documents\gis-wt\.testdata'
+$env:DATA_ROOT     = '<数据根目录>'   # 可选覆盖，默认 .\data
+$env:TESTDATA_ROOT = '<测试数据根目录>'
 ```
 `TESTDATA_ROOT` 未设置时相关 e2e demo 图层会被**跳过并告警**（非致命，其余服务照常）。
 
 ## 换机不碎 · 现状与后续（务必知悉）
 
-- **现状**：配置文件里的**路径引用已去机器化**（`${DATA_ROOT}` 占位，仓库不再含 `E:\`/`D:\`），
+- **现状**：配置文件里的**路径引用已去机器化**（`${DATA_ROOT}` 占位，仓库不含固定盘符路径），
   且加载器对**磁盘 XML 与 PG `service_doc`** 两条后端都会 `expand_env`。但「新增服务」
   写入时（map-api `catalog_admin::create` 的 `guard_data_root` 仅**校验**、结果丢弃；
   manager `publish` 用 browse 得到的**绝对** `source.path`），无论落 XML 还是落库
