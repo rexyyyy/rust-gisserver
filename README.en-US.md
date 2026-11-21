@@ -1,0 +1,227 @@
+# rust-gisserver
+
+[English](README.en-US.md) | [中文](README.md)
+
+> **First things first: rust-gisserver serves a very wide range of service types.** One engine provides WMS 1.1.1/1.3.0, WMTS 1.0.0, TMS/XYZ, MVT vector tiles (including dynamic PostGIS vectors), WFS, OGC API - Features, OGC API - Tiles, 3D Tiles/terrain pass-through, plus direct reads of COG / PMTiles / MBTiles / ArcGIS compact caches (`.tpk`/`.tpkx`). It also handles CGCS2000, Gauss-Kruger 3°/6° zones and UTM with identity-path output and optional PROJ reprojection.
+
+**rust-gisserver** is built in Rust: **low runtime footprint, high performance and high concurrency**. It aims to be a new benchmark for open GIS servers. Core byte-level paths (TIFF/COG parsing, tile decoding, MVT encoding, PMTiles archive I/O, projection) are implemented independently from public format specifications, without heavy GDAL C bindings. PROJ is an optional runtime backend and the server falls back to built-in projection paths when it is absent.
+
+## Three components
+
+```text
+rust-gisserver/
+├── gisserver/   # Core library: single package, feature-gated modules, publishable to crates.io
+├── mapserver/   # Map server: self-contained tile/imagery/feature engine (binary mapserve)
+├── manager/     # Admin console: Rust backend + Vite UI (catalog/publish/logs/styles)
+├── docs/        # Architecture and per-service publishing guides
+└── installscript/ # PostgreSQL/PostGIS and installer assets, SQL baselines
+```
+
+| Component | Role | Description | License |
+|---|---|---|---|
+| **gisserver** | Core library | Pure Rust data/protocol layer: COG/BigTIFF, tile rendering, MVT, PMTiles/MBTiles, WMS/WFS/OGC API, projection, PostGIS sources, path encoding | MIT OR Apache-2.0 |
+| **mapserver** | Map server | Ready-to-run HTTP services: WMS / WMTS / TMS / XYZ / MVT / PMTiles / MBTiles / COG / WFS / OGC API / 3D Tiles; five-stage cache + optional disk L2 | AGPL-3.0-only + commercial exception |
+| **manager** | Admin console | Web console: service catalog, publishing wizard (CRS/bbox validation), runtime monitoring, styles, cache and audit logs | AGPL-3.0-only + commercial exception |
+
+> Licensing: **gisserver** is dual-licensed MIT OR Apache-2.0 and may be closed-source/commercial without a license fee. **mapserver** and **manager** are AGPL-3.0-only with a **Commercial License Exception**: internal use, personal study and open-source integration are free; SaaS or closed-source commercial integration requires a commercial license (see the end of [mapserver/LICENSE](mapserver/LICENSE) / [manager/LICENSE](manager/LICENSE), contact rex yang <13556388@qq.com>).
+
+## Why it is fast
+
+- **No heavy dependencies**: pure Rust, no GDAL/tiff/mapbox C bindings; PROJ is optional and the default build has zero FFI / zero unsafe.
+- **Call style first**: MVT cache hits 16–19 ms, XYZ raster tiles 10–21 ms/tile, archives/COG/3D Tiles use zero-decode HTTP Range pass-through; WMS GetMap is a fallback, not the basemap zoom path.
+- **Five-stage cache**: output tiles, layer index, metadata documents, catalog metadata and feature key/value, unified in `CacheHub`, with TTL, manual purge and optional disk L2.
+- **Concurrency**: rendering/encoding/blocking IO all run in `spawn_blocking`; tokio workers only schedule. Local files and HTTP Range sources use positional reads (`read_at`/`seek_read`) with no shared-fd cursor races; remote sources are isolated in a dedicated rayon pool.
+- **Render fast path**: when request CRS == source CRS and the geotransform is affine, 262,144 per-pixel projections for a 512×256 GetMap drop to 5 (2.9× in a release micro-benchmark).
+
+See [mapserver/README.md](mapserver/README.md) for measurements and implementation notes.
+
+---
+
+## Install on Linux
+
+### 1) Docker (recommended)
+
+Deployment entries are split by language × platform. On Linux use:
+
+| Directory | Compose project | First-run DB seed |
+|---|---|---|
+| `manager/deploy_zh-cn/linux/` | `gis-data-base-zh-linux` | `system.sql` → `map.sql` |
+| `manager/deploy_en/linux/` | `gis-data-base-en-linux` | `.en_US` seeds |
+
+Both projects use the same ports (6180 / 8080 / `MAPSERVER_DB_PORT`, default 5434), so **they cannot run at the same time**. Volumes are isolated per project, so switching language does not need `down -v`.
+
+```bash
+cd manager/deploy_zh-cn/linux          # English: manager/deploy_en/linux
+cp ../../deploy/.env.example .env
+# Edit .env: at minimum set MANAGER_JWT_SECRET (openssl rand -hex 32) and change MAPSERVER_DB_PASSWORD
+bash ../../deploy/start.sh --dir .     # up --build → wait for healthy PostGIS → validate
+```
+
+Or manually:
+
+```bash
+docker compose up -d --build
+docker compose ps
+docker compose logs -f map-api
+```
+
+Open: admin console <http://localhost:6180/>, map API health <http://localhost:8080/health>, WMS capabilities <http://localhost:8080/wms?service=WMS&request=GetCapabilities>.
+
+`GISDATA_DIR` (default `./gisdata`) is mounted read-only at map-api `/app/data`. Put layer XML files in the deploy config template `config/mapserver/` and reference data as `/app/data/...`. See [manager/deploy/README.md](manager/deploy/README.md).
+
+### 2) Build from source
+
+Requirements: Rust 1.80+ (validated on 1.98.1), build-essential, pkg-config, PostgreSQL client; PROJ runtime libraries for cross-CRS transforms.
+
+```bash
+sudo apt-get update
+sudo apt-get install -y build-essential pkg-config curl libproj-dev proj-bin libsqlite3-0 postgresql-client
+
+curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --profile minimal
+source "$HOME/.cargo/env"
+
+cargo build --release --manifest-path mapserver/Cargo.toml
+cargo build --release --manifest-path manager/backend/Cargo.toml
+
+cd manager/ui
+corepack enable
+pnpm install --frozen-lockfile
+pnpm run build:prod
+cd ../../..
+```
+
+Initialize PostgreSQL 16 + PostGIS (the database name contains a hyphen and needs double quotes):
+
+```bash
+psql -h localhost -p 5434 -U postgres -c 'CREATE DATABASE "mapserver-manager"'
+psql -h localhost -p 5434 -U postgres -d mapserver-manager -f manager/backend/sql/system.sql
+psql -h localhost -p 5434 -U postgres -d mapserver-manager -f manager/backend/sql/map.sql
+# English baseline: use system.en_US.sql / map.en_US.sql instead; never run both sets
+```
+
+Run from the repository root so that `static_dir="manager/ui/dist"` and relative `data_root` resolve correctly:
+
+```bash
+export MANAGER_DB_PASSWORD='<your password>'
+export MANAGER_JWT_SECRET='<random long secret>'
+export MAPSERVER_DB_PASSWORD='<your password>'
+export PROJ_DATA=/usr/share/proj
+# Optional: export DATA_ROOT=/srv/gisdata
+
+./mapserver/target/release/mapserve serve --config mapserver/config/mapserver.xml    # :8080
+./manager/backend/target/release/manager --config manager/backend/config/manager.xml  # :6180
+```
+
+> Install PROJ explicitly (`libproj-dev proj-bin libsqlite3-0`) in containers and source builds. Without it the service still starts, but cross-CRS transforms (4490/45xx/UTM) fail. Check the `proj` field of `/health`.
+
+PostgreSQL guides: [中文](docs/postgresql16-postgis-linux-install.zh-CN.md) / [English](docs/postgresql16-postgis-linux-install.en-US.md).
+
+---
+
+## Install on Windows
+
+### 1) Build and install
+
+Requirements: Windows 10/11 x64, Rust MSVC toolchain, VS 2019/2022 Build Tools, optional Node.js + pnpm.
+
+```powershell
+cd <repo>\build\script
+.\build_all.bat            # mapserver + manager
+.\build_all.bat frontend   # also build the UI (recommended; otherwise admin UI is 404)
+.\install.bat              # default: <repo>\..\..\..\rmap_target
+# or: .\install.bat D:\gis\rmap_target
+```
+
+The install directory contains `bin\` (`mapserve.exe`, `manager.exe`, PROJ DLLs), `config\`, `web\`, `data\`, `cache\`, `logs\`, `share\proj\`, `start-mapserver.bat` and `start-manager.bat`. Copy `.env.example` to `.env` and set at least `MANAGER_DB_PASSWORD`, `MANAGER_JWT_SECRET` and `MAPSERVER_DB_PASSWORD`. Full paths and known issues: [build/script/README.md](build/script/README.md).
+
+### 2) Run as a Windows service (NSSM)
+
+```powershell
+nssm install map-api "<install dir>\bin\mapserve.exe"
+nssm install manager  "<install dir>\bin\manager.exe"
+nssm set map-api AppDirectory "<install dir>"
+nssm set manager  AppDirectory "<install dir>"
+nssm start map-api
+nssm start manager
+```
+
+**Always set `AppDirectory`**: `data_root` defaults to the relative path `data`. Without it NSSM uses `bin\` as the working directory and the admin plane reports `data_root` inaccessible. The same rule applies to any custom launcher (systemd / Task Scheduler).
+
+### 3) Start from the command line
+
+```powershell
+cd <install dir>
+.\start-mapserver.bat   # map-api on :8080; clears PROJ_LIB and sets PROJ_DATA
+.\start-manager.bat     # manager on :6180
+# or manually:
+.\bin\mapserve.exe serve --config config\mapserver.xml
+.\bin\manager.exe --config config\manager.xml
+```
+
+Ports are not read from `.env`: map-api uses `<server port>` in `config/mapserver.xml` or `--listen`, manager uses `<server addr>` in `config/manager.xml`. After changing the map-api port, update `<mapsvc base_url>` in `manager.xml`. See [mapserver/install/windows/README.md](mapserver/install/windows/README.md).
+
+---
+
+## System architecture
+
+```text
+HTTP (axum 0.8 / tokio)     mapserver/services/map-api
+  ├─ handlers/  WMS · WMTS · TMS · XYZ · MVT · PMTiles · MBTiles · COG · WFS · OAF · OAT · 3DTiles · health
+  ├─ admin/     discovery/publish wizard · service registry · styles · access log · cache · TPK import
+  ├─ state.rs   AppState (layer runtime, five-stage cache, base URL, manager mode)
+  └─ config.rs  XML → serde structs → TileMatrixSet
+
+Protocol layer              gisserver::wms_protocol / wfs_protocol / ogcapi_features / ogcapi_tiles
+Data layer                  gisserver::projection / storage / cog / renderer / mvt / pmtiles / pg_source / arcgis_cache
+Admin plane                 manager/backend (axum) + manager/ui (Vue 3 + Vite + Element Plus)
+```
+
+- map-api is a pure map engine and **does not host the UI**; `<manager>` only performs a short health probe to choose `managed` / `standalone` mode.
+- Layer configuration is XML, one layer per file, under `<catalog.root>/<kind>/`. The admin plane writes the same location with syntax validation, `.xml.bak` backup and reload rollback.
+- `RangeSource` is the single read seam: local files, HTTP(S) objects and S3 pre-signed URLs all use positional reads.
+
+Layering, data flows, concurrency and cache conventions: [docs/architecture.md](docs/architecture.md).
+
+---
+
+## Publishing each service type
+
+Recommended flow: **workspace → data-source Store → discover data layer → publishing wizard (select service types) → published-service preview / copy endpoints**. Under the hood manager calls map-api `/admin/services` to write layer XML and hot-reload.
+
+| Service | Publishable sources | Details | Operation guide |
+|---|---|---|---|
+| **WMS** 1.1.1/1.3.0 | COG, GeoJSON, PostGIS tables | [WMS guide](docs/services/wms.en-US.md) | [Steps](docs/services/wms.en-US.md#operation-guide-admin-ui) |
+| **WMTS** 1.0.0 | COG, GeoJSON, raster PMTiles/MBTiles, ArcGIS cache | [WMTS guide](docs/services/wmts.en-US.md) | [Steps](docs/services/wmts.en-US.md#operation-guide-admin-ui) |
+| **XYZ / TMS** | Same as WMTS; Leaflet/MapLibre/legacy TMS | [XYZ/TMS guide](docs/services/xyz-tms.en-US.md) | [Steps](docs/services/xyz-tms.en-US.md#operation-guide-admin-ui) |
+| **MVT** vector tiles | GeoJSON, PostGIS, vector PMTiles/MBTiles | [MVT guide](docs/services/mvt.en-US.md) | [Steps](docs/services/mvt.en-US.md#operation-guide-admin-ui) |
+| **WFS** 2.0/1.1/1.0 | GeoJSON, PostGIS tables | [WFS guide](docs/services/wfs.en-US.md) | [Steps](docs/services/wfs.en-US.md#operation-guide-admin-ui) |
+| **OGC API - Features** | GeoJSON, PostGIS tables | [OAF guide](docs/services/oaf.en-US.md) | [Steps](docs/services/oaf.en-US.md#operation-guide-admin-ui) |
+| **OGC API - Tiles** | COG, GeoJSON, raster archives, ArcGIS cache | [OAT guide](docs/services/oat.en-US.md) | [Steps](docs/services/oat.en-US.md#operation-guide-admin-ui) |
+| **3D Tiles** | `tileset.json` directories (convert OSGB first) | [3D Tiles guide](docs/services/3dtiles.en-US.md) | [Steps](docs/services/3dtiles.en-US.md#operation-guide-admin-ui) |
+| **ArcGIS cache** | `Conf.xml` cache dirs, `.tpk`, `.tpkx` | [ArcGIS cache guide](docs/services/arcgis-cache.en-US.md) | [Steps](docs/services/arcgis-cache.en-US.md#operation-guide-admin-ui) |
+
+> Static Shapefile directories and static MVT tile directories can be discovered but are not yet publishable. Plain PostGIS tables without a geometry column are data-query only. The authoritative matrix is `GET /admin/capabilities`.
+
+All guides: [中文](docs/services/README.zh-CN.md) / [English](docs/services/README.en-US.md). Protocol matrix, request samples and limits: [mapserver/README.md](mapserver/README.md).
+
+---
+
+## Next steps
+
+Roadmap directions, without a fixed schedule:
+
+1. **Portable deployments (P1)**: store runtime-published `source.path` as `${DATA_ROOT}`-relative paths and resolve them against `data_root` at serve time, for both file and DB backends. See [manager/deploy/data-root.md](manager/deploy/data-root.md).
+2. **More data sources**: static Shapefile / GeoPackage readers, stronger ArcGIS-cache publishing, COG JPEG/WEBP tile decoding and writing.
+3. **Security and governance**: data-plane auth/RBAC, TLS termination, clustered deployment, monitoring and alerting. The current version should sit behind a reverse proxy.
+4. **OGC completeness**: WMS multi-layer composition, broader SLD symbol/filter support, more conformance classes and automated tests.
+5. **Performance**: parallelize resampling/palette loops, add an output cache for WMS GetMap, make rayon and MBTiles pool sizes configurable.
+6. **Delivery experience**: Linux one-click installer and systemd unit, plus continued bilingual docs and sample data.
+
+---
+
+## License
+
+- `gisserver/` (core library): **MIT OR Apache-2.0**, see [gisserver/LICENSE](gisserver/LICENSE)
+- `mapserver/` and `manager/`: **AGPL-3.0-only** with a commercial license exception, see each `LICENSE`; third-party notices in [mapserver/THIRD-PARTY-NOTICES.md](mapserver/THIRD-PARTY-NOTICES.md)
+
+Copyright (c) 2026 rex yang <13556388@qq.com> and contributors.
