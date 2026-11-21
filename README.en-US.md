@@ -120,7 +120,6 @@ The system organizes catalogs by source kind: `cog/`, `vector/`, `pmtiles/`, `mb
 | **Shapefile (`.shp`)** | ✅ import into PostGIS | **Dynamic MVT** / WMS / WFS / OAF; admin "Import SHP" → `postgis_table` | Standard import path |
 | **FileGDB (`.gdb`)** | ✅ convert into PostGIS | **Dynamic MVT** / WMS / WFS / OAF | Dedicated conversion tool → `postgis_table`; `Status.gdb` in caches is a state store, not a data source |
 | Static MVT tile directories | ⚠️ discover only | **Not publishable** (no SourceKind) | — |
-| Esri `.mmpk` | ❌ unsupported | Extract the inner COG first | — |
 
 > The authoritative matrix is `data_type_caps` behind `GET /admin/capabilities` (it describes **direct** publishing from static data sources). Shapefile / FileGDB follow the "load into PostGIS → dynamic MVT" migration path and join the matrix as `postgis_table` once loaded.
 
@@ -302,12 +301,10 @@ All guides: [中文](docs/services/README.zh-CN.md) / [English](docs/services/RE
 
 Roadmap directions, without a fixed schedule:
 
-1. **Portable deployments (P1)**: store runtime-published `source.path` as `${DATA_ROOT}`-relative paths and resolve them against `data_root` at serve time, for both file and DB backends. See [manager/deploy/data-root.md](manager/deploy/data-root.md).
-2. **More data sources**: Shapefile / FileGDB publish dynamic MVT after conversion into PostGIS; next up are native readers (no conversion step), GeoPackage, stronger ArcGIS-cache publishing, and COG JPEG/WEBP tile decoding and writing.
-3. **Security and governance**: data-plane auth/RBAC, TLS termination, clustered deployment, monitoring and alerting. The current version should sit behind a reverse proxy.
-4. **OGC completeness**: WMS multi-layer composition, broader SLD symbol/filter support, more conformance classes and automated tests.
-5. **Performance**: parallelize resampling/palette loops, add an output cache for WMS GetMap, make rayon and MBTiles pool sizes configurable.
-6. **Delivery experience**: Linux one-click installer and systemd unit, plus continued bilingual docs and sample data.
+1. **Security and governance**: data-plane auth/RBAC, TLS termination, clustered deployment, monitoring and alerting. The current version should sit behind a reverse proxy.
+2. **OGC completeness**: WMS multi-layer composition, broader SLD symbol/filter support, more conformance classes and automated tests.
+3. **Performance**: parallelize resampling/palette loops, add an output cache for WMS GetMap, make rayon and MBTiles pool sizes configurable.
+4. **Delivery experience**: Linux one-click installer and systemd unit, plus sample data.
 
 ---
 

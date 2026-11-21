@@ -120,7 +120,6 @@ MBTiles 同时支持 PNG/JPEG/WebP 栅格与 gzip pbf 矢量包，TMS 行号自�
 | **Shapefile（`.shp`）** | ✅ 导入 PostGIS | **动态 MVT** / WMS / WFS / OAF | 管理后台「导入 SHP」→ `postgis_table` |
 | **FileGDB（`.gdb`）** | ✅ 转换入 PostGIS | **动态 MVT** / WMS / WFS / OAF | 专用转换工具 → `postgis_table`；缓存内 `Status.gdb` 是状态库非数据源 |
 | 静态 MVT 瓦片目录 | ⚠️ 仅发现 | **不可发布**（无 SourceKind） | — |
-| Esri `.mmpk` | ❌ 不支持 | 需取出内部 COG | — |
 
 > 格式能力以 `GET /admin/capabilities` 的 `data_type_caps` 为权威矩阵（描述**静态数据源**的直接发布）。Shapefile / FileGDB 走「转入 PostGIS → 动态 MVT」迁移链路，入库后按 `postgis_table` 参与发布矩阵。
 
@@ -301,12 +300,10 @@ HTTP (axum 0.8 / tokio)     mapserver/services/map-api
 
 以下为路线图方向，不承诺具体时间表：
 
-1. **换机不碎（P1）**：运行期发布的服务把 `source.path` 规约为 `${DATA_ROOT}` 相对存储，serve 端按 `data_root` 拼接；files 与 db 两种后端统一。详见 [manager/deploy/data-root.md](manager/deploy/data-root.md)。
-2. **更多数据源**：Shapefile / FileGDB 经转入 PostGIS 后发布动态 MVT；下一步补齐原生读取（免转换）、GeoPackage、ArcGIS 缓存发布链路增强、COG JPEG/WEBP 瓦片解码与写入。
-3. **安全与治理**：数据面鉴权/RBAC、TLS 终结、集群部署与监控告警；当前版本建议置于反向代理之后。
-4. **OGC 完整性**：WMS 多图层合成、SLD 更多符号与过滤能力、更多 conformance class 与自动化测试。
-5. **性能持续调优**：重采样/调色板并行化、WMS GetMap 输出缓存、rayon 池与 MBTiles 连接池可配置化。
-6. **交付体验**：Linux 一键安装包与 systemd 单元、双语文档与示例数据同步完善。
+1. **安全与治理**：数据面鉴权/RBAC、TLS 终结、集群部署与监控告警；当前版本建议置于反向代理之后。
+2. **OGC 完整性**：WMS 多图层合成、SLD 更多符号与过滤能力、更多 conformance class 与自动化测试。
+3. **性能持续调优**：重采样/调色板并行化、WMS GetMap 输出缓存、rayon 池与 MBTiles 连接池可配置化。
+4. **交付体验**：Linux 一键安装包与 systemd 单元、示例数据。
 
 ---
 
