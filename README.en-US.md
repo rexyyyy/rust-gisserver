@@ -1,10 +1,19 @@
 # rust-gisserver
 
-[English](README.en-US.md) | [中文](README.md)
+|                            |                 |
+| -------------------------- | --------------- |
+| [English](README.en-US.md) | [中文](README.md) |
 
 > **First things first: rust-gisserver serves a very wide range of service types.** One engine provides WMS 1.1.1/1.3.0, WMTS 1.0.0, TMS/XYZ, MVT vector tiles (including dynamic PostGIS vectors), WFS, OGC API - Features, OGC API - Tiles, 3D Tiles/terrain pass-through, plus direct reads of COG / PMTiles / MBTiles / ArcGIS compact caches (`.tpk`/`.tpkx`). It also handles CGCS2000, Gauss-Kruger 3°/6° zones and UTM with identity-path output and optional PROJ reprojection.
 
-**rust-gisserver** is built in Rust: **low runtime footprint, high performance and high concurrency**. It aims to be a new benchmark for open GIS servers. Core byte-level paths (TIFF/COG parsing, tile decoding, MVT encoding, PMTiles archive I/O, projection) are implemented independently from public format specifications, without heavy GDAL C bindings. PROJ is an optional runtime backend and the server falls back to built-in projection paths when it is absent.
+**rust-gisserver** is built in Rust: **low runtime footprint, high performance and high concurrency**. It is a new benchmark for open GIS servers, designed for domestic coordinate systems (CGCS2000 / Gauss-Kruger) and large-scale concurrency. Core byte-level paths (TIFF/COG parsing, tile decoding, MVT encoding, PMTiles archive I/O, projection) are implemented from public format specifications, without heavy GDAL C bindings. PROJ is an optional runtime backend and the server falls back to built-in projection paths when it is absent.
+
+> **Four pillars of advancement (migration-friendly):**
+> ① **Smooth migration of traditional tile formats** — XYZ/TMS directories, MBTiles and PMTiles mount directly, **no re-tiling, no format conversion**;
+> ② **ArcGIS compact caches read as-is** — Server cache directories, `.tpk` (compact v1), `.tpkx` (compact v2) and gis-wt `.webpdle` (WTC v1) through one read path;
+> ③ **Direct serving of modern COG** — byte-range HTTP Range delivery, **no tiling pipeline, no preprocessing**;
+> ④ **High-performance dynamic MVT from PostGIS** — vector tiles generated live from spatial tables/views, **change the DB, change the map**.
+> See [Advanced data compatibility and migration](#advanced-data-compatibility-and-migration).
 
 ## Three components
 
@@ -17,11 +26,11 @@ rust-gisserver/
 └── installscript/ # PostgreSQL/PostGIS and installer assets, SQL baselines
 ```
 
-| Component | Role | Description | License |
-|---|---|---|---|
-| **gisserver** | Core library | Pure Rust data/protocol layer: COG/BigTIFF, tile rendering, MVT, PMTiles/MBTiles, WMS/WFS/OGC API, projection, PostGIS sources, path encoding | MIT OR Apache-2.0 |
-| **mapserver** | Map server | Ready-to-run HTTP services: WMS / WMTS / TMS / XYZ / MVT / PMTiles / MBTiles / COG / WFS / OGC API / 3D Tiles; five-stage cache + optional disk L2 | AGPL-3.0-only + commercial exception |
-| **manager** | Admin console | Web console: service catalog, publishing wizard (CRS/bbox validation), runtime monitoring, styles, cache and audit logs | AGPL-3.0-only + commercial exception |
+| Component     | Role          | Description                                                                                                                                        | License                              |
+| ------------- | ------------- | -------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------ |
+| **gisserver** | Core library  | Pure Rust data/protocol layer: COG/BigTIFF, tile rendering, MVT, PMTiles/MBTiles, WMS/WFS/OGC API, projection, PostGIS sources, path encoding      | MIT OR Apache-2.0                    |
+| **mapserver** | Map server    | Ready-to-run HTTP services: WMS / WMTS / TMS / XYZ / MVT / PMTiles / MBTiles / COG / WFS / OGC API / 3D Tiles; five-stage cache + optional disk L2 | AGPL-3.0-only + commercial exception |
+| **manager**   | Admin console | Web console: service catalog, publishing wizard (CRS/bbox validation), runtime monitoring, styles, cache and audit logs                            | AGPL-3.0-only + commercial exception |
 
 > Licensing: **gisserver** is dual-licensed MIT OR Apache-2.0 and may be closed-source/commercial without a license fee. **mapserver** and **manager** are AGPL-3.0-only with a **Commercial License Exception**: internal use, personal study and open-source integration are free; SaaS or closed-source commercial integration requires a commercial license (see the end of [mapserver/LICENSE](mapserver/LICENSE) / [manager/LICENSE](manager/LICENSE), contact rex yang <13556388@qq.com>).
 
@@ -37,16 +46,69 @@ See [mapserver/README.md](mapserver/README.md) for measurements and implementati
 
 ---
 
+## Advanced data compatibility and migration
+
+In one sentence: **your existing tile assets can be served without re-tiling, conversion or GDAL; new data goes straight to COG reads and dynamic PostGIS MVT — zero preprocessing end to end.** The four pillars in detail:
+
+### 1) Traditional tile formats: smooth migration, no re-tiling
+
+| Existing asset | Migration path | Services gained immediately |
+| --- | --- | --- |
+| `z/x/y.{png,jpg,pbf}` directory trees | Drop into a layer directory and discover | XYZ / TMS / WMTS (top-origin / bottom-origin y-flip automatic) |
+| MBTiles (SQLite tile packages) | Read-only direct access, pooled connections + `prepare_cached` | All front ends: XYZ / TMS / WMTS / MVT |
+| PMTiles v3 archives | Whole-archive HTTP Range delivery | `/pmtiles/{name}` and `pmtiles://` clients |
+| Static `z/x/y` tile directories | Optionally pack into PMTiles | Hilbert clustering, blob dedup, gzip re-encoding |
+
+MBTiles supports both PNG/JPEG/WebP raster and gzipped pbf vector packages with automatic TMS row flipping; publishing one archive yields every tile front end — no per-protocol re-tiling.
+
+### 2) ArcGIS compact caches: four forms, one read path
+
+Historical ArcGIS assets are **read as-is** — no unpack-and-retile, no format conversion:
+
+| Form | Carrier | Byte layout | Grid config |
+| --- | --- | --- | --- |
+| ArcGIS Server cache directory | Directory | compact v1 / v2 | `Conf.xml` + `conf.cdi` |
+| `.tpk` tile package | ZIP | compact v1 (separate `.bundlx`, column-major) | `Conf.xml` + `conf.cdi` |
+| `.tpkx` (Pro Compact Tile Package) | ZIP | compact v2 (embedded index, row-major) | `root.json` |
+| gis-wt `.webpdle` (WTC v1, native) | Directory | WTC v1 sparse index | `Conf.xml` + `conf.cdi` |
+
+- **One logic**: all four normalize their grid scheme into `gisserver::arcgis_cache::definition::CacheDefinition`; differences are limited to directory layout and tile byte layout, so there is a single tile-reading implementation.
+- **Definition reuse**: keyed by a content fingerprint (CRS, origin, tile size, DPI, LODs, PacketSize, tile root). One grid can back datasets with different extents and still share a record.
+- **One-click import**: `POST /admin/import-tpk` performs unpack → cache-root promotion → atomic publish into `data_root/arcgis_tpk/`; a temp directory plus atomic rename leaves no half-finished output, and re-importing the same name overwrites with rollback.
+- **Verified samples**: `road.tpk` (EPSG:4490, compact v1, L00–L08) and `bai.tpkx` (EPSG:4522, compact v2, L00–L04) are both recognized as `arcgis` by `/admin/discover` and publishable after import.
+
+Format details: [docs/arcgis-cache-formats.md](docs/arcgis-cache-formats.md). Publishing steps: [ArcGIS cache guide](docs/services/arcgis-cache.en-US.md).
+
+### 3) Modern COG: direct serving, no tiling pipeline
+
+- Cloud Optimized GeoTIFF read directly from local paths or HTTP(S) / S3 pre-signed URLs via **HTTP Range 206** byte requests; QGIS / rasterio can open it remotely and GB-scale imagery is never loaded whole into memory.
+- In-house TIFF / BigTIFF parser (IFD chains, overview-pyramid selection, rayon parallel decoding), **without GDAL or other heavy C bindings**.
+- One COG serves WMS / WMTS / TMS / XYZ simultaneously, avoiding the long "tile → import → publish" pipeline; `/cog/{layer}` offers a zero-decode pass-through endpoint.
+- Compatible with CGCS2000, Gauss-Kruger 3°/6° zones and UTM; identity output in the source CRS, optional PROJ backend for cross-CRS transforms.
+
+### 4) High-performance dynamic MVT tiles from PostGIS
+
+- **Change the DB, change the map**: generate MVT vector tiles live from PostGIS tables, views or SQL expressions — no pre-tiling, no cache-directory refresh.
+- **Dual CRS endpoints**: `/{z}/{x}/{y}.pbf` (EPSG:3857) and `/{srid}/{z}/{x}/{y}.pbf` (source CRS units, e.g. 4543 metres or 4326 degrees, with no server-side `ST_Transform`); TileJSON declares bounds/crs/grid per endpoint.
+- **Built for concurrency**: connection pools shared per DSN, PG≥11 / PostGIS≥3.0 version preflight, GiST index self-check at startup; bbox pre-filtering before encoding, `ST_SimplifyPreserveTopology` at low zooms; output-cache hits around 16–25 ms with optional disk L2 surviving restarts.
+- **Publish without new tables**: `from` expressions publish SQL/view layers directly; bounds/count use statistics estimates with automatic fallback to exact scans.
+
+Publishing and tuning: [MVT guide](docs/services/mvt.en-US.md) and [architecture notes](docs/architecture.md).
+
+> **Why this is more advanced**: traditional GIS servers treat format conversion + pyramid tiling + import as prerequisites to publishing, and any data change reruns the whole chain. rust-gisserver implements the byte layer in-house and faces existing assets (traditional tiles, ArcGIS compact caches) and modern standards (COG, dynamic PostGIS MVT) head-on: **zero re-tiling to migrate, zero preprocessing for new data, publish-and-serve**. Combined with pure-Rust zero-heavy-dependency design, the five-stage cache, positional reads and the `spawn_blocking` concurrency model, it delivers compatibility and performance together for domestic CRS and high-concurrency scenarios.
+
+---
+
 ## Install on Linux
 
 ### 1) Docker (recommended)
 
 Deployment entries are split by language × platform. On Linux use:
 
-| Directory | Compose project | First-run DB seed |
-|---|---|---|
+| Directory                     | Compose project          | First-run DB seed        |
+| ----------------------------- | ------------------------ | ------------------------ |
 | `manager/deploy_zh-cn/linux/` | `gis-data-base-zh-linux` | `system.sql` → `map.sql` |
-| `manager/deploy_en/linux/` | `gis-data-base-en-linux` | `.en_US` seeds |
+| `manager/deploy_en/linux/`    | `gis-data-base-en-linux` | `.en_US` seeds           |
 
 Both projects use the same ports (6180 / 8080 / `MAPSERVER_DB_PORT`, default 5434), so **they cannot run at the same time**. Volumes are isolated per project, so switching language does not need `down -v`.
 
@@ -65,7 +127,7 @@ docker compose ps
 docker compose logs -f map-api
 ```
 
-Open: admin console <http://localhost:6180/>, map API health <http://localhost:8080/health>, WMS capabilities <http://localhost:8080/wms?service=WMS&request=GetCapabilities>.
+Open: admin console <http://localhost:6180/>, map API health <http://localhost:8080/health>, WMS capabilities <http://localhost:8080/wms?service=WMS\&request=GetCapabilities>.
 
 `GISDATA_DIR` (default `./gisdata`) is mounted read-only at map-api `/app/data`. Put layer XML files in the deploy config template `config/mapserver/` and reference data as `/app/data/...`. See [manager/deploy/README.md](manager/deploy/README.md).
 
@@ -180,6 +242,7 @@ Admin plane                 manager/backend (axum) + manager/ui (Vue 3 + Vite + 
 - Layer configuration is XML, one layer per file, under `<catalog.root>/<kind>/`. The admin plane writes the same location with syntax validation, `.xml.bak` backup and reload rollback.
 - `RangeSource` is the single read seam: local files, HTTP(S) objects and S3 pre-signed URLs all use positional reads.
 
+
 Layering, data flows, concurrency and cache conventions: [docs/architecture.md](docs/architecture.md).
 
 ---
@@ -188,12 +251,14 @@ Layering, data flows, concurrency and cache conventions: [docs/architecture.md](
 
 Recommended flow: **workspace → data-source Store → discover data layer → publishing wizard (select service types) → published-service preview / copy endpoints**. Under the hood manager calls map-api `/admin/services` to write layer XML and hot-reload.
 
+**Migration and dynamic data first**: existing XYZ/TMS tile directories, MBTiles/PMTiles archives and ArcGIS compact caches mount and publish directly ([migration capabilities](#1-traditional-tile-formats-smooth-migration-no-re-tiling)); for new data, prefer COG reads (raster) and dynamic PostGIS MVT (vector) — change the DB, change the map, no pre-tiling.
+
 | Service | Publishable sources | Details | Operation guide |
 |---|---|---|---|
 | **WMS** 1.1.1/1.3.0 | COG, GeoJSON, PostGIS tables | [WMS guide](docs/services/wms.en-US.md) | [Steps](docs/services/wms.en-US.md#operation-guide-admin-ui) |
 | **WMTS** 1.0.0 | COG, GeoJSON, raster PMTiles/MBTiles, ArcGIS cache | [WMTS guide](docs/services/wmts.en-US.md) | [Steps](docs/services/wmts.en-US.md#operation-guide-admin-ui) |
-| **XYZ / TMS** | Same as WMTS; Leaflet/MapLibre/legacy TMS | [XYZ/TMS guide](docs/services/xyz-tms.en-US.md) | [Steps](docs/services/xyz-tms.en-US.md#operation-guide-admin-ui) |
-| **MVT** vector tiles | GeoJSON, PostGIS, vector PMTiles/MBTiles | [MVT guide](docs/services/mvt.en-US.md) | [Steps](docs/services/mvt.en-US.md#operation-guide-admin-ui) |
+| **XYZ / TMS** | Same as WMTS; legacy `z/x/y` tile directories migrate with no re-tiling | [XYZ/TMS guide](docs/services/xyz-tms.en-US.md) | [Steps](docs/services/xyz-tms.en-US.md#operation-guide-admin-ui) |
+| **MVT** vector tiles | **Dynamic from PostGIS**, GeoJSON, vector PMTiles/MBTiles | [MVT guide](docs/services/mvt.en-US.md) | [Steps](docs/services/mvt.en-US.md#operation-guide-admin-ui) |
 | **WFS** 2.0/1.1/1.0 | GeoJSON, PostGIS tables | [WFS guide](docs/services/wfs.en-US.md) | [Steps](docs/services/wfs.en-US.md#operation-guide-admin-ui) |
 | **OGC API - Features** | GeoJSON, PostGIS tables | [OAF guide](docs/services/oaf.en-US.md) | [Steps](docs/services/oaf.en-US.md#operation-guide-admin-ui) |
 | **OGC API - Tiles** | COG, GeoJSON, raster archives, ArcGIS cache | [OAT guide](docs/services/oat.en-US.md) | [Steps](docs/services/oat.en-US.md#operation-guide-admin-ui) |
@@ -211,7 +276,7 @@ All guides: [中文](docs/services/README.zh-CN.md) / [English](docs/services/RE
 Roadmap directions, without a fixed schedule:
 
 1. **Portable deployments (P1)**: store runtime-published `source.path` as `${DATA_ROOT}`-relative paths and resolve them against `data_root` at serve time, for both file and DB backends. See [manager/deploy/data-root.md](manager/deploy/data-root.md).
-2. **More data sources**: static Shapefile / GeoPackage readers, stronger ArcGIS-cache publishing, COG JPEG/WEBP tile decoding and writing.
+2. **More data sources**: building on support already shipped for traditional tile migration, ArcGIS compact caches, direct COG reads and dynamic PostGIS MVT — continue with static Shapefile / GeoPackage readers, stronger ArcGIS-cache publishing, and COG JPEG/WEBP tile decoding and writing.
 3. **Security and governance**: data-plane auth/RBAC, TLS termination, clustered deployment, monitoring and alerting. The current version should sit behind a reverse proxy.
 4. **OGC completeness**: WMS multi-layer composition, broader SLD symbol/filter support, more conformance classes and automated tests.
 5. **Performance**: parallelize resampling/palette loops, add an output cache for WMS GetMap, make rayon and MBTiles pool sizes configurable.

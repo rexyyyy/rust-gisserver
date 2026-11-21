@@ -1,10 +1,19 @@
 # rust-gisserver
 
-[English](README.en-US.md) | [中文](README.md)
+|                            |                 |
+| -------------------------- | --------------- |
+| [English](README.en-US.md) | [中文](README.md) |
 
 > **先说重点：rust-gisserver 支持的服务类型非常多。** 一套引擎同时提供 WMS 1.1.1/1.3.0、WMTS 1.0.0、TMS/XYZ、MVT 矢量瓦片（含 PostGIS 动态矢量）、WFS、OGC API - Features、OGC API - Tiles、3D Tiles/terrain 直通，以及 COG / PMTiles / MBTiles / ArcGIS 紧凑缓存（`.tpk`/`.tpkx`）直读；并面向 CGCS2000、高斯-克吕格 3°/6° 分带、UTM 等中国常用坐标系提供恒等直出与可选 PROJ 跨坐标转换。
 
-**rust-gisserver** 基于 Rust 开发，**运行资源占用低、运行性能很高、并发量很大**，目标是成为新一代开放 GIS 服务器标杆产品。核心字节码路径（TIFF/COG 解析、瓦片解码、MVT 编码、PMTiles 归档读写、投影）均依据公开格式规范独立实现，不依赖 GDAL 等重型 C 绑定；PROJ 仅作为可选运行时后端，缺失时自动降级到内置投影路径。
+**rust-gisserver** 基于 Rust 开发，**运行资源占用低、运行性能很高、并发量很大**，是面向国产化坐标系与大规模并发场景的新一代开放 GIS 服务器标杆产品。核心字节码路径（TIFF/COG 解析、瓦片解码、MVT 编码、PMTiles 归档读写、投影）均依据公开格式规范，不依赖 GDAL 等重型 C 绑定；PROJ 仅作为可选运行时后端，缺失时自动降级到内置投影路径。
+
+> **四个先进性支点（迁移友好）：**
+> ① **传统瓦片格式平滑迁移** —— XYZ/TMS 目录、MBTiles、PMTiles 直接挂接，**不重切图、不转格式**；
+> ② **ArcGIS 紧凑缓存原样读取** —— Server 缓存目录、`.tpk`（compact v1）、`.tpkx`（compact v2）、gis-wt `.webpdle`（WTC v1）一套逻辑通吃；
+> ③ **新型 COG 直接服务** —— HTTP Range 按字节直出，**无需切片入库、无需预处理**；
+> ④ **基于 PostGIS 的高性能动态 MVT** —— 空间表/视图实时生成矢量瓦片，**改库即改图**。
+> 详见 [先进性与数据兼容（迁移友好）](#先进性与数据兼容迁移友好)。
 
 ## 三组件结构
 
@@ -17,11 +26,11 @@ rust-gisserver/
 └── installscript/ # PostgreSQL/PostGIS 与服务安装资产、SQL 基线
 ```
 
-| 组件 | 角色 | 说明 | 许可证 |
-|---|---|---|---|
-| **gisserver** | 核心库 | 纯 Rust 数据与协议层：COG/BigTIFF 解析与写入、瓦片渲染、MVT 编码、PMTiles/MBTiles 归档、WMS/WFS/OGC API 协议、投影、PostGIS 数据源、路径编码推断 | MIT OR Apache-2.0 |
+| 组件            | 角色    | 说明                                                                                                                                 | 许可证                    |
+| ------------- | ----- | ---------------------------------------------------------------------------------------------------------------------------------- | ---------------------- |
+| **gisserver** | 核心库   | 纯 Rust 数据与协议层：COG/BigTIFF 解析与写入、瓦片渲染、MVT 编码、PMTiles/MBTiles 归档、WMS/WFS/OGC API 协议、投影、PostGIS 数据源、路径编码推断                            | MIT OR Apache-2.0      |
 | **mapserver** | 地图服务器 | 开箱即用的 HTTP 服务：WMS / WMTS / TMS / XYZ / MVT / PMTiles / MBTiles / COG / WFS / OGC API / 3D Tiles；五段缓存 + 可选磁盘 L2；预览与 UI 由 manager 托管 | AGPL-3.0-only + 商业授权例外 |
-| **manager** | 管理控制台 | Web 控制台：服务目录管理、地图服务发布向导（坐标系/范围校验）、运行时监控、样式管理、缓存管理、日志审计 | AGPL-3.0-only + 商业授权例外 |
+| **manager**   | 管理控制台 | Web 控制台：服务目录管理、地图服务发布向导（坐标系/范围校验）、运行时监控、样式管理、缓存管理、日志审计                                                                             | AGPL-3.0-only + 商业授权例外 |
 
 > 许可说明：核心库 **gisserver** 采用 MIT OR Apache-2.0 双许可，可自由闭源/商用集成；**mapserver** 与 **manager** 在 AGPL-3.0-only 基础上附**商业授权例外**——内部使用/个人学习/开源集成免费，SaaS 服务或闭源商业集成需购买商业授权（条款见 [mapserver/LICENSE](mapserver/LICENSE) / [manager/LICENSE](manager/LICENSE) 末尾，咨询 rex yang <13556388@qq.com>）。
 
@@ -37,16 +46,69 @@ rust-gisserver/
 
 ---
 
+## 先进性与数据兼容（迁移友好）
+
+一句话概括：**已有的瓦片资产不用重切、不用转格式、不用上 GDAL，挂上就能服务；新数据走 COG 直读与 PostGIS 动态出图，全程零预处理。** 四个支点展开如下。
+
+### 1) 传统瓦片格式：平滑迁移，不重切图
+
+| 已有资产 | 迁移方式 | 直接获得的服务 |
+| --- | --- | --- |
+| `z/x/y.{png,jpg,pbf}` 标准目录树 | 放入图层目录即可发现 | XYZ / TMS / WMTS（顶行/底行 y-flip 自动处理） |
+| MBTiles（SQLite 瓦片包） | 只读直读，内置连接池 + `prepare_cached` | XYZ / TMS / WMTS / MVT 全部前端 |
+| PMTiles v3 归档 | HTTP Range 整档直出 | `/pmtiles/{name}` 与 `pmtiles://` 客户端直连 |
+| 静态 `z/x/y` 瓦片目录 | 可选打包为 PMTiles | Hilbert 聚类、blob 去重、gzip 重编码 |
+
+MBTiles 同时支持 PNG/JPEG/WebP 栅格与 gzip pbf 矢量包，TMS 行号自动翻转；一个归档发布即获得全部瓦片前端，无需为每种协议各切一套。
+
+### 2) ArcGIS 紧凑缓存：四类形态，一套读取逻辑
+
+对历史 ArcGIS 资产做到**原样读取**——不解压重切、不转换格式：
+
+| 形态 | 载体 | 字节布局 | 网格配置 |
+| --- | --- | --- | --- |
+| ArcGIS Server 缓存目录 | 目录 | compact v1 / v2 | `Conf.xml` + `conf.cdi` |
+| `.tpk` 瓦片包 | ZIP | compact v1（独立 `.bundlx`、列优先） | `Conf.xml` + `conf.cdi` |
+| `.tpkx`（Pro Compact Tile Package） | ZIP | compact v2（索引内嵌、行优先） | `root.json` |
+| gis-wt `.webpdle`（WTC v1，自有） | 目录 | WTC v1 稀疏索引 | `Conf.xml` + `conf.cdi` |
+
+- **一套逻辑**：四类形态的网格方案统一归一为 `gisserver::arcgis_cache::definition::CacheDefinition`；差异只在目录布局与瓦片字节布局，读瓦片代码只有一套。
+- **定义记录复用**：按内容指纹（CRS、原点、瓦片尺寸、DPI、LOD、PacketSize、瓦片根目录名）复用；同一套网格装不同范围的数据也共享记录，不重复建条目。
+- **一键导入**：`POST /admin/import-tpk` 完成解压 → 提升缓存根 → 原子发布到 `data_root/arcgis_tpk/`；临时目录 + 原子改名，失败不留半成品，同名重导覆盖且可回滚。
+- **实测样本**：`road.tpk`（EPSG:4490，compact v1，L00–L08）、`bai.tpkx`（EPSG:4522，compact v2，L00–L04）导入后均被 `/admin/discover` 识别为 `arcgis` 且可发布。
+
+格式细节见 [docs/arcgis-cache-formats.md](docs/arcgis-cache-formats.md)，发布操作见 [ArcGIS 缓存指南](docs/services/arcgis-cache.zh-CN.md)。
+
+### 3) 新型 COG：直接服务，无需切片入库
+
+- Cloud Optimized GeoTIFF 直接读取：本地路径或 HTTP(S) / S3 预签名 URL，走 **HTTP Range 206** 按字节取数据，QGIS / rasterio 可远程打开，GB 级影像不整读进内存。
+- 自研 TIFF / BigTIFF 解析（经典 TIFF 与 BigTIFF 的 IFD 链、overview 金字塔选层、rayon 并行解码），**无 GDAL 等重型 C 绑定**。
+- 一份 COG 同时服务 WMS / WMTS / TMS / XYZ，避免"先切片、再入库、再发布"的冗长链路；`/cog/{layer}` 提供零解码直通端点。
+- 兼容 CGCS2000、高斯-克吕格 3°/6° 分带、UTM 等常用坐标系；同坐标系恒等直出，跨坐标系交给可选 PROJ 后端。
+
+### 4) 基于 PostGIS 的高性能动态 MVT 瓦片
+
+- **改库即改图**：从 PostGIS 空间表、视图或 SQL 表达式实时生成 MVT 矢量瓦片，无需预切瓦片、无需刷新缓存目录。
+- **双坐标接口**：`/{z}/{x}/{y}.pbf`（EPSG:3857）与 `/{srid}/{z}/{x}/{y}.pbf`（源 CRS 自身单位，如 4543 米、4326 度，服务端不做 `ST_Transform`）；TileJSON 按接口分别宣告 bounds/crs/grid。
+- **为高并发而设计**：按 DSN 共享连接池，版本预检 PG≥11 / PostGIS≥3.0，启动自检 GiST 索引；编码前按瓦片 bbox 预过滤，低 z 用 `ST_SimplifyPreserveTopology` 分级简化；输出缓存命中约 16–25ms，可选磁盘 L2 跨重启保留。
+- **免落表发布**：`from` 表达式直接发布 SQL / 视图图层；bounds/count 走统计估计，缺失自动回退精确扫描。
+
+发布与调优见 [MVT 指南](docs/services/mvt.zh-CN.md) 与 [架构说明](docs/architecture.md)。
+
+> **为什么这更先进**：传统 GIS 服务器把"格式转换 + 金字塔切片 + 入库"当作发布前置条件，数据一变就要重跑整条链路。rust-gisserver 把字节层做到自研，直接面向已有资产（传统瓦片、ArcGIS 紧凑缓存）与新型标准（COG、PostGIS 动态 MVT）：**迁移零重切、新数据零预处理、发布即服务**；叠加纯 Rust 的零重型依赖、五段缓存、定位读与 `spawn_blocking` 并发模型，在国产化坐标系与大规模并发场景下兼具兼容性与性能优势。
+
+---
+
 ## Linux 安装
 
 ### 1) Docker 方式（推荐）
 
 部署入口按「语言 × 平台」拆分，Linux 宿主机用：
 
-| 目录 | compose 项目名 | 首建库种子 |
-|---|---|---|
+| 目录                            | compose 项目名              | 首建库种子                    |
+| ----------------------------- | ------------------------ | ------------------------ |
 | `manager/deploy_zh-cn/linux/` | `gis-data-base-zh-linux` | `system.sql` → `map.sql` |
-| `manager/deploy_en/linux/` | `gis-data-base-en-linux` | `.en_US` 版种子 |
+| `manager/deploy_en/linux/`    | `gis-data-base-en-linux` | `.en_US` 版种子             |
 
 两个项目端口相同（6180 / 8080 / `MAPSERVER_DB_PORT` 默认 5434），**不能同时运行**；卷按项目名隔离，切换语言不需要 `down -v`。
 
@@ -65,7 +127,7 @@ docker compose ps
 docker compose logs -f map-api
 ```
 
-访问：管理后台 <http://localhost:6180/>，地图服务健康 <http://localhost:8080/health>，WMS 能力 <http://localhost:8080/wms?service=WMS&request=GetCapabilities>。
+访问：管理后台 <http://localhost:6180/>，地图服务健康 <http://localhost:8080/health>，WMS 能力 <http://localhost:8080/wms?service=WMS\&request=GetCapabilities>。
 
 数据挂载点 `GISDATA_DIR`（默认 `./gisdata`）只读挂到 map-api 的 `/app/data`；把图层 XML 放进部署模板 `config/mapserver/`，数据路径写 `/app/data/...` 即可。详见 [manager/deploy/README.md](manager/deploy/README.md)。
 
@@ -188,17 +250,19 @@ HTTP (axum 0.8 / tokio)     mapserver/services/map-api
 
 发布主链路（推荐）：**工作空间 → 数据源 Store → 发现数据图层 → 发布向导勾选服务类型 → 已发布服务预览/复制端点**。底层由 manager 调 map-api 的 `/admin/services` 写图层 XML 并热重载。
 
-| 服务类型 | 可发布的数据来源 | 详细说明 | 操作说明 |
-|---|---|---|---|
-| **WMS** 1.1.1/1.3.0 | COG、GeoJSON、PostGIS 空间表 | [WMS 指南](docs/services/wms.zh-CN.md) | [发布步骤](docs/services/wms.zh-CN.md#操作说明管理后台) |
-| **WMTS** 1.0.0 | COG、GeoJSON、栅格 PMTiles/MBTiles、ArcGIS 缓存 | [WMTS 指南](docs/services/wmts.zh-CN.md) | [发布步骤](docs/services/wmts.zh-CN.md#操作说明管理后台) |
-| **XYZ / TMS** | 同 WMTS；Leaflet/MapLibre/老 TMS 客户端 | [XYZ/TMS 指南](docs/services/xyz-tms.zh-CN.md) | [发布步骤](docs/services/xyz-tms.zh-CN.md#操作说明管理后台) |
-| **MVT** 矢量瓦片 | GeoJSON、PostGIS、矢量 PMTiles/MBTiles | [MVT 指南](docs/services/mvt.zh-CN.md) | [发布步骤](docs/services/mvt.zh-CN.md#操作说明管理后台) |
-| **WFS** 2.0/1.1/1.0 | GeoJSON、PostGIS 空间表 | [WFS 指南](docs/services/wfs.zh-CN.md) | [发布步骤](docs/services/wfs.zh-CN.md#操作说明管理后台) |
-| **OGC API - Features** | GeoJSON、PostGIS 空间表 | [OAF 指南](docs/services/oaf.zh-CN.md) | [发布步骤](docs/services/oaf.zh-CN.md#操作说明管理后台) |
-| **OGC API - Tiles** | COG、GeoJSON、栅格归档、ArcGIS 缓存 | [OAT 指南](docs/services/oat.zh-CN.md) | [发布步骤](docs/services/oat.zh-CN.md#操作说明管理后台) |
-| **3D Tiles** | `tileset.json` 目录（OSGB 需先转 3D Tiles） | [3D Tiles 指南](docs/services/3dtiles.zh-CN.md) | [发布步骤](docs/services/3dtiles.zh-CN.md#操作说明管理后台) |
-| **ArcGIS 缓存** | `Conf.xml` 缓存目录、`.tpk`、`.tpkx` | [ArcGIS 缓存指南](docs/services/arcgis-cache.zh-CN.md) | [发布步骤](docs/services/arcgis-cache.zh-CN.md#操作说明管理后台) |
+**迁移与动态数据优先**：既有 XYZ/TMS 瓦片目录、MBTiles/PMTiles 归档、ArcGIS 紧凑缓存可直接挂接发布（[迁移能力](#1-传统瓦片格式平滑迁移不重切图)）；新数据推荐 COG 直读（栅格）与 PostGIS 动态 MVT（矢量），改库即改图，无需预切瓦片。
+
+| 服务类型                   | 可发布的数据来源                                 | 详细说明                                               | 操作说明                                                 |
+| ---------------------- | ---------------------------------------- | -------------------------------------------------- | ---------------------------------------------------- |
+| **WMS** 1.1.1/1.3.0    | COG、GeoJSON、PostGIS 空间表                  | [WMS 指南](docs/services/wms.zh-CN.md)               | [发布步骤](docs/services/wms.zh-CN.md#操作说明管理后台)          |
+| **WMTS** 1.0.0         | COG、GeoJSON、栅格 PMTiles/MBTiles、ArcGIS 缓存 | [WMTS 指南](docs/services/wmts.zh-CN.md)             | [发布步骤](docs/services/wmts.zh-CN.md#操作说明管理后台)         |
+| **XYZ / TMS**          | 同 WMTS；传统 `z/x/y` 瓦片目录免重切迁移        | [XYZ/TMS 指南](docs/services/xyz-tms.zh-CN.md)       | [发布步骤](docs/services/xyz-tms.zh-CN.md#操作说明管理后台)      |
+| **MVT** 矢量瓦片           | **PostGIS 动态生成**、GeoJSON、矢量 PMTiles/MBTiles | [MVT 指南](docs/services/mvt.zh-CN.md)               | [发布步骤](docs/services/mvt.zh-CN.md#操作说明管理后台)          |
+| **WFS** 2.0/1.1/1.0    | GeoJSON、PostGIS 空间表                      | [WFS 指南](docs/services/wfs.zh-CN.md)               | [发布步骤](docs/services/wfs.zh-CN.md#操作说明管理后台)          |
+| **OGC API - Features** | GeoJSON、PostGIS 空间表                      | [OAF 指南](docs/services/oaf.zh-CN.md)               | [发布步骤](docs/services/oaf.zh-CN.md#操作说明管理后台)          |
+| **OGC API - Tiles**    | COG、GeoJSON、栅格归档、ArcGIS 缓存               | [OAT 指南](docs/services/oat.zh-CN.md)               | [发布步骤](docs/services/oat.zh-CN.md#操作说明管理后台)          |
+| **3D Tiles**           | `tileset.json` 目录（OSGB 需先转 3D Tiles）     | [3D Tiles 指南](docs/services/3dtiles.zh-CN.md)      | [发布步骤](docs/services/3dtiles.zh-CN.md#操作说明管理后台)      |
+| **ArcGIS 缓存**          | `Conf.xml` 缓存目录、`.tpk`、`.tpkx`           | [ArcGIS 缓存指南](docs/services/arcgis-cache.zh-CN.md) | [发布步骤](docs/services/arcgis-cache.zh-CN.md#操作说明管理后台) |
 
 > 静态 Shapefile 目录、静态 MVT 瓦片目录可被发现但暂不可发布；PostGIS 普通表（无 geometry 列）仅数据查询，不发布图层服务。权威矩阵来自 `GET /admin/capabilities`。
 
@@ -211,7 +275,7 @@ HTTP (axum 0.8 / tokio)     mapserver/services/map-api
 以下为路线图方向，不承诺具体时间表：
 
 1. **换机不碎（P1）**：运行期发布的服务把 `source.path` 规约为 `${DATA_ROOT}` 相对存储，serve 端按 `data_root` 拼接；files 与 db 两种后端统一。详见 [manager/deploy/data-root.md](manager/deploy/data-root.md)。
-2. **更多数据源**：静态 Shapefile / GeoPackage 读取，ArcGIS 缓存发布链路增强，COG JPEG/WEBP 瓦片解码与写入能力补齐。
+2. **更多数据源**：在已支持传统瓦片格式迁移、ArcGIS 紧凑缓存、COG 直读与 PostGIS 动态 MVT 的基础上，继续补齐静态 Shapefile / GeoPackage 读取、ArcGIS 缓存发布链路增强、COG JPEG/WEBP 瓦片解码与写入。
 3. **安全与治理**：数据面鉴权/RBAC、TLS 终结、集群部署与监控告警；当前版本建议置于反向代理之后。
 4. **OGC 完整性**：WMS 多图层合成、SLD 更多符号与过滤能力、更多 conformance class 与自动化测试。
 5. **性能持续调优**：重采样/调色板并行化、WMS GetMap 输出缓存、rayon 池与 MBTiles 连接池可配置化。
