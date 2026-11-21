@@ -469,8 +469,8 @@ mapserver 默认采用 **AGPL-3.0-only** 授权——这是一种「网络 copyl
 - **创业团队/个人开发者** → 可基于商业授权快速推出垂直 SaaS 产品
 - **整体收购** → 核心库 + 服务端 + 管理后台全栈技术交接
 
-**联系方式**：rex yang <13556388@qq.com>
+**联系方式**：rex yan 853740877@qq.com
 
 ---
 
-Copyright (c) 2026 rex yang <13556388@qq.com> and contributors.
+Copyright (c) 2026 rex yan 853740877@qq.com and contributors.

@@ -62,4 +62,4 @@ cargo test --features full
 
 gisserver 采用 **MIT OR Apache-2.0** 双许可（任选其一），全文见 [LICENSE](LICENSE)。
 
-Copyright (c) 2026 rex yang <13556388@qq.com> and contributors.
+Copyright (c) 2026 rex yan 853740877@qq.com and contributors.

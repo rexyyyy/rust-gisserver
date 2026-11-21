@@ -318,4 +318,4 @@ python tools/check_perm_rules.py
 
 本项目（rust-gisserver）采用 **GNU Affero General Public License v3.0**（SPDX：`AGPL-3.0-only`）授权，全文见 [LICENSE](LICENSE)。
 
-Copyright (c) 2026 rex yang <13556388@qq.com> and contributors.
+Copyright (c) 2026 rex yan 853740877@qq.com and contributors.

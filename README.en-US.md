@@ -32,7 +32,7 @@ rust-gisserver/
 | **mapserver** | Map server    | Ready-to-run HTTP services: WMS / WMTS / TMS / XYZ / MVT / PMTiles / MBTiles / COG / WFS / OGC API / 3D Tiles; five-stage cache + optional disk L2 | AGPL-3.0-only + commercial exception |
 | **manager**   | Admin console | Web console: service catalog, publishing wizard (CRS/bbox validation), runtime monitoring, styles, cache and audit logs                            | AGPL-3.0-only + commercial exception |
 
-> Licensing: **gisserver** is dual-licensed MIT OR Apache-2.0 and may be closed-source/commercial without a license fee. **mapserver** and **manager** are AGPL-3.0-only with a **Commercial License Exception**: internal use, personal study and open-source integration are free; SaaS or closed-source commercial integration requires a commercial license (see the end of [mapserver/LICENSE](mapserver/LICENSE) / [manager/LICENSE](manager/LICENSE), contact rex yang <13556388@qq.com>).
+> Licensing: **gisserver** is dual-licensed MIT OR Apache-2.0 and may be closed-source/commercial without a license fee. **mapserver** and **manager** are AGPL-3.0-only with a **Commercial License Exception**: internal use, personal study and open-source integration are free; SaaS or closed-source commercial integration requires a commercial license (see the end of [mapserver/LICENSE](mapserver/LICENSE) / [manager/LICENSE](manager/LICENSE), contact rex yan 853740877@qq.com).
 
 ## Why it is fast
 
@@ -314,4 +314,4 @@ Roadmap directions, without a fixed schedule:
 - `gisserver/` (core library): **MIT OR Apache-2.0**, see [gisserver/LICENSE](gisserver/LICENSE)
 - `mapserver/` and `manager/`: **AGPL-3.0-only** with a commercial license exception, see each `LICENSE`; third-party notices in [mapserver/THIRD-PARTY-NOTICES.md](mapserver/THIRD-PARTY-NOTICES.md)
 
-Copyright (c) 2026 rex yang <13556388@qq.com> and contributors.
+Copyright (c) 2026 rex yan 853740877@qq.com and contributors.

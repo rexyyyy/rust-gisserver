@@ -32,7 +32,7 @@ rust-gisserver/
 | **mapserver** | 地图服务器 | 开箱即用的 HTTP 服务：WMS / WMTS / TMS / XYZ / MVT / PMTiles / MBTiles / COG / WFS / OGC API / 3D Tiles；五段缓存 + 可选磁盘 L2；预览与 UI 由 manager 托管 | AGPL-3.0-only + 商业授权例外 |
 | **manager**   | 管理控制台 | Web 控制台：服务目录管理、地图服务发布向导（坐标系/范围校验）、运行时监控、样式管理、缓存管理、日志审计                                                                             | AGPL-3.0-only + 商业授权例外 |
 
-> 许可说明：核心库 **gisserver** 采用 MIT OR Apache-2.0 双许可，可自由闭源/商用集成；**mapserver** 与 **manager** 在 AGPL-3.0-only 基础上附**商业授权例外**——内部使用/个人学习/开源集成免费，SaaS 服务或闭源商业集成需购买商业授权（条款见 [mapserver/LICENSE](mapserver/LICENSE) / [manager/LICENSE](manager/LICENSE) 末尾，咨询 rex yang <13556388@qq.com>）。
+> 许可说明：核心库 **gisserver** 采用 MIT OR Apache-2.0 双许可，可自由闭源/商用集成；**mapserver** 与 **manager** 在 AGPL-3.0-only 基础上附**商业授权例外**——内部使用/个人学习/开源集成免费，SaaS 服务或闭源商业集成需购买商业授权（条款见 [mapserver/LICENSE](mapserver/LICENSE) / [manager/LICENSE](manager/LICENSE) 末尾，咨询 rex yan 853740877@qq.com）。
 
 ## 为什么快
 
@@ -313,4 +313,4 @@ HTTP (axum 0.8 / tokio)     mapserver/services/map-api
 - `gisserver/`（核心库）：**MIT OR Apache-2.0** 双许可，见 [gisserver/LICENSE](gisserver/LICENSE)
 - `mapserver/` 与 `manager/`：**AGPL-3.0-only** + 商业授权例外，见各自 `LICENSE`；第三方组件声明见 [mapserver/THIRD-PARTY-NOTICES.md](mapserver/THIRD-PARTY-NOTICES.md)
 
-Copyright (c) 2026 rex yang <13556388@qq.com> and contributors.
+Copyright (c) 2026 rex yan 853740877@qq.com and contributors.
