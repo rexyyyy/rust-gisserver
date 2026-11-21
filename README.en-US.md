@@ -99,6 +99,31 @@ Publishing and tuning: [MVT guide](docs/services/mvt.en-US.md) and [architecture
 
 ---
 
+## Data formats and directory mapping
+
+The system organizes catalogs by source kind: `cog/`, `vector/`, `pmtiles/`, `mbtiles/`, `postgis/`, `3dtiles/`, `terrain/` and `arcgis/`; `mvt/`, `osgb/` and `styles/` are reserved/auxiliary directories. A local test dataset on the author's machine (`E:\data\1`, with a per-format breakdown in its `README.md` §1.1) covers the assets below as migration test cases:
+
+| Format / asset | Support | Publishable services | Sample location (`E:\data\1`) |
+| --- | --- | --- | --- |
+| COG / BigTIFF (`.tif`) | ✅ native | WMS / WMTS / XYZ | `cog/` (real EPSG:4326 imagery + fixture) |
+| GeoJSON | ✅ native (→ `vector/`) | MVT / WMS / WMTS / XYZ / WFS / OAF | `geojson/`, `recon/` |
+| MBTiles (raster / vector) | ✅ native | raster → WMTS/XYZ; vector → MVT | `mbtiles/`, `recon/` |
+| PMTiles (raster / vector) | ✅ native | raster → WMTS/XYZ; vector → MVT | `pmtiles/` |
+| ArcGIS Server cache (compact v1 / v2) | ✅ native (→ `arcgis/`) | WMTS / XYZ | `arcgis_cache/` (3×v1 + 1×v2) |
+| `.tpk` / `.tpkx` compact tile packages | ✅ native (→ `arcgis/`) | WMTS / XYZ after import | `arcgis_tpk/`, `arcgis_cache/` |
+| 3D Tiles (`tileset.json` + `.b3dm`) | ✅ native | `/3dtiles` pass-through | `3dtiles/` (recon / kmczc / kmczc_full) |
+| Quantized-Mesh (`.terrainpack`) | ✅ native pass-through | `/terrain/{name}/layer.json` | `terrain/` |
+| PostGIS spatial tables / views | ✅ native | **Dynamic MVT** / WMS / WFS / OAF | `postgis/` (pg_dump + view export) |
+| Static `z/x/y` tile trees | ⚠️ pack first | WMTS/XYZ after packing to PMTiles/MBTiles | `xyz-tms/` (sample pending) |
+| Raw OSGB photogrammetry | ⚠️ convert first | Publish as 3D Tiles | `osgb/` (sample pending) |
+| Static Shapefile | ⚠️ discover only | **Not publishable** (no shp reader) | `shapefile/` |
+| Static MVT tile directories | ⚠️ discover only | **Not publishable** (no SourceKind) | `mvt/` (reserved) |
+| Esri `.mmpk` / FileGDB `.gdb` | ❌ unsupported | Extract the inner COG first | `cog/cog.mmpk`, `Status.gdb` in cache dirs |
+
+> The authoritative matrix is `data_type_caps` behind `GET /admin/capabilities`; "discoverable" does not mean "publishable". Once an shp reader lands in the gisserver core library, the Shapefile row becomes publishable.
+
+---
+
 ## Install on Linux
 
 ### 1) Docker (recommended)

@@ -99,6 +99,31 @@ MBTiles 同时支持 PNG/JPEG/WebP 栅格与 gzip pbf 矢量包，TMS 行号自�
 
 ---
 
+## 数据格式与目录对照
+
+系统按 catalog 的 kind 组织目录：`cog/`、`vector/`、`pmtiles/`、`mbtiles/`、`postgis/`、`3dtiles/`、`terrain/`、`arcgis/`；`mvt/`、`osgb/`、`styles/` 为预留/辅目录。作者本机测试数据集 `E:\data\1`（其 `README.md` §1.1 有逐格式说明）覆盖下列资产，可作为格式迁移的实测参考：
+
+| 格式 / 资产 | 系统支持 | 可发布服务 | 样本位置（`E:\data\1`） |
+| --- | --- | --- | --- |
+| COG / BigTIFF（`.tif`） | ✅ 原生 | WMS / WMTS / XYZ | `cog/`（EPSG:4326 真实影像 + fixture） |
+| GeoJSON | ✅ 原生（→ `vector/`） | MVT / WMS / WMTS / XYZ / WFS / OAF | `geojson/`、`recon/` |
+| MBTiles（栅格 / 矢量） | ✅ 原生 | 栅格 → WMTS/XYZ；矢量 → MVT | `mbtiles/`、`recon/` |
+| PMTiles（栅格 / 矢量） | ✅ 原生 | 栅格 → WMTS/XYZ；矢量 → MVT | `pmtiles/` |
+| ArcGIS Server 缓存（compact v1 / v2） | ✅ 原生（→ `arcgis/`） | WMTS / XYZ | `arcgis_cache/`（3×v1 + 1×v2） |
+| `.tpk` / `.tpkx` 紧凑瓦片包 | ✅ 原生（→ `arcgis/`） | 导入后 WMTS / XYZ | `arcgis_tpk/`、`arcgis_cache/` |
+| 3D Tiles（`tileset.json` + `.b3dm`） | ✅ 原生 | `/3dtiles` 直通 | `3dtiles/`（recon / kmczc / kmczc_full） |
+| Quantized-Mesh（`.terrainpack`） | ✅ 原生直通 | `/terrain/{name}/layer.json` | `terrain/` |
+| PostGIS 空间表 / 视图 | ✅ 原生 | **动态 MVT** / WMS / WFS / OAF | `postgis/`（pg_dump + 视图导出） |
+| 静态 `z/x/y` 瓦片目录 | ⚠️ 需打包 | 打包为 PMTiles/MBTiles 后 WMTS/XYZ | `xyz-tms/`（样本待补） |
+| OSGB 原始倾斜摄影 | ⚠️ 需转换 | 转 3D Tiles 后发布 | `osgb/`（样本待补） |
+| 静态 Shapefile | ⚠️ 仅发现 | **不可发布**（无 shp 读取器） | `shapefile/` |
+| 静态 MVT 瓦片目录 | ⚠️ 仅发现 | **不可发布**（无 SourceKind） | `mvt/`（预留） |
+| Esri `.mmpk` / FileGDB `.gdb` | ❌ 不支持 | 需取出内部 COG | `cog/cog.mmpk`、缓存目录内 `Status.gdb` |
+
+> 格式能力以 `GET /admin/capabilities` 的 `data_type_caps` 为权威矩阵；「可发现」不等于「可发布」。gisserver 核心库未来补齐 shp 读取器后，`shapefile/` 一行即可转为可发布。
+
+---
+
 ## Linux 安装
 
 ### 1) Docker 方式（推荐）
