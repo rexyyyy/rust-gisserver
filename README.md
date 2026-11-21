@@ -92,6 +92,7 @@ MBTiles 同时支持 PNG/JPEG/WebP 栅格与 gzip pbf 矢量包，TMS 行号自�
 - **双坐标接口**：`/{z}/{x}/{y}.pbf`（EPSG:3857）与 `/{srid}/{z}/{x}/{y}.pbf`（源 CRS 自身单位，如 4543 米、4326 度，服务端不做 `ST_Transform`）；TileJSON 按接口分别宣告 bounds/crs/grid。
 - **为高并发而设计**：按 DSN 共享连接池，版本预检 PG≥11 / PostGIS≥3.0，启动自检 GiST 索引；编码前按瓦片 bbox 预过滤，低 z 用 `ST_SimplifyPreserveTopology` 分级简化；输出缓存命中约 16–25ms，可选磁盘 L2 跨重启保留。
 - **免落表发布**：`from` 表达式直接发布 SQL / 视图图层；bounds/count 走统计估计，缺失自动回退精确扫描。
+- **传统矢量资产同路上云**：Shapefile 走管理后台「导入 SHP」（`shp2pgsql`，从 `.prj` 自动识别 CGCS2000 / WGS84），FileGDB 走 `ogr2ogr` 入库，统一变成 PostGIS 表后即可发布动态 MVT / WFS / OAF——无需为静态矢量另写读取器。
 
 发布与调优见 [MVT 指南](docs/services/mvt.zh-CN.md) 与 [架构说明](docs/architecture.md)。
 
@@ -116,11 +117,12 @@ MBTiles 同时支持 PNG/JPEG/WebP 栅格与 gzip pbf 矢量包，TMS 行号自�
 | PostGIS 空间表 / 视图 | ✅ 原生 | **动态 MVT** / WMS / WFS / OAF | `postgis/`（pg_dump + 视图导出） |
 | 静态 `z/x/y` 瓦片目录 | ⚠️ 需打包 | 打包为 PMTiles/MBTiles 后 WMTS/XYZ | `xyz-tms/`（样本待补） |
 | OSGB 原始倾斜摄影 | ⚠️ 需转换 | 转 3D Tiles 后发布 | `osgb/`（样本待补） |
-| 静态 Shapefile | ⚠️ 仅发现 | **不可发布**（无 shp 读取器） | `shapefile/` |
+| **Shapefile（`.shp`）** | ✅ 导入 PostGIS | **动态 MVT** / WMS / WFS / OAF；管理后台「导入 SHP」→ `postgis_table` | `shapefile/` |
+| **FileGDB（`.gdb`）** | ✅ 导入 PostGIS | **动态 MVT** / WMS / WFS / OAF；`ogr2ogr` 入库或转 SHP 后走「导入 SHP」 | 业务 gdb 待补；缓存内 `Status.gdb` 是状态库非数据源 |
 | 静态 MVT 瓦片目录 | ⚠️ 仅发现 | **不可发布**（无 SourceKind） | `mvt/`（预留） |
-| Esri `.mmpk` / FileGDB `.gdb` | ❌ 不支持 | 需取出内部 COG | `cog/cog.mmpk`、缓存目录内 `Status.gdb` |
+| Esri `.mmpk` | ❌ 不支持 | 需取出内部 COG | `cog/cog.mmpk` |
 
-> 格式能力以 `GET /admin/capabilities` 的 `data_type_caps` 为权威矩阵；「可发现」不等于「可发布」。gisserver 核心库未来补齐 shp 读取器后，`shapefile/` 一行即可转为可发布。
+> 格式能力以 `GET /admin/capabilities` 的 `data_type_caps` 为权威矩阵（描述**静态数据源**的直接发布）。Shapefile / FileGDB 走「导入 PostGIS → 动态 MVT」迁移链路，入库后按 `postgis_table` 参与发布矩阵；核心库未来补齐原生 shp/gdb 读取器后可免导入直接发布。
 
 ---
 
@@ -289,7 +291,7 @@ HTTP (axum 0.8 / tokio)     mapserver/services/map-api
 | **3D Tiles**           | `tileset.json` 目录（OSGB 需先转 3D Tiles）     | [3D Tiles 指南](docs/services/3dtiles.zh-CN.md)      | [发布步骤](docs/services/3dtiles.zh-CN.md#操作说明管理后台)      |
 | **ArcGIS 缓存**          | `Conf.xml` 缓存目录、`.tpk`、`.tpkx`           | [ArcGIS 缓存指南](docs/services/arcgis-cache.zh-CN.md) | [发布步骤](docs/services/arcgis-cache.zh-CN.md#操作说明管理后台) |
 
-> 静态 Shapefile 目录、静态 MVT 瓦片目录可被发现但暂不可发布；PostGIS 普通表（无 geometry 列）仅数据查询，不发布图层服务。权威矩阵来自 `GET /admin/capabilities`。
+> 静态 Shapefile / FileGDB 目录本身不能直接发布，但可通过管理后台「导入 SHP」（依赖 `shp2pgsql`）或 `ogr2ogr` 入库 PostGIS，再按 `postgis_table` 发布**动态 MVT** / WMS / WFS / OAF；静态 MVT 瓦片目录仍只发现不发布；PostGIS 普通表（无 geometry 列）仅数据查询。权威矩阵来自 `GET /admin/capabilities`。
 
 全部指南索引：[中文](docs/services/README.zh-CN.md) / [English](docs/services/README.en-US.md)。协议矩阵、请求样例与限制见 [mapserver/README.md](mapserver/README.md)。
 
@@ -300,7 +302,7 @@ HTTP (axum 0.8 / tokio)     mapserver/services/map-api
 以下为路线图方向，不承诺具体时间表：
 
 1. **换机不碎（P1）**：运行期发布的服务把 `source.path` 规约为 `${DATA_ROOT}` 相对存储，serve 端按 `data_root` 拼接；files 与 db 两种后端统一。详见 [manager/deploy/data-root.md](manager/deploy/data-root.md)。
-2. **更多数据源**：在已支持传统瓦片格式迁移、ArcGIS 紧凑缓存、COG 直读与 PostGIS 动态 MVT 的基础上，继续补齐静态 Shapefile / GeoPackage 读取、ArcGIS 缓存发布链路增强、COG JPEG/WEBP 瓦片解码与写入。
+2. **更多数据源**：Shapefile / FileGDB 已可通过导入 PostGIS 发布动态 MVT；下一步补齐其**原生读取**（免导入）、GeoPackage 读取、ArcGIS 缓存发布链路增强、COG JPEG/WEBP 瓦片解码与写入。
 3. **安全与治理**：数据面鉴权/RBAC、TLS 终结、集群部署与监控告警；当前版本建议置于反向代理之后。
 4. **OGC 完整性**：WMS 多图层合成、SLD 更多符号与过滤能力、更多 conformance class 与自动化测试。
 5. **性能持续调优**：重采样/调色板并行化、WMS GetMap 输出缓存、rayon 池与 MBTiles 连接池可配置化。

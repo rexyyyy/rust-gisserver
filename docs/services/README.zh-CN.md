@@ -51,7 +51,7 @@
 | `arcgis` | `arcgis` | wmts, xyz | wmts |
 | `postgis_table` | `postgis` | wms, mvt, wfs, oaf | mvt, wms |
 | `pg_table` | — | 无（仅数据查询） | — |
-| `shapefile` | — | 无（暂无读取器） | — |
+| `shapefile` | — | 无原生发布；**导入 PostGIS 后按 `postgis_table` 发布 mvt/wms/wfs/oaf** | mvt |
 | `mvt` | — | 无（静态目录只发现） | — |
 
 ## 相关文档

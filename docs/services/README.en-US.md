@@ -51,7 +51,7 @@ Publishing ultimately calls map-api `POST /admin/services` to write `<catalog.ro
 | `arcgis` | `arcgis` | wmts, xyz | wmts |
 | `postgis_table` | `postgis` | wms, mvt, wfs, oaf | mvt, wms |
 | `pg_table` | — | none (data query only) | — |
-| `shapefile` | — | none (no reader yet) | — |
+| `shapefile` | — | none natively; **import into PostGIS → `postgis_table` publishes mvt/wms/wfs/oaf** | mvt |
 | `mvt` | — | none (static directory is discoverable only) | — |
 
 ## Related docs
