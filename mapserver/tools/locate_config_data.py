@@ -3,7 +3,7 @@
 import os
 from pathlib import Path
 
-ROOT = Path(r"D:\mycomputer\documents")
+ROOT = Path(os.environ.get("LOCATE_ROOT", Path.home() / "Documents"))
 TARGETS = [
     "wh2013_small_4326.tif",
     "recon_footprint_4326.geojson",

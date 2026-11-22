@@ -69,10 +69,10 @@ map-api 是纯地图引擎，**不托管 UI**。`<manager/>` 配置声明「受�
 cargo build --release
 
 # 2) 生成示例 COG（fixtures/sample.tif，1024x512 渐变 RGB）
-cargo run -p mapserver -- cog-create
+cargo run -p r-mapserver -- cog-create
 
 # 3) 启动（默认读取 config/mapserver.xml，监听 0.0.0.0:8080）
-cargo run -p mapserver -- serve
+cargo run -p r-mapserver -- serve
 
 # 4) 数据面就绪探活（预览入口在 manager 控制台，引擎不托管页面）
 #    curl http://localhost:8080/health
@@ -155,7 +155,7 @@ curl -o tile.pbf "http://localhost:8080/ogc/tiles/v1/collections/places/tiles/We
 
 ```powershell
 # 打包目录 z/x/y.{pbf,png} -> .pmtiles
-cargo run -p mapserver -- pmtiles-pack --input data/tiles --output data/cities.pmtiles --tile-type mvt --compression none
+cargo run -p r-mapserver -- pmtiles-pack --input data/tiles --output data/cities.pmtiles --tile-type mvt --compression none
 ```
 
 ## 配置
@@ -295,7 +295,7 @@ CRS 链路落在正确地面范围。
 - **COG 解析（自研）**：经典 TIFF + BigTIFF（magic `II`/`MM`、42/43），IFD 链，跳过 `NewSubfileType` bit 2 之外的子文件；标签覆盖宽度/高度/位深/压缩/光度/每样本位数/预测器/平铺/`ModelPixelScale`/`ModelTiepoint`；`read_window_rgba` 按 overview 缩放因子选层、rayon 并行解码。
 - **瓦片解码**：compression 1 / 5(LZW) / 8·32946(DEFLATE) / 50000(ZSTD)；predictor 2（8/16bit，16bit 分端序）、3（float 反字节差分+解交织）；1bit 位图展开；16bit 无符号 `>>8`、有符号重映射、float 钳制到 8bit。JPEG/WEBP 瓦片零填充并在响应中说明不支持。
 - **渲染**：输出像素中心 → native 像素 → 选中 overview 层，两次重采样（nearest/bilinear），全出界返回透明，瓦片对齐窗口 +1px margin。
-- **渲染投影快速路径**：请求 CRS 与源 CRS 相同（identity）且源 geotransform 为仿射时，output→native 像素映射整体双线性，由 4 个输出角点求解 + 画布中点投影校验（偏差 >0.05px 则回退逐像素）。512×256 GetMap 的 262,144 次逐点投影降为 5 次：**8.94ms → 3.11ms（2.9×，release micro-bench，`cargo test --release -p mapserver -- --nocapture pass1`）**；快速路径与逐像素参考逐点一致（单测断言 <1e-6）。
+- **渲染投影快速路径**：请求 CRS 与源 CRS 相同（identity）且源 geotransform 为仿射时，output→native 像素映射整体双线性，由 4 个输出角点求解 + 画布中点投影校验（偏差 >0.05px 则回退逐像素）。512×256 GetMap 的 262,144 次逐点投影降为 5 次：**8.94ms → 3.11ms（2.9×，release micro-bench，`cargo test --release -p r-mapserver -- --nocapture pass1`）**；快速路径与逐像素参考逐点一致（单测断言 <1e-6）。
 - **投影**：EPSG:4326 ↔ EPSG:3857 自写（无 proj），`MERC_MAX = 20037508.3427892`、`MAX_LAT = 85.0511287798066`；`CRS:84`/`OGC:CRS84` 归一化为 `EPSG:4326`，`900913`/`3785` 归一化为 `EPSG:3857`；CGCS2000（4490）与高斯-克吕格 / UTM 分带经可选 PROJ 后端互转，同名 CRS 走恒等路径不依赖 PROJ（见《坐标系支持》）。渲染侧只依赖 `gisserver::wms_common::reproject::Reprojector` trait，具体后端由服务层注入。
 - **并发模型**：渲染/编码/文件 IO 一律走 `tokio::task::spawn_blocking`（tokio worker 不被阻塞，health 等轻请求零排队）；本地文件与 HTTP Range 源全部定位读（Windows `seek_read` / Unix `read_at`，不改共享 fd 游标，并发无竞态）；**远程源**的同步 HTTP 读取跑在专用 rayon 池（8 线程），慢源不会占满本地 COG 解码的全局 rayon 池。
 - **缓存（foyer，`services/map-api/src/cache.rs` 的 `CacheHub` 统一收口；output 为 `HybridCache`，`server.disk_cache` 可选磁盘 L2 跨重启保留）**：五段缓存——① 输出瓦片（`output`，weigher 按字节计量，预算 `cache_mib`）；② 图层索引（`layers`，name → `Arc<LayerRuntime>`，替代 `AppState::layer` 的线性扫描，未命中名不做负缓存）；③ 元数据文档（`docs`，能力文档/OGC API 文档/TileJSON/style，按 `(服务,版本,base)` 等全量入 key，字节预算 32MiB）；④ 目录元数据（`catalog`，OGC API collections/tiled collections/advertised grids 单条目，构建时零 FeatureCollection clone）；⑤ 要素键值缓存（`features`，`(collectionId, featureId)` → 单要素 GeoJSON，替原整表 clone+线性扫描）。另保留解码瓦片缓存（`gisserver::storage::TileCache`，容量按**实际最大 tile_px** 估算，杜绝 512px 层的 4 倍内存超配）。
@@ -400,7 +400,7 @@ python tools/bench_server.py --label before
 
 ```powershell
 cargo test --workspace                                    # 单元测试（27 个套件）
-cargo test --release -p mapserver -- --nocapture pass1     # 渲染投影 micro-bench
+cargo test --release -p r-mapserver -- --nocapture pass1     # 渲染投影 micro-bench
 python tools/verify_fixes.py                              # 启动预检 + 压缩策略 + 全协议回归
 python tools/wfs_ogcapi_probe.py                         # WFS + OGC API-Features/Tiles 实测（64 项）
 python tools/capability_probe.py                          # 深度探针：@512 网格 / 3dtiles 穿越防护 / 错误语义 / 并发

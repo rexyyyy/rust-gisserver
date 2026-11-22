@@ -1,7 +1,8 @@
-"""Summarize test results from E:\\tmp\\cargo.log."""
+"""Summarize test results from cargo.log in the system temp directory."""
+import tempfile
 from pathlib import Path
 
-log = Path(r"E:\tmp\cargo.log")
+log = Path(tempfile.gettempdir()) / "cargo.log"
 text = log.read_text(encoding="utf-8", errors="replace")
 results = [l.strip() for l in text.splitlines() if l.strip().startswith("test result")]
 failed = [l for l in text.splitlines() if "FAILED" in l or "panicked" in l]

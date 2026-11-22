@@ -50,7 +50,7 @@ if not exist Cargo.toml (
     exit /b 1
 )
 echo   cargo target: %CARGO_TARGET_DIR%
-cargo build --release -p mapserver
+cargo build --release -p r-mapserver
 if errorlevel 1 (
     echo [ERROR] mapserver build failed
     exit /b 1

@@ -9,6 +9,7 @@ edition = "2021"
 license = "MIT OR Apache-2.0"
 repository = "https://github.com/rexyyyy/rust-gisserver"
 readme = "README.md"
+exclude = ["tests/data/**"]
 
 [features]
 default = ["encoding", "mvt", "projection", "vector-query"]

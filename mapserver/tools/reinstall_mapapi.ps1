@@ -1,6 +1,7 @@
 # Replace the installed mapserve.exe with a fresh release build and restart the 8080 service
-$install = "D:\mycomputor\documents\gis-wt\thirdparty\rust-gisserver-install"
-$src     = "D:\mycomputor\documents\gis-wt\thirdparty\rust-gisserver\target\release\mapserve.exe"
+param([string]$Install = "$env:LOCALAPPDATA\rust-gisserver")
+$install = $Install
+$src     = Join-Path (Resolve-Path "$PSScriptRoot\..\..").Path "target\release\mapserve.exe"
 $dst     = "$install\map-api\mapserve.exe"
 
 # 1) Stop the old process holding port 8080

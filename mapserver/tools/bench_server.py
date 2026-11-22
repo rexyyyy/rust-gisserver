@@ -19,13 +19,14 @@ import json
 import shutil
 import statistics
 import subprocess
+import tempfile
 import threading
 import time
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
 EXE = ROOT / "target" / "release" / "map-api.exe"
-BENCH_DIR = Path("E:/tmp/rms-bench")
+BENCH_DIR = Path(tempfile.gettempdir()) / "rms-bench"
 HOST, PORT = "127.0.0.1", 18082
 
 GETMAP = (
@@ -50,7 +51,7 @@ def prepare_catalog():
     shutil.copy(ROOT / "config/mbtiles/test.yaml", BENCH_DIR / "mbtiles/test.yaml")
     (BENCH_DIR / "mapserver.yaml").write_text(
         "server:\n  host: 127.0.0.1\n  port: 18082\n  cache_mib: 64\n"
-        "catalog:\n  root: E:/tmp/rms-bench\n  backend: files\n",
+        f"catalog:\n  root: {BENCH_DIR.as_posix()}\n  backend: files\n",
         encoding="utf-8",
     )
 

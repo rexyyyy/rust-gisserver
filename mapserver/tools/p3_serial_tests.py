@@ -1,4 +1,8 @@
-import subprocess, time, os
+import subprocess, time, os, shutil
+from pathlib import Path
+ROOT = Path(__file__).resolve().parents[2]
+CARGO = shutil.which("cargo") or str(
+    Path(os.environ.get("CARGO_HOME", Path.home() / ".cargo")) / "bin" / "cargo.exe")
 env = dict(os.environ)
 vs = r"C:/Program Files/Microsoft Visual Studio/2022/Community"
 m = "14.44.35207"; s = "10.0.26100.0"
@@ -15,12 +19,12 @@ crates = ["pg-source", "wms-common", "wms-protocol", "wfs-protocol", "vector-que
           "pmtiles", "map-api"]
 lines = []
 for crate in crates:
-    cmd = [r"C:/Users/Administrator/.cargo/bin/cargo.exe", "test", "-p", crate,
-           "--manifest-path", r"D:\mycomputer\documents\gis-wt\thirdparty\rust-gisserver\Cargo.toml"]
+    cmd = [CARGO, "test", "-p", crate,
+           "--manifest-path", str(ROOT / "Cargo.toml")]
     t0 = time.time()
     try:
         p = subprocess.run(cmd, capture_output=True, text=False, timeout=600,
-                           cwd=r"D:\mycomputer\documents\gis-wt\thirdparty\rust-gisserver", env=env)
+                           cwd=str(ROOT), env=env)
         rc, out = p.returncode, as_text(p.stdout) + as_text(p.stderr)
     except subprocess.TimeoutExpired as e:
         rc = -99
@@ -28,5 +32,5 @@ for crate in crates:
     tails = [l for l in out.strip().splitlines() if l.strip()][-8:]
     lines.append(f"=== {crate} exit={rc} dur={time.time()-t0:.0f}s ===\n" + "\n".join(tails))
     # write incrementally so a later hang does not lose earlier results
-    with open(r"D:\mycomputer\documents\gis-wt\thirdparty\rust-gisserver\serial_tests.txt", "w", encoding="utf-8", errors="replace") as f:
+    with open(ROOT / "serial_tests.txt", "w", encoding="utf-8", errors="replace") as f:
         f.write("\n\n".join(lines))

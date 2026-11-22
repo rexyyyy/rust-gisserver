@@ -37,7 +37,7 @@ if exist "C:\Program Files\Microsoft Visual Studio\2022\Community\VC\Auxiliary\B
 REM Build rust-gisserver
 echo [3/4] Building rust-gisserver (release)...
 cd /d "%~dp0..\.."
-cargo build --release -p mapserver
+cargo build --release -p r-mapserver
 if errorlevel 1 (
     echo [ERROR] rust-gisserver build failed
     exit /b 1

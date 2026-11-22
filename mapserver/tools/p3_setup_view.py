@@ -1,5 +1,5 @@
 import subprocess, sys
-py = r"C:\Users\Administrator\.workbuddy\binaries\python\envs\default\python.exe"
+py = sys.executable
 try:
     import psycopg2  # noqa
     print("psycopg2 already ok")

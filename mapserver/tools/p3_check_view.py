@@ -1,4 +1,6 @@
 import psycopg2, traceback
+from pathlib import Path
+ROOT = Path(__file__).resolve().parents[2]
 out = []
 try:
     conn = psycopg2.connect("postgres://postgres:123456@localhost:5434/gis")
@@ -14,5 +16,5 @@ try:
     out.append("OK")
 except Exception:
     out.append(traceback.format_exc())
-with open(r"D:\mycomputer\documents\gis-wt\thirdparty\rust-gisserver\setup_view_result.txt", "w", encoding="utf-8") as f:
+with open(ROOT / "setup_view_result.txt", "w", encoding="utf-8") as f:
     f.write("\n".join(out))

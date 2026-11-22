@@ -81,7 +81,7 @@ cd <repo>\build\script
 .\build_all.bat frontend   # 额外在 manager/ui 跑 pnpm/npm install + build
 ```
 - `build_all.bat` 设 `CARGO_TARGET_DIR=<repo>\build\target`，产物落在 `build\target\release\`。
-- 内部依次：`mapserver`（`cargo build --release -p mapserver`）、`manager`（`cargo build --release` in `manager/backend`）。
+- 内部依次：`mapserver`（`cargo build --release -p r-mapserver`）、`manager`（`cargo build --release` in `manager/backend`）。
 - 成功标志：`build\target\release\mapserve.exe` 与 `manager.exe` 生成。
 
 ### 3.2 安装

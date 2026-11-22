@@ -17,13 +17,14 @@ import http.client
 import shutil
 import subprocess
 import sys
+import tempfile
 import time
 import zlib
 from pathlib import Path
 
-ROOT = Path(r"D:\mycomputer\documents\gis-wt\thirdparty\rust-gisserver")
+ROOT = Path(__file__).resolve().parents[2]
 EXE = ROOT / "target" / "release" / "map-api.exe"
-GOOD = Path("E:/tmp/rms-probe")
+GOOD = Path(tempfile.gettempdir()) / "rms-probe"
 TDS = GOOD / "tds" / "probe"          # 3dtiles dataset root
 HOST, PORT = "127.0.0.1", 18084
 
@@ -114,7 +115,7 @@ def build_catalog():
     )
     (GOOD / "mapserver.yaml").write_text(
         "server:\n  host: 127.0.0.1\n  port: 18084\n  cache_mib: 64\n"
-        "catalog:\n  root: E:/tmp/rms-probe\n  backend: files\n",
+        f"catalog:\n  root: {GOOD.as_posix()}\n  backend: files\n",
         encoding="utf-8",
     )
 

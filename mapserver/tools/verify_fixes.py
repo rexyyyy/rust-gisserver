@@ -4,14 +4,14 @@ import json
 import shutil
 import subprocess
 import sys
-import time
+import tempfile
 from pathlib import Path
 
-ROOT = Path(r"D:\mycomputer\documents\gis-wt\thirdparty\rust-gisserver")
+ROOT = Path(__file__).resolve().parents[2]
 EXE = ROOT / "target" / "release" / "map-api.exe"
-GOOD = Path("E:/tmp/rms-verify")
-BAD = Path("E:/tmp/rms-badcfg")
-ALLBAD = Path("E:/tmp/rms-allbad")
+GOOD = Path(tempfile.gettempdir()) / "rms-verify"
+BAD = Path(tempfile.gettempdir()) / "rms-badcfg"
+ALLBAD = Path(tempfile.gettempdir()) / "rms-allbad"
 HOST, PORT = "127.0.0.1", 18083
 
 
@@ -53,7 +53,7 @@ def prepare_good():
     shutil.copy(ROOT / "config/mbtiles/test.yaml", GOOD / "mbtiles/test.yaml")
     (GOOD / "mapserver.yaml").write_text(
         "server:\n  host: 127.0.0.1\n  port: 18083\n  cache_mib: 64\n"
-        "catalog:\n  root: E:/tmp/rms-verify\n  backend: files\n",
+        f"catalog:\n  root: {GOOD.as_posix()}\n  backend: files\n",
         encoding="utf-8",
     )
 
@@ -69,16 +69,16 @@ def prepare_bad():
     shutil.copy(ROOT / "config/cog/world.yaml", BAD / "cog/world.yaml")
     (BAD / "cog/broken1.yaml").write_text(
         "name: broken1\nsource:\n  type: cog\n"
-        "  path: D:\\mycomputor\\documents\\gis-wt\\nope\\x.tif\n",
+        "  path: no-such-dir/x.tif\n",
         encoding="utf-8",
     )
     (BAD / "vector/broken2.yaml").write_text(
-        "name: broken2\nsource:\n  type: vector\n  path: E:/tmp/does_not_exist.geojson\n",
+        "name: broken2\nsource:\n  type: vector\n  path: no-such-file.geojson\n",
         encoding="utf-8",
     )
     (BAD / "mapserver.yaml").write_text(
         "server:\n  host: 127.0.0.1\n  port: 18083\n  cache_mib: 64\n"
-        "catalog:\n  root: E:/tmp/rms-badcfg\n  backend: files\n",
+        f"catalog:\n  root: {BAD.as_posix()}\n  backend: files\n",
         encoding="utf-8",
     )
 
@@ -90,16 +90,16 @@ def prepare_all_bad():
         (ALLBAD / sub).mkdir(parents=True, exist_ok=True)
     (ALLBAD / "cog/broken1.yaml").write_text(
         "name: broken1\nsource:\n  type: cog\n"
-        "  path: D:\\mycomputor\\documents\\gis-wt\\nope\\x.tif\n",
+        "  path: no-such-dir/x.tif\n",
         encoding="utf-8",
     )
     (ALLBAD / "cog/broken2.yaml").write_text(
-        "name: broken2\nsource:\n  type: cog\n  path: E:/tmp/also_missing.tif\n",
+        "name: broken2\nsource:\n  type: cog\n  path: also_missing.tif\n",
         encoding="utf-8",
     )
     (ALLBAD / "mapserver.yaml").write_text(
         "server:\n  host: 127.0.0.1\n  port: 18083\n  cache_mib: 64\n"
-        "catalog:\n  root: E:/tmp/rms-allbad\n  backend: files\n",
+        f"catalog:\n  root: {ALLBAD.as_posix()}\n  backend: files\n",
         encoding="utf-8",
     )
 

@@ -23,13 +23,14 @@ import math
 import shutil
 import subprocess
 import sys
+import tempfile
 import time
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
 EXE = ROOT / "target" / "release" / "map-api.exe"
 HOST, PORT = "127.0.0.1", 18086
-CAT = Path("E:/tmp/rms-wfs")
+CAT = Path(tempfile.gettempdir()) / "rms-wfs"
 
 results = []
 
