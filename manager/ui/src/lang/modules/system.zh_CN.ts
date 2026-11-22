@@ -320,7 +320,7 @@ export default {
     colPhone: '手机号码',
     colStatus: '状态',
     colCreatedAt: '创建时间',
-    illegalCharsTip: '不能包含非法字符：< > " \' \\ |',
+    illegalCharsTip: '不能包含非法字符：< > " \' \\ {\'|\'}',
     routeParamsTip: '访问路由的默认传递参数，如：`{"id": 1, "name": "ry"}`',
   },
 };

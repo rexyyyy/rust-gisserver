@@ -666,7 +666,7 @@ export default {
     ofdataLayerPublishedServicesDataLayerPubli: '被级联的数据图层与已发布服务还需到「数据图层」「已发布服务」页逐个恢复。目录型改动定位后需重新发现才刷新账本。',
     yesof: '工作空间是服务与数据源的',
     deleteInServiceHour: '删除只作用于容器：其下仍有数据源或在服服务时会被服务端拒绝。',
-    default12: '个工作空间。默认工作区',
+    default12: '个工作空间。默认工作空间',
     text190: '由数据库初始化脚本（',
     text191: '写入；',
     serviceNameOne: '服务名为扁平唯一，',

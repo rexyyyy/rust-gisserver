@@ -30,7 +30,7 @@ delete from sys_workspace where name != 'ws1';
 
 -- ⑧ 确保 ws1 存在（若被误删则重建）
 insert into sys_workspace (name, title, remark)
-values ('ws1', '默认工作区', '系统默认工作空间')
+values ('ws1', '默认工作空间', '系统默认工作空间')
 on conflict (name) where del_flag = 0 do nothing;
 
 -- =====================================================================

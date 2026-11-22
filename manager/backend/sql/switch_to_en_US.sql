@@ -198,7 +198,7 @@ update sys_role set role_name = 'Self only' where role_id = '4';
 update sys_user set nick_name = 'Crazy Lion Li', remark = 'Administrator' where user_id = 1;
 update sys_user set nick_name = 'This dept and below (password 666666)' where user_id = 3;
 update sys_user set nick_name = 'Self only (password 666666)' where user_id = 4;
-update sys_workspace set title = 'Default Workspace', remark = 'Plan section 3 default workspace seed: existing services and unassigned data belong to it' where name = 'ws1' and del_flag = 0;
+update sys_workspace set title = 'default workspace', remark = 'System default workspace: existing services and unassigned data belong to it' where name = 'ws1' and del_flag = 0;
 do $i18n$
 declare
   s text;

@@ -320,7 +320,7 @@ export default {
     colPhone: 'Phone',
     colStatus: 'Status',
     colCreatedAt: 'Created At',
-    illegalCharsTip: 'Must not contain illegal characters: < > " \' \\ |',
+    illegalCharsTip: 'Must not contain illegal characters: < > " \' \\ {\'|\'}',
     routeParamsTip: 'Default route params, e.g. `{"id": 1, "name": "ry"}`',
   },
 };

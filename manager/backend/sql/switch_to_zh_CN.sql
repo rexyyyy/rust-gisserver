@@ -198,7 +198,7 @@ update sys_role set role_name = '仅本人' where role_id = '4';
 update sys_user set nick_name = '疯狂的狮子Li', remark = '管理员' where user_id = 1;
 update sys_user set nick_name = '本部门及以下 密码666666' where user_id = 3;
 update sys_user set nick_name = '仅本人 密码666666' where user_id = 4;
-update sys_workspace set title = '默认工作区', remark = '计划 §3 默认工作区种子：既有服务与未分workspace的数据都归它' where name = 'ws1' and del_flag = 0;
+update sys_workspace set title = '默认工作空间', remark = '系统默认工作空间：既有服务与未分workspace的数据都归它' where name = 'ws1' and del_flag = 0;
 do $i18n$
 declare
   s text;

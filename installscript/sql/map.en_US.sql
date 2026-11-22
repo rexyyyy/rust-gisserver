@@ -341,7 +341,7 @@ comment on column sys_workspace.data_root is 'Data file root path (use / separat
 comment on column sys_workspace.del_flag  is '0 normal / 1 deleted (soft delete flag only)';
 
 insert into sys_workspace (name, title, remark)
-values ('ws1', 'Default Workspace', 'Plan section 3 default workspace seed: existing services and unassigned data belong to it')
+values ('ws1', 'default workspace', 'System default workspace: existing services and unassigned data belong to it')
   on conflict do nothing;
 
 -- Data store: pointer only (directory or PostGIS connection). No data imported.

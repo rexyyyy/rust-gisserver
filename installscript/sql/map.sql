@@ -341,7 +341,7 @@ comment on column sys_workspace.data_root is '数据文件根路径（统一用 
 comment on column sys_workspace.del_flag  is '0 正常 / 1 已删（软删除仅标记）';
 
 insert into sys_workspace (name, title, remark)
-values ('ws1', '默认工作区', '计划 §3 默认工作区种子：既有服务与未分workspace的数据都归它')
+values ('ws1', '默认工作空间', '系统默认工作空间：既有服务与未分workspace的数据都归它')
   on conflict do nothing;
 
 -- 数据存储：纯指针（目录 或 PostGIS 连接），不导入任何数据。

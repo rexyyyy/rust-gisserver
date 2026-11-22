@@ -96,7 +96,7 @@ import { NavTypeEnum } from '@/enums/NavTypeEnum';
 import Logo from "@/layout/components/Sidebar/Logo.vue";
 import TopBar from '@/layout/components/TopBar/index.vue'
 import DarkSwitch from './TopBar/DarkSwitch.vue'
-import defAva from '@/assets/images/profile.jpg'
+import defAva from '@/assets/images/user.svg'
 
 const appStore = useAppStore();
 const userStore = useUserStore();
