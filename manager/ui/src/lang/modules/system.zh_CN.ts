@@ -251,6 +251,7 @@ export default {
     nicknameisRequired: '用户昵称不能为空',
     passwordisRequired: '用户密码不能为空',
     passwordMustBe520Characters: '用户密码长度必须介于 5 和 20 之间',
+    passwordPolicyTip: '密码需 6–20 位，且同时包含大写字母、小写字母、数字和符号',
     userRoleisRequired: '用户角色不能为空',
     areYouSureToDeleteUserID: '是否确认删除用户编号为"',
     text5: '"用户吗?',

@@ -33,6 +33,8 @@ export interface LoginData {
  */
 export interface LoginResult {
   access_token: string;
+  /** 是否为初始密码，需要强制修改 */
+  needChangePwd?: boolean;
 }
 
 /**

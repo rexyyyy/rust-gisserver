@@ -27,8 +27,25 @@ export default {
       },
       code: {
         required: 'Please enter a verification code'
+      },
+      newPassword: {
+        required: 'Please enter the new password',
+        length: 'The password must be 6 to 20 characters long',
+        pattern: 'The password must contain uppercase, lowercase, digit and symbol'
+      },
+      confirmPassword: {
+        required: 'Please enter the new password again',
+        equalToPassword: 'The two passwords do not match'
       }
     },
+    pwdTitle: 'Change Initial Password',
+    pwdTip: 'This account still uses the initial password. You must change it before entering the system.',
+    oldPassword: 'Old Password',
+    newPassword: 'New Password',
+    confirmPassword: 'Confirm Password',
+    pwdPolicy: 'Rules: 6-20 characters, including uppercase, lowercase, digit and symbol.',
+    pwdSubmit: 'Confirm',
+    pwdChanged: 'Password changed. Please sign in with the new password.',
     social: {
       wechat: 'Wechat Login',
       maxkey: 'MaxKey Login',

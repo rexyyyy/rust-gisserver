@@ -27,8 +27,25 @@ export default {
       },
       code: {
         required: '请输入验证码'
+      },
+      newPassword: {
+        required: '请输入新密码',
+        length: '密码长度必须为 6 到 20 位',
+        pattern: '密码必须同时包含大写字母、小写字母、数字和符号'
+      },
+      confirmPassword: {
+        required: '请再次输入新密码',
+        equalToPassword: '两次输入的密码不一致'
       }
     },
+    pwdTitle: '修改初始密码',
+    pwdTip: '当前账号使用初始密码，首次登录必须修改密码后才能进入系统。',
+    oldPassword: '原密码',
+    newPassword: '新密码',
+    confirmPassword: '确认密码',
+    pwdPolicy: '密码规则：6–20 位，且必须同时包含大写字母、小写字母、数字和符号。',
+    pwdSubmit: '确认修改',
+    pwdChanged: '密码修改成功，请使用新密码重新登录',
     social: {
       wechat: '微信登录',
       maxkey: 'MaxKey登录',

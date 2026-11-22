@@ -396,9 +396,8 @@ const initData: PageData<UserForm, UserQuery> = {
     password: [
       { required: true, message: t('system.auto.passwordisRequired'), trigger: 'blur' },
       {
-        min: 5,
-        max: 20,
-        message: t('system.auto.passwordMustBe520Characters'),
+        pattern: /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[^A-Za-z0-9]).{6,20}$/,
+        message: t('system.auto.passwordPolicyTip'),
         trigger: 'blur'
       },
       { pattern: /^[^<>"'|\\]+$/, message: t('system.auto.illegalCharsTip'), trigger: 'blur' }
@@ -524,8 +523,8 @@ const handleResetPwd = async (row: UserVO) => {
       confirmButtonText: t('system.auto.ok2'),
       cancelButtonText: t('system.auto.cancel2'),
       closeOnClickModal: false,
-      inputPattern: /^.{5,20}$/,
-      inputErrorMessage: t('system.auto.passwordMustBe520Characters'),
+      inputPattern: /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[^A-Za-z0-9]).{6,20}$/,
+      inputErrorMessage: t('system.auto.passwordPolicyTip'),
       inputValidator: (value) => {
         if (/<|>|"|'|\||\\/.test(value)) {
           return t('system.auto.illegalCharsTip');

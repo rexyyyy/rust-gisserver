@@ -48,6 +48,35 @@
         </div>
       </el-form-item>
     </el-form>
+    <!-- 首次登录强制修改初始密码 -->
+    <el-dialog
+      v-model="pwdDialog"
+      :title="t('login.pwdTitle')"
+      width="440px"
+      :show-close="false"
+      :close-on-click-modal="false"
+      :close-on-press-escape="false"
+      append-to-body
+    >
+      <el-alert :title="t('login.pwdTip')" type="warning" :closable="false" show-icon style="margin-bottom: 16px" />
+      <el-form ref="pwdRef" :model="pwdForm" :rules="pwdRules" label-width="96px">
+        <el-form-item :label="t('login.oldPassword')" prop="oldPassword">
+          <el-input v-model="pwdForm.oldPassword" type="password" show-password autocomplete="off" />
+        </el-form-item>
+        <el-form-item :label="t('login.newPassword')" prop="newPassword">
+          <el-input v-model="pwdForm.newPassword" type="password" show-password autocomplete="off" />
+        </el-form-item>
+        <el-form-item :label="t('login.confirmPassword')" prop="confirmPassword">
+          <el-input v-model="pwdForm.confirmPassword" type="password" show-password autocomplete="off" />
+        </el-form-item>
+      </el-form>
+      <div class="pwd-policy">{{ t('login.pwdPolicy') }}</div>
+      <template #footer>
+        <el-button type="primary" :loading="pwdLoading" style="width: 100%" @click="submitPwd">
+          {{ t('login.pwdSubmit') }}
+        </el-button>
+      </template>
+    </el-dialog>
     <!--  底部  -->
     <div class="el-login-footer">
       <span>{{ $t('misc.auto.copyrightAllRightsReserved') }}</span>
@@ -57,6 +86,7 @@
 
 <script setup lang="ts">
 import { getCodeImg } from '@/api/login';
+import { updateUserPwd } from '@/api/system/user';
 import { useUserStore } from '@/store/modules/user';
 import { LoginData } from '@/api/types';
 import { to } from 'await-to-js';
@@ -93,6 +123,47 @@ const register = ref(false);
 const redirect = ref('/');
 const loginRef = ref<ElFormInstance>();
 
+// 首次登录强制修改初始密码
+const pwdDialog = ref(false);
+const pwdLoading = ref(false);
+const pwdRef = ref<ElFormInstance>();
+const pwdForm = ref({ oldPassword: '', newPassword: '', confirmPassword: '' });
+const pwdRules: ElFormRules = {
+  oldPassword: [{ required: true, trigger: 'blur', message: t('login.rule.password.required') }],
+  newPassword: [
+    { required: true, trigger: 'blur', message: t('login.rule.newPassword.required') },
+    { min: 6, max: 20, message: t('login.rule.newPassword.length'), trigger: 'blur' },
+    {
+      pattern: /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[^A-Za-z0-9]).{6,20}$/,
+      message: t('login.rule.newPassword.pattern'),
+      trigger: 'blur'
+    }
+  ],
+  confirmPassword: [
+    { required: true, trigger: 'blur', message: t('login.rule.confirmPassword.required') },
+    {
+      validator: (_rule: any, value: string, callback: any) =>
+        value === pwdForm.value.newPassword ? callback() : callback(new Error(t('login.rule.confirmPassword.equalToPassword'))),
+      trigger: 'blur'
+    }
+  ]
+};
+
+const submitPwd = () => {
+  pwdRef.value?.validate(async (valid: boolean) => {
+    if (!valid) return;
+    pwdLoading.value = true;
+    const [err] = await to(updateUserPwd(pwdForm.value.oldPassword, pwdForm.value.newPassword));
+    pwdLoading.value = false;
+    if (err) return;
+    pwdDialog.value = false;
+    proxy?.$modal.msgSuccess(t('login.pwdChanged'));
+    await userStore.logout();
+    loginForm.value.password = '';
+    localStorage.removeItem('password');
+  });
+};
+
 watch(
   () => router.currentRoute.value,
   (newRoute: any) => {
@@ -117,8 +188,17 @@ const handleLogin = () => {
         localStorage.removeItem('rememberMe');
       }
       // 调用action的登录方法
-      const [err] = await to(userStore.login(loginForm.value));
+      const [err, needChange] = await to(userStore.login(loginForm.value));
       if (!err) {
+        if (needChange) {
+          // 初始密码：强制修改后才能进入系统
+          pwdForm.value.oldPassword = loginForm.value.password;
+          pwdForm.value.newPassword = '';
+          pwdForm.value.confirmPassword = '';
+          pwdDialog.value = true;
+          loading.value = false;
+          return;
+        }
         const redirectUrl = redirect.value || '/';
         await router.push(redirectUrl);
         loading.value = false;
@@ -225,6 +305,13 @@ onMounted(() => {
   font-size: 13px;
   text-align: center;
   color: #bfbfbf;
+}
+
+.pwd-policy {
+  font-size: 12px;
+  line-height: 1.6;
+  color: var(--el-text-color-secondary);
+  padding: 0 4px 4px 4px;
 }
 
 .login-form :deep(.el-input__wrapper) {

@@ -251,6 +251,7 @@ export default {
     nicknameisRequired: 'Nicknameis required',
     passwordisRequired: 'Passwordis required',
     passwordMustBe520Characters: 'Password must be 5-20 characters',
+    passwordPolicyTip: 'Password must be 6-20 characters and contain uppercase, lowercase, digit and symbol',
     userRoleisRequired: 'User Roleis required',
     areYouSureToDeleteUserID: 'Are you sure to delete user ID',
     text5: '?',

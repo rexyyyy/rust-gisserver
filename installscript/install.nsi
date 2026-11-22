@@ -25,7 +25,7 @@ RequestExecutionLevel admin
 
 !define APP_NAME       "rust-gisserver"
 !define APP_PUBLISHER  "rust-gisserver"
-!define APP_VERSION    "1.0.0.0"
+!define APP_VERSION    "0.8.1.0"
 
 ; 服务名（NSSM 注册用，实际进程 mapserve.exe / manager.exe）
 !define SVC_MAP_NAME   "mapserve"
@@ -35,13 +35,13 @@ RequestExecutionLevel admin
 ; 路径
 
 ; 源：项目的 run-env 目录（扁平化部署结构）
-!define SRC "D:\mycomputor\documents\gis-wt\thirdparty\rust-gisserver\run-env"
+!define SRC "${__FILEDIR__}\..\run-env"
 
 ; SQL 初始化脚本目录
-!define SQL_DIR "D:\mycomputor\documents\gis-wt\thirdparty\rust-gisserver\installscript\sql"
+!define SQL_DIR "${__FILEDIR__}\sql"
 
 ; NSSM 位置
-!define NSSM_DIR "D:\mycomputor\documents\gis-wt\thirdparty\rust-gisserver\installscript\nssm"
+!define NSSM_DIR "${__FILEDIR__}\nssm"
 !define NSSM_SRC "${NSSM_DIR}\nssm.exe"
 
 ;--------------------------------
@@ -215,17 +215,17 @@ Function ConfigCreate
   Pop $hMgrPort
 
   ; 说明
-  ${NSD_CreateLabel} 0 128u 100% 30u "数据库密码默认 123456（PostgreSQL 端口 5434）。$\n安装后可在 $INSTDIR\.env 修改。"
+  ${NSD_CreateLabel} 0 128u 100% 60u "数据库密码默认 123456（PostgreSQL 端口 5434），安装后请在 $INSTDIR\.env 中修改 MANAGER_DB_PASSWORD。$\n数据库仅供本机/内网使用：不要对所有 IP 开放（PostgreSQL listen_addresses 与 pg_hba.conf）。$\nJWT 签名密钥将在安装时随机生成，无需手工填写。"
   Pop $0
 
   ; 选项
-  ${NSD_CreateCheckbox} 0 164u 100% 16u "注册为 Windows 服务（开机自启，使用 NSSM）"
+  ${NSD_CreateCheckbox} 0 196u 100% 16u "注册为 Windows 服务（开机自启，使用 NSSM）"
   Pop $hChkSvc
   ${If} $WantService == 1
     ${NSD_Check} $hChkSvc
   ${EndIf}
 
-  ${NSD_CreateCheckbox} 0 184u 100% 16u "创建开始菜单快捷方式"
+  ${NSD_CreateCheckbox} 0 216u 100% 16u "创建开始菜单快捷方式"
   Pop $hChkSc
   ${If} $WantShortcut == 1
     ${NSD_Check} $hChkSc
@@ -325,7 +325,7 @@ Function FinishCreate
   Pop $0
   SendMessage $0 ${WM_SETFONT} $hFontTitle 0
 
-  StrCpy $1 "map-api  : http://127.0.0.1:$MapPort/$\nmanager  : http://127.0.0.1:$MgrPort/$\n安装位置 : $INSTDIR$\n数据库密码默认: 123456"
+  StrCpy $1 "map-api  : http://127.0.0.1:$MapPort/$\nmanager  : http://127.0.0.1:$MgrPort/$\n安装位置 : $INSTDIR$\n数据库密码默认: 123456（请尽快修改）$\nJWT 密钥: 安装时已随机生成$\n安全提示: 数据库勿对所有 IP 开放（仅本机/内网）"
   ${NSD_CreateLabel} 0 40u 100% 100u "$1"
   Pop $0
   SendMessage $0 ${WM_SETFONT} $hFontBody 0
@@ -390,7 +390,7 @@ Section "InstallFiles" SEC_FILES
 
   ; sql 初始化脚本目录
   ${IfNot} ${FileExists} "${SQL_DIR}\system.sql"
-    !warning "SQL 目录不存在：${SQL_DIR}（跳过打包，用户需自备数据库初始化脚本）"
+    DetailPrint "SQL 目录不存在：${SQL_DIR}（跳过打包，用户需自备数据库初始化脚本）"
   ${Else}
     CreateDirectory "$INSTDIR\sql"
     SetOutPath "$INSTDIR\sql"
@@ -417,31 +417,29 @@ SectionEnd
 Section "Configure" SEC_CONFIG
   SectionIn RO
 
-  ; 如果用户改了端口，更新 .env
-  ; 默认端口 8080/6180 与 .env 一致时无需更新
-  ${If} $MapPort != "8080"
-    ${OrIf} $MgrPort != "6180"
-      DetailPrint "用户自定义端口，更新 .env 配置..."
-      ; 写入临时 ps1 脚本到 %TEMP%
-      GetTempFileName $R9
-      FileOpen $0 $R9 w
-      FileWrite $0 "$$c = [IO.File]::ReadAllText('$INSTDIR\.env')$\r$\n"
-      FileWrite $0 "$$c = $$c -replace '^MAPSRV_PORT=.*$', 'MAPSRV_PORT=$MapPort'$\r$\n"
-      FileWrite $0 "$$c = $$c -replace '^MAPSERVER_MANAGER_URL=.*$', 'MAPSERVER_MANAGER_URL=http://127.0.0.1:$MgrPort'$\r$\n"
-      FileWrite $0 "[IO.File]::WriteAllText('$INSTDIR\.env', $$c)$\r$\n"
-      FileWrite $0 "Write-Output '.env updated'$\r$\n"
-      FileClose $0
-      nsExec::ExecToStack 'powershell.exe -NoProfile -ExecutionPolicy Bypass -File "$R9"'
-      Pop $0
-      Pop $1
-      Delete $R9
-      ${If} $0 != 0
-        DetailPrint ".env 更新警告: $1"
-      ${Else}
-        DetailPrint "$1"
-      ${EndIf}
+  ; 写入部署配置：端口 + 随机 JWT 密钥（每次安装生成，避免使用固定密钥）
+  DetailPrint "生成部署配置（端口 / 随机 JWT 密钥）..."
+  StrCpy $R9 "$TEMP\rgs-configure.ps1"
+  FileOpen $0 $R9 w
+  FileWrite $0 "$$p = '$INSTDIR\.env'$\r$\n"
+  FileWrite $0 "$$c = [IO.File]::ReadAllText($$p)$\r$\n"
+  FileWrite $0 "$$c = $$c -replace '(?m)^MAPSRV_PORT=.*$$', 'MAPSRV_PORT=$MapPort'$\r$\n"
+  FileWrite $0 "$$c = $$c -replace '(?m)^MAPSERVER_MANAGER_URL=.*$$', 'MAPSERVER_MANAGER_URL=http://127.0.0.1:$MgrPort'$\r$\n"
+  FileWrite $0 "$$b = New-Object byte[] 32$\r$\n"
+  FileWrite $0 "[Security.Cryptography.RandomNumberGenerator]::Create().GetBytes($$b)$\r$\n"
+  FileWrite $0 "$$jwt = ($$b | ForEach-Object { $$_.ToString('x2') }) -join ''$\r$\n"
+  FileWrite $0 "$$c = $$c -replace '(?m)^MANAGER_JWT_SECRET=.*$$', ('MANAGER_JWT_SECRET=' + $$jwt)$\r$\n"
+  FileWrite $0 "[IO.File]::WriteAllText($$p, $$c, [System.Text.UTF8Encoding]::new($$false))$\r$\n"
+  FileWrite $0 "Write-Output '部署配置已生成'$\r$\n"
+  FileClose $0
+  nsExec::ExecToStack 'powershell.exe -NoProfile -ExecutionPolicy Bypass -File "$R9"'
+  Pop $0
+  Pop $1
+  Delete $R9
+  ${If} $0 != 0
+    DetailPrint "配置生成警告: $1"
   ${Else}
-    DetailPrint "使用默认端口 8080/6180，.env 无需更新。"
+    DetailPrint "$1"
   ${EndIf}
 SectionEnd
 

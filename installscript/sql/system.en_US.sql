@@ -155,6 +155,9 @@ create table if not exists sys_user
     update_by   int8,
     update_time timestamp,
     remark      varchar(500) default null::varchar,
+    pwd_update_date  timestamp,
+    login_fail_count int4 default 0,
+    lock_until  timestamp,
     constraint "sys_user_pk" primary key (user_id)
 );
 
@@ -900,7 +903,7 @@ insert into sys_dict_data values(36, 0,  '安卓', 'android',       'sys_device_
 insert into sys_dict_data values(37, 0,  'iOS', 'ios',            'sys_device_type',   '',   'default', 'N', 103, 1, now(), null, null, 'iOS') on conflict do nothing;
 insert into sys_dict_data values(38, 0,  '小程序', 'xcx',         'sys_device_type',   '',   'default', 'N', 103, 1, now(), null, null, '小程序') on conflict do nothing;
 insert into sys_config values(1, '主框架页-默认皮肤样式名称',     'sys.index.skinName',            'skin-blue',     'Y', 103, 1, now(), null, null, '蓝色 skin-blue、绿色 skin-green、紫色 skin-purple、红色 skin-red、黄色 skin-yellow' ) on conflict do nothing;
-insert into sys_config values(2, '用户管理-账号初始密码',         'sys.user.initPassword',         '123456',        'Y', 103, 1, now(), null, null, '初始化密码 123456' ) on conflict do nothing;
+insert into sys_config values(2, '用户管理-账号初始密码',         'sys.user.initPassword',         'Init@123456',   'Y', 103, 1, now(), null, null, '初始化密码 Init@123456' ) on conflict do nothing;
 insert into sys_config values(3, '主框架页-侧边栏主题',           'sys.index.sideTheme',           'theme-dark',    'Y', 103, 1, now(), null, null, '深色主题theme-dark，浅色主题theme-light' ) on conflict do nothing;
 insert into sys_config values(5, '账号自助-是否开启用户注册功能',   'sys.account.registerUser',      'false',         'Y', 103, 1, now(), null, null, '是否开启注册用户功能（true开启，false关闭）') on conflict do nothing;
 insert into sys_config values(11, 'OSS预览列表资源开关',          'sys.oss.previewListResource',   'true',          'Y', 103, 1, now(), null, null, 'true:开启, false:关闭') on conflict do nothing;

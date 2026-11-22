@@ -46,6 +46,8 @@ pub async fn login(
     State(state): State<Arc<AppState>>,
     Json(body): Json<Value>,
 ) -> Result<Json<Value>, AppError> {
+    use chrono::Datelike;
+
     let user_name = jstr(&body, "username");
     let password = jstr(&body, "password");
     let code = jstr(&body, "code");
@@ -61,21 +63,93 @@ pub async fn login(
         return Err(AppError::bad("验证码错误"));
     }
 
-    let sql = format!("SELECT {USER_COLS}, u.password FROM sys_user u WHERE u.user_name = $1 AND u.del_flag = '0'");
+    let sql = format!(
+        "SELECT {USER_COLS}, u.password, u.pwd_update_date, u.login_fail_count, u.lock_until \
+         FROM sys_user u WHERE u.user_name = $1 AND u.del_flag = '0'"
+    );
     let rows = query(&state.pool, &sql, &[&user_name]).await?;
     let row = rows.first().ok_or_else(|| AppError::bad("用户不存在或已被删除"))?;
+
+    let uid: i64 = row.try_get("user_id").unwrap_or(0);
+    let now = chrono::Local::now().naive_local();
+    let mut lock_until: Option<chrono::NaiveDateTime> = row.try_get("lock_until").ok().flatten();
+    let mut fails: i32 = row.try_get("login_fail_count").unwrap_or(0);
+
+    // 锁定到期后自动解锁并清零
+    if let Some(lu) = lock_until {
+        if lu <= now {
+            let _ = crate::state::execute(
+                &state.pool,
+                "UPDATE sys_user SET login_fail_count = 0, lock_until = NULL WHERE user_id = $1",
+                &[&uid],
+            )
+            .await;
+            lock_until = None;
+            fails = 0;
+        }
+    }
+    if let Some(lu) = lock_until {
+        auth::log_login(&state, &user_name, "1", "账号已锁定", &ip, "Chrome", "Windows").await;
+        let msg = if lu.year() >= 2999 {
+            "账号已锁定，请联系管理员解锁".to_string()
+        } else {
+            format!("账号已锁定，请于 {} 后重试", lu.format("%Y-%m-%d %H:%M"))
+        };
+        return Err(AppError::bad(msg));
+    }
 
     let hash: String = row.try_get("password").unwrap_or_default();
     let ok = bcrypt::verify(&password, &hash).unwrap_or(false);
     if !ok {
+        let fails = fails + 1;
+        // 3/6/9 次分别锁定 30/60/180 分钟，12 次永久锁定（需管理员解锁）
+        let lock_minutes = match fails {
+            3..=5 => 30,
+            6..=8 => 60,
+            9..=11 => 180,
+            _ => 0,
+        };
+        let msg = if fails >= 12 {
+            let _ = crate::state::execute(
+                &state.pool,
+                "UPDATE sys_user SET login_fail_count = $1, lock_until = TIMESTAMP '2999-12-31 00:00:00' WHERE user_id = $2",
+                &[&fails, &uid],
+            )
+            .await;
+            "密码错误次数过多，账号已锁定，请联系管理员解锁".to_string()
+        } else if lock_minutes > 0 {
+            let until = now + chrono::Duration::minutes(lock_minutes);
+            let _ = crate::state::execute(
+                &state.pool,
+                "UPDATE sys_user SET login_fail_count = $1, lock_until = $2 WHERE user_id = $3",
+                &[&fails, &until, &uid],
+            )
+            .await;
+            format!("用户名或密码错误，连续失败 {fails} 次，账号已锁定 {lock_minutes} 分钟")
+        } else {
+            let _ = crate::state::execute(
+                &state.pool,
+                "UPDATE sys_user SET login_fail_count = $1 WHERE user_id = $2",
+                &[&fails, &uid],
+            )
+            .await;
+            format!("用户名或密码错误（连续失败 {fails} 次）")
+        };
         auth::log_login(&state, &user_name, "1", "密码错误", &ip, "Chrome", "Windows").await;
-        return Err(AppError::bad("用户名或密码错误"));
+        return Err(AppError::bad(msg));
     }
     let status: String = row.try_get("status").unwrap_or_default();
     if status != "0" {
         auth::log_login(&state, &user_name, "1", "账号已停用", &ip, "Chrome", "Windows").await;
         return Err(AppError::bad("账号已停用，请联系管理员"));
     }
+
+    // 从未修改过密码 → 首登强制改密
+    let need_change = row
+        .try_get::<_, Option<chrono::NaiveDateTime>>("pwd_update_date")
+        .ok()
+        .flatten()
+        .is_none();
 
     let mut user = crate::models::user_from_row(row, false);
     user.password = None;
@@ -98,12 +172,16 @@ pub async fn login(
     });
     let _ = ua;
 
-    // 更新登录信息
-    let upd = "UPDATE sys_user SET login_ip = $1, login_date = NOW() WHERE user_id = $2";
+    // 更新登录信息并清零失败计数
+    let upd = "UPDATE sys_user SET login_ip = $1, login_date = NOW(), login_fail_count = 0, lock_until = NULL WHERE user_id = $2";
     let _ = crate::state::execute(&state.pool, upd, &[&ip, &user.user_id]).await;
     auth::log_login(&state, &user_name, "0", "登录成功", &ip, "Chrome", "Windows").await;
 
-    Ok(Json(json!({ "code": 200, "msg": "登录成功", "data": { "access_token": token } })))
+    Ok(Json(json!({
+        "code": 200,
+        "msg": "登录成功",
+        "data": { "access_token": token, "needChangePwd": need_change }
+    })))
 }
 
 /// POST /auth/logout

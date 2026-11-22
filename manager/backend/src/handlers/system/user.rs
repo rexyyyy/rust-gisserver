@@ -275,8 +275,14 @@ pub async fn reset_pwd(
     let pwd = jstr(&body, "password");
     let pwd = if pwd.is_empty() { "123456".to_string() } else { pwd };
     let hash = bcrypt::hash(&pwd, bcrypt::DEFAULT_COST).map_err(|e| AppError::bad(e.to_string()))?;
-    execute(&state.pool, "UPDATE sys_user SET password = $1 WHERE user_id = $2", &[&hash, &id]).await?;
-    Ok(Json(json!({ "code": 200, "msg": "密码重置成功" })))
+    // 重置后视为初始密码：下次登录强制改密，并解除锁定
+    execute(
+        &state.pool,
+        "UPDATE sys_user SET password = $1, pwd_update_date = NULL, login_fail_count = 0, lock_until = NULL WHERE user_id = $2",
+        &[&hash, &id],
+    )
+    .await?;
+    Ok(Json(json!({ "code": 200, "msg": "密码重置成功，下次登录需修改密码" })))
 }
 
 /// GET /system/user/profile
@@ -341,8 +347,16 @@ pub async fn update_pwd(
     if !bcrypt::verify(&old, &hash).unwrap_or(false) {
         return Err(AppError::bad("原密码不正确"));
     }
+    if let Err(msg) = crate::auth::validate_password(&new) {
+        return Err(AppError::bad(msg));
+    }
     let nh = bcrypt::hash(&new, bcrypt::DEFAULT_COST).map_err(|e| AppError::bad(e.to_string()))?;
-    execute(&state.pool, "UPDATE sys_user SET password = $1 WHERE user_id = $2", &[&nh, &user.user_id]).await?;
+    execute(
+        &state.pool,
+        "UPDATE sys_user SET password = $1, pwd_update_date = NOW(), login_fail_count = 0, lock_until = NULL WHERE user_id = $2",
+        &[&nh, &user.user_id],
+    )
+    .await?;
     Ok(Json(json!({ "code": 200, "msg": "修改成功" })))
 }
 

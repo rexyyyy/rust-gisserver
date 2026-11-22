@@ -19,15 +19,15 @@ export const useUserStore = defineStore('user', () => {
   /**
    * 登录
    * @param userInfo
-   * @returns
+   * @returns 是否需要强制修改初始密码
    */
-  const login = async (userInfo: LoginData): Promise<void> => {
+  const login = async (userInfo: LoginData): Promise<boolean> => {
     const [err, res] = await to(loginApi(userInfo));
     if (res) {
       const data = res.data;
       setToken(data.access_token);
       token.value = data.access_token;
-      return Promise.resolve();
+      return Promise.resolve(data.needChangePwd === true);
     }
     return Promise.reject(err);
   };

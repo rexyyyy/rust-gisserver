@@ -155,6 +155,9 @@ create table if not exists sys_user
     update_by   int8,
     update_time timestamp,
     remark      varchar(500) default null::varchar,
+    pwd_update_date  timestamp,
+    login_fail_count int4 default 0,
+    lock_until  timestamp,
     constraint "sys_user_pk" primary key (user_id)
 );
 
@@ -900,7 +903,7 @@ insert into sys_dict_data values(36, 0,  'Android', 'android',       'sys_device
 insert into sys_dict_data values(37, 0,  'iOS', 'ios',            'sys_device_type',   '',   'default', 'N', 103, 1, now(), null, null, 'iOS') on conflict do nothing;
 insert into sys_dict_data values(38, 0,  'Mini Program', 'xcx',         'sys_device_type',   '',   'default', 'N', 103, 1, now(), null, null, 'Mini Program') on conflict do nothing;
 insert into sys_config values(1, 'Main frame - default skin name',     'sys.index.skinName',            'skin-blue',     'Y', 103, 1, now(), null, null, 'blue skin-blue, green skin-green, purple skin-purple, red skin-red, yellow skin-yellow' ) on conflict do nothing;
-insert into sys_config values(2, 'User Management - Initial Password',         'sys.user.initPassword',         '123456',        'Y', 103, 1, now(), null, null, 'Initial password 123456' ) on conflict do nothing;
+insert into sys_config values(2, 'User Management - Initial Password',         'sys.user.initPassword',         'Init@123456',   'Y', 103, 1, now(), null, null, 'Initial password Init@123456' ) on conflict do nothing;
 insert into sys_config values(3, 'Main frame - sidebar theme',           'sys.index.sideTheme',           'theme-dark',    'Y', 103, 1, now(), null, null, 'Dark theme theme-dark, light theme theme-light' ) on conflict do nothing;
 insert into sys_config values(5, 'Self-service - whether user registration is enabled',   'sys.account.registerUser',      'false',         'Y', 103, 1, now(), null, null, 'Whether user registration is enabled (true/false)') on conflict do nothing;
 insert into sys_config values(11, 'OSS preview list resource switch',          'sys.oss.previewListResource',   'true',          'Y', 103, 1, now(), null, null, 'true: enabled, false: disabled') on conflict do nothing;

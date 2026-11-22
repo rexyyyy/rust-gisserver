@@ -38,6 +38,14 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         let row = c.query_one("SELECT version()", &[]).await?;
         let v: String = row.try_get(0)?;
         tracing::info!("已连接 PostgreSQL: {}", v.split(',').next().unwrap_or(&v));
+        // 安全相关字段（幂等，兼容升级安装）
+        let _ = c
+            .batch_execute(
+                "ALTER TABLE sys_user ADD COLUMN IF NOT EXISTS pwd_update_date timestamp;\
+                 ALTER TABLE sys_user ADD COLUMN IF NOT EXISTS login_fail_count int4 DEFAULT 0;\
+                 ALTER TABLE sys_user ADD COLUMN IF NOT EXISTS lock_until timestamp;",
+            )
+            .await;
     }
 
     let state = Arc::new(AppState {

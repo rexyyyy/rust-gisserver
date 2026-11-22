@@ -12,6 +12,25 @@ use serde::{Deserialize, Serialize};
 use crate::error::{AppError, AppResult};
 use crate::state::AppState;
 
+/// 密码复杂度：6–20 位，且同时包含大写字母、小写字母、数字和符号。
+pub fn validate_password(pwd: &str) -> Result<(), String> {
+    let len = pwd.chars().count();
+    if len < 6 {
+        return Err("密码长度不能少于 6 位".into());
+    }
+    if len > 20 {
+        return Err("密码长度不能超过 20 位".into());
+    }
+    let has_upper = pwd.chars().any(|c| c.is_ascii_uppercase());
+    let has_lower = pwd.chars().any(|c| c.is_ascii_lowercase());
+    let has_digit = pwd.chars().any(|c| c.is_ascii_digit());
+    let has_symbol = pwd.chars().any(|c| !c.is_alphanumeric());
+    if !(has_upper && has_lower && has_digit && has_symbol) {
+        return Err("密码必须同时包含大写字母、小写字母、数字和符号".into());
+    }
+    Ok(())
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Claims {
     /// 用户 id
