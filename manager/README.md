@@ -243,7 +243,7 @@ python tools/ui_smoke.py
 
 ### 排查要点
 
-- **顶层路由 path 必须以 `/` 开头**：vue-router 5.x 的 `addRoute` 对根级 path 强制要求，否则抛
+- **顶层路由 path 必须以 `/` 开头**：vue-router 的 `addRoute` 对根级 path 强制要求，否则抛
   `Route paths should start with a "/"`，被 `permission.ts` 的 try/catch 吞掉后落回 `/index`，表现为「全站 404」。
 - **`meta` 字段名是驼峰**（`noCache` / `activeMenu` / `alwaysShow`）：前端 `tagsView.ts`、`TopBar`、`Sidebar` 都按驼峰读，
   下发成 `no_cache` 会让 keep-alive 判断恒失效。

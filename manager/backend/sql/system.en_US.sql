@@ -13,7 +13,7 @@
 --              sys_logininfor / sys_notice
 --   §2 Patch: avatar column + log table PK sequences
 --   §3 Seed data: menus / roles / users / depts / posts / dicts / configs / notices
---   §4 Patch: Online Users menu (missing from upstream 5.X seed, added here)
+--   §4 Patch: Online Users menu (missing from the original seed, added here)
 --   §5 Normalize top-level directory sort order
 -- ---------------------------------------------------------------------
 -- Idempotent: CREATE TABLE IF NOT EXISTS; CREATE INDEX IF NOT EXISTS;
@@ -658,7 +658,7 @@ comment on column sys_notice.remark         is 'Remark';
 -- =====================================================================
 -- §2 Patch: avatar column + log table PK sequences
 -- ---------------------------------------------------------------------
--- 5.X originally had sys_user.avatar as bigint (OSS file id); this project has no OSS,
+-- Earlier versions had sys_user.avatar as bigint (OSS file id); this project has no OSS,
 -- changed to varchar(500) for a relative path (e.g. /profile/avatar/2026/10/26/u1_xxx.png).
 -- Add sequences for oper_id / info_id to avoid PK collisions on concurrent inserts.
 -- =====================================================================
@@ -910,7 +910,7 @@ insert into sys_notice values('2', 'Maintenance notice: scheduled maintenance on
 -- =====================================================================
 -- §4 Patch: Online Users menu
 -- ---------------------------------------------------------------------
--- Upstream 5.X sys_menu has 109 (Online Users, parent=2 System Monitor) plus 1046/1047/1048
+-- The original sys_menu seed has 109 (Online Users, parent=2 System Monitor) plus 1046/1047/1048
 -- three button permissions - missing in this project seed, so monitor/online page had no entry.
 -- =====================================================================
 
