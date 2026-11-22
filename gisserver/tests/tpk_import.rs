@@ -10,31 +10,40 @@
 //! * 两者的网格、坐标、LOD 都从各自配置文件读出，归一成同一条定义记录；
 //! * 内容完全一致的缓存**引用同一条**定义记录，不新建。
 //!
-//! 样例：`E:\data\1\arcgis_tpk\{road.tpk,bai.tpkx}`；文件不存在时整组跳过。
+//! 样例：本地 TPK/TPKX 样例，分别由 `GS_TEST_TPK`、`GS_TEST_TPKX` 指定；未设置
+//! 或文件不存在时整组跳过。
 
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 
 use gisserver::arcgis_cache::bundle::CacheVersion;
 use gisserver::arcgis_cache::definition::{CacheDefinition, DefinitionKind};
 use gisserver::arcgis_cache::{conf::CacheDocs, grid, tpk::unpack_to, ArcgisCache};
 
-const TPK: &str = r"E:\data\1\arcgis_tpk\road.tpk";
-const TPKX: &str = r"E:\data\1\arcgis_tpk\bai.tpkx";
+const TPK_ENV: &str = "GS_TEST_TPK";
+const TPKX_ENV: &str = "GS_TEST_TPKX";
 
-fn sample(p: &str) -> Option<PathBuf> {
-    let p = Path::new(p);
-    p.is_file().then(|| p.to_path_buf())
+fn sample(env_key: &str) -> Option<PathBuf> {
+    let Ok(value) = std::env::var(env_key) else {
+        eprintln!("跳过：未设置 {env_key}");
+        return None;
+    };
+    let p = PathBuf::from(value);
+    if p.is_file() {
+        Some(p)
+    } else {
+        eprintln!("跳过：{env_key} 指向的文件不存在");
+        None
+    }
 }
 
 /// `.tpk` 导入后：落点根下直接是 `conf.xml` + `_alllayers/`，且能被打开读瓦。
 #[test]
 fn tpk_import_produces_flat_cache_dir() {
-    let Some(src) = sample(TPK) else {
-        eprintln!("跳过：{TPK} 不存在");
+    let Some(src) = sample(TPK_ENV) else {
         return;
     };
     let tmp = tempfile::tempdir().unwrap();
-    let dest = tmp.path().join("road_tpk");
+    let dest = tmp.path().join("tpk_import");
     let r = unpack_to(&src, &dest).expect("导入应成功");
 
     // 落点根下直接是 conf.xml（不再是 v101/图层/conf.xml）。
@@ -57,10 +66,10 @@ fn tpk_import_produces_flat_cache_dir() {
     let ac = ArcgisCache::open(&dest).expect("导入后的目录应能作为缓存打开");
     assert_eq!(ac.info().kind, DefinitionKind::ConfXml);
     assert_eq!(ac.info().tile_root, "_alllayers");
-    assert_eq!(ac.version(), CacheVersion::V1, "road.tpk 带 .bundlx，是 compact v1");
+    assert_eq!(ac.version(), CacheVersion::V1, "TPK 样例带 .bundlx，是 compact v1");
 
     // 网格由定义记录推导，取到真实瓦片。
-    let spec = ac.grid_spec("arcgis_road").expect("推导网格");
+    let spec = ac.grid_spec("arcgis_tpk").expect("推导网格");
     let bounds = ac.bounds().expect("conf.cdi 应给出数据范围");
     let z = ac.probe().max_zoom;
     let (c, r) = grid::tile_indices(&spec, z, (bounds[0] + bounds[2]) / 2.0, (bounds[1] + bounds[3]) / 2.0).unwrap();
@@ -81,18 +90,17 @@ fn tpk_import_produces_flat_cache_dir() {
     assert!(hit.is_some(), "导入后应能取到真实瓦片");
     let (cc, rr, len) = hit.unwrap();
     assert!(len > 100, "瓦片过小：{len}B");
-    println!("road.tpk 导入 → {:?} v{:?} z{z} 命中 ({cc},{rr}) {len}B", ac.info().crs, ac.version());
+    println!("TPK 导入 → {:?} v{:?} z{z} 命中 ({cc},{rr}) {len}B", ac.info().crs, ac.version());
 }
 
 /// `.tpkx` 导入后：`root.json` + `tile/` 在根，瓦片根目录名由定义记录给出。
 #[test]
 fn tpkx_import_keeps_root_json_layout() {
-    let Some(src) = sample(TPKX) else {
-        eprintln!("跳过：{TPKX} 不存在");
+    let Some(src) = sample(TPKX_ENV) else {
         return;
     };
     let tmp = tempfile::tempdir().unwrap();
-    let dest = tmp.path().join("bai_tpk");
+    let dest = tmp.path().join("tpkx_import");
     let r = unpack_to(&src, &dest).expect("导入应成功");
 
     assert!(dest.join("root.json").is_file(), "root.json 应在落点根");
@@ -105,7 +113,7 @@ fn tpkx_import_keeps_root_json_layout() {
     assert_eq!(ac.version(), CacheVersion::V2, "tpkx 是 compact v2");
     assert!(!ac.info().lods.is_empty(), "LOD 应从 root.json 读出");
     println!(
-        "bai.tpkx 导入 → {} z{}..{} tile_root={}",
+        "TPKX 导入 → {} z{}..{} tile_root={}",
         ac.info().crs,
         ac.info().min_zoom(),
         ac.info().max_zoom(),
@@ -116,8 +124,8 @@ fn tpkx_import_keeps_root_json_layout() {
 /// 两种形态的配置归一到同一形状：字段名不同，网格语义一致。
 #[test]
 fn both_package_shapes_map_to_one_definition_shape() {
-    let (Some(tpk), Some(tpkx)) = (sample(TPK), sample(TPKX)) else {
-        eprintln!("跳过：样本不存在");
+    let (Some(tpk), Some(tpkx)) = (sample(TPK_ENV), sample(TPKX_ENV)) else {
+        eprintln!("跳过：样本未设置或不存在");
         return;
     };
     let tmp = tempfile::tempdir().unwrap();
@@ -144,8 +152,7 @@ fn both_package_shapes_map_to_one_definition_shape() {
 /// 同一份缓存导入两次 → 引用同一条定义记录，不新建。
 #[test]
 fn reimport_reuses_definition_record() {
-    let Some(src) = sample(TPK) else {
-        eprintln!("跳过：{TPK} 不存在");
+    let Some(src) = sample(TPK_ENV) else {
         return;
     };
     let tmp = tempfile::tempdir().unwrap();
@@ -166,12 +173,11 @@ fn reimport_reuses_definition_record() {
 /// 目录缓存（不经包）同样归一到定义记录，且与包形态字段同形。
 #[test]
 fn directory_cache_and_package_share_definition_shape() {
-    let Some(src) = sample(TPK) else {
-        eprintln!("跳过：{TPK} 不存在");
+    let Some(src) = sample(TPK_ENV) else {
         return;
     };
     let tmp = tempfile::tempdir().unwrap();
-    let dest = tmp.path().join("road_tpk");
+    let dest = tmp.path().join("tpk_import");
     unpack_to(&src, &dest).unwrap();
 
     let docs = CacheDocs::load(&dest).expect("目录形态应能装载");

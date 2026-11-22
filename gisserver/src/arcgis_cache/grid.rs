@@ -5,7 +5,7 @@
 //! ArcGIS 预切片缓存的瓦片寻址完全由 Conf.xml 决定：
 //! `col = floor((x - TileOrigin.X) / (TileCols * Resolution(z)))`，行同理自左上角
 //! 向南。这套参数与任何预设网格（WebMercatorQuad / WorldCRS84Quad）都不等价——
-//! 尤其当缓存是 CGCS2000 地理坐标系（EPSG:4490，本仓库 E 盘样例）或高斯-克吕格
+//! 尤其当缓存是 CGCS2000 地理坐标系（EPSG:4490，本仓库样例）或高斯-克吕格
 //! 投影带（EPSG:4522 等）时，用预设网格去取瓦片会整体错位。因此这里把 Conf.xml
 //! 直接摊成一份 custom grid 定义，让浏览端按**数据自身的**分辨率取瓦片。
 //!
@@ -383,7 +383,7 @@ mod tests {
     use super::*;
     use crate::arcgis_cache::definition::CacheDefinition;
 
-    /// E 盘真实缓存（TD_DZZHYHD_G_2025_GCS2000）的 Conf.xml 关键参数固化。
+    /// 真实缓存样例的 Conf.xml 关键参数固化。
     fn real_info() -> CacheDefinition {
         let text = std::fs::read_to_string(concat!(env!("CARGO_MANIFEST_DIR"), "/tests/data/TD_Conf.xml")).unwrap();
         CacheDefinition::from_xml(&text).unwrap()
@@ -465,14 +465,14 @@ mod tests {
     #[test]
     fn emits_layer_xml_with_lod_scales() {
         let info = real_info();
-        let spec = derive(&info, "arcgis_td_dzzhyhd", Some(CDI)).unwrap();
-        let xml = layer_xml("td_dzzhyhd", "专题图层", Path::new("E:/data_km/arcgis_cah/TD_DZZHYHD_G_2025_GCS2000"), &spec);
+        let spec = derive(&info, "arcgis_td", Some(CDI)).unwrap();
+        let xml = layer_xml("td", "专题图层", Path::new("cache/arcgis/sample"), &spec);
         assert!(xml.starts_with("<?xml"));
-        assert!(xml.contains("<layer name=\"td_dzzhyhd\" title=\"专题图层\" src_crs=\"EPSG:4490\" tile_px=\"256\">"));
-        assert!(xml.contains("<source type=\"arcgis\" path=\"E:/data_km/arcgis_cah/TD_DZZHYHD_G_2025_GCS2000\"/>"));
-        assert!(xml.contains("<item>arcgis_td_dzzhyhd</item>"));
+        assert!(xml.contains("<layer name=\"td\" title=\"专题图层\" src_crs=\"EPSG:4490\" tile_px=\"256\">"));
+        assert!(xml.contains("<source type=\"arcgis\" path=\"cache/arcgis/sample\"/>"));
+        assert!(xml.contains("<item>arcgis_td</item>"));
         assert!(xml.contains("<custom_grids>"));
-        assert!(xml.contains("id=\"arcgis_td_dzzhyhd\""));
+        assert!(xml.contains("id=\"arcgis_td\""));
         // 19 级分辨率 + 19 级比例尺，且数字可被原样读回（不丢精度）
         assert!(xml.contains(&format!("<item>{}</item>", info.lods[0].resolution)));
         assert!(xml.contains(&format!("<item>{}</item>", info.lods[0].scale)));
@@ -487,7 +487,7 @@ mod tests {
         assert_eq!(round.origin, spec.origin);
         assert_eq!(round.extent, spec.extent);
         assert_eq!(round.tile_px, spec.tile_px);
-        assert_eq!(round.id, "arcgis_td_dzzhyhd");
+        assert_eq!(round.id, "arcgis_td");
         assert_eq!(round.crs, "EPSG:4490");
         // 图层整文档形式也能回读（运维反向校验走同一条路径）
         assert_eq!(parse_custom_grid_xml(&xml).unwrap().resolutions, spec.resolutions);

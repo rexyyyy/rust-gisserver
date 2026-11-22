@@ -4,7 +4,7 @@
 [package]
 name = "gisserver"
 description = "Core library family of rust-gisserver: bespoke COG/BigTIFF reader, tile rendering, MVT encoding, PMTiles/MBTiles archives, WMS/WFS/OGC API protocols, projections and PostGIS source - pure Rust, no GDAL binding."
-version = "0.8.1"
+version = "0.8.2"
 edition = "2021"
 license = "MIT OR Apache-2.0"
 repository = "https://github.com/rexyyyy/rust-gisserver"
@@ -13,8 +13,8 @@ readme = "README.md"
 [features]
 default = ["encoding", "mvt", "projection", "vector-query"]
 # Windows ANSI code page fallback for gisserver::encoding::Region::from_env.
-# Off by default: core stays zero-FFI / zero-unsafe; region is declared via
-# GIS_ENCODING_REGION in .env (see config/env presets).
+# Off by default: keeps the encoding module zero-FFI / zero-unsafe; region is
+# declared via GIS_ENCODING_REGION in .env (see config/env presets).
 win-acp = []
 encoding = ["dep:encoding_rs"]
 projection = []

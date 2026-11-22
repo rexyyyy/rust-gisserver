@@ -18,9 +18,9 @@
 //! * **v2（ArcGIS 10.3+）**：无 `.bundlx`，索引内嵌在 `.bundle` 的 64 字节头之后，
 //!   每槽 **8 字节**（前 5 字节偏移 + 后 3 字节大小），槽位号 `idx =
 //!   PacketSize * (row % PacketSize) + (col % PacketSize)`（**行优先**，与 v1 相反）。
-//! * **WTC v1（gis-wt 自有，2026-11）**：`magic = "GISWTC01"` 开头，64B 自描述头 +
+//! * **WTC v1（自定义扩展，2026-11）**：`magic = "GISWTC01"` 开头，64B 自描述头 +
 //!   `tile_count × 16B` 稀疏索引（只存有效瓦片，按 `(row_in,col_in)` 升序，二分查找），
-//!   瓦片 `[4B size][WebP]`。不再是 ArcGIS 格式变体，详见 gis-wt `docs/12-WebP缓存格式规范.md`。
+//!   瓦片 `[4B size][WebP]`。不再是 ArcGIS 格式变体，其 `offset`/`size` 语义见下。
 //!   WTC 的 `offset`/`size` 语义与 v2 一致（offset 指向图像数据首字节），故读瓦片时共用
 //!   v2 分支；区别只在索引如何解析。扩展名沿用 `.webpdle`，靠 magic 分派。
 //!
@@ -64,7 +64,7 @@ pub enum CacheVersion {
     V1,
     /// ArcGIS 10.3+：索引内嵌 `.bundle`。
     V2,
-    /// gis-wt WTC v1：magic `GISWTC01`，自描述头 + 16B 稀疏索引（扩展名沿用 `.webpdle`）。
+    /// WTC v1（自定义扩展）：magic `GISWTC01`，自描述头 + 16B 稀疏索引（扩展名沿用 `.webpdle`）。
     Wtc,
 }
 
@@ -441,7 +441,7 @@ fn slot(packet: u32, col_in: u32, row_in: u32, version: CacheVersion) -> usize {
 
 /// 把 `<base>` 换成同目录的 `<stem>.<ext>`，并按磁盘实际大小写解析。
 ///
-/// gis-wt 定制：当 `ext == "bundle"` 但标准 `.bundle` 不存在时，回退查找
+/// 自定义扩展：当 `ext == "bundle"` 但标准 `.bundle` 不存在时，回退查找
 /// `.webpdle`（Compact Cache V2 结构 + WebP 瓦片，扩展名定制）。这样一份
 /// 缓存里两种扩展名可共存，读端对老格式行为完全不变。
 fn sidecar(base: &Path, ext: &str) -> Result<PathBuf, String> {
@@ -753,7 +753,7 @@ mod tests {
         assert_eq!(sniff(JPG, ImageType::Mixed), "image/jpeg");
         assert_eq!(sniff(&[], ImageType::Png), "image/png");
         assert_eq!(sniff(&[1, 2, 3], ImageType::Other), "application/octet-stream");
-        // gis-wt 定制：WebP 魔数优先于声明类型，WEBPDLE 声明也能识别。
+        // 自定义扩展：WebP 魔数优先于声明类型，WEBPDLE 声明也能识别。
         let webp = b"RIFF\x1a\x00\x00\x00WEBPVP8 ";
         assert_eq!(sniff(webp, ImageType::Webp), "image/webp");
         assert_eq!(sniff(webp, ImageType::Other), "image/webp");
@@ -832,10 +832,10 @@ mod tests {
         assert!(ac.read_tile(0, 9, 7).unwrap().is_none());
     }
 
-    /// gis-wt writer 产物读回：定制扩展名 .webpdle + V2 索引 offset 指向 WebP 数据首字节
-    /// （4B size 前缀在 offset-4），行优先槽位。覆盖老杨"格式必须完全保证"的读回闭环。
+    /// 自定义 writer 产物读回：定制扩展名 .webpdle + V2 索引 offset 指向 WebP 数据首字节
+    /// （4B size 前缀在 offset-4），行优先槽位。覆盖格式读回闭环。
     #[test]
-    fn gislab_webpdle_v2_roundtrip() {
+    fn webpdle_v2_roundtrip() {
         // 一个最小的合法 lossless WebP（1x1，RIFF....WEBPVP8L）
         let webp: &[u8] = b"RIFF\x1a\x00\x00\x00WEBPVP8L\x12\x00\x00\x00\x2f\x00\x00\x00\x10\x07\x10\x11\x11\x88\x88\xfe\x07\x00";
         let dir = tempfile::tempdir().unwrap();
@@ -882,7 +882,7 @@ mod tests {
     /// WTC v1 格式读回：magic + 64B 自描述头 + 16B 稀疏索引（非 V2 固定槽）。
     /// 覆盖独立格式的核心：自描述头解析、稀疏索引展开、offset 指向 WebP 首字节。
     #[test]
-    fn gislab_wtc_v1_roundtrip() {
+    fn wtc_v1_roundtrip() {
         let webp: &[u8] = b"RIFF\x1a\x00\x00\x00WEBPVP8L\x12\x00\x00\x00\x2f\x00\x00\x00\x10\x07\x10\x11\x11\x88\x88\xfe\x07\x00";
         let dir = tempfile::tempdir().unwrap();
         let cache = dir.path().join("svc_wtc");

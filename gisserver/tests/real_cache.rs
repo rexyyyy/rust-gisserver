@@ -1,10 +1,11 @@
-//! E 盘真实 ArcGIS 缓存的验收测试。
+//! 本地真实 ArcGIS 缓存的验收测试。
 //!
-//! 数据不在仓库里（体积大、且属于第三方产出），因此默认 `#[ignore]`。有数据的
-//! 开发机上执行：
+//! 数据不在仓库里（体积大、且属于第三方产出），因此默认 `#[ignore]`。缓存根目录
+//! 由环境变量 `GS_TEST_ARCGIS_CACHE` 指定，未设置或目录不存在时整组跳过。有数据的
+//! 环境执行：
 //!
 //! ```text
-//! cargo test -p arcgis-cache --test real_cache -- --ignored --nocapture
+//! GS_TEST_ARCGIS_CACHE=/path/to/cache cargo test --features arcgis-cache --test real_cache -- --ignored --nocapture
 //! ```
 //!
 //! # 为什么值得留这条
@@ -12,26 +13,40 @@
 //! 合成 fixture 只能证明「代码与自己写的字节一致」；compact cache 的索引顺序、
 //! bundle 命名的十六进制习惯、`conf.cdi` 的实际精度都由 ArcGIS 的产出决定。真实
 //! 数据一旦读错，表现是**整幅地图镜像错位而不报任何错**——只有拿真实缓存对齐地理
-//! 范围才能发现。这里的期望值来自本机实测：L10 的 `R0100C0600.bundle` 按 v1 列优
-//! 先解出的行列（col 1603–1607 / row 370–372）正好落在 `conf.cdi` 的昆明范围内。
+//! 范围才能发现。
 
 use std::path::{Path, PathBuf};
 
 use gisserver::arcgis_cache::bundle::{ArcgisCache, CacheVersion};
 use gisserver::arcgis_cache::grid;
 
-/// 本机 ArcGIS 缓存根目录（不存在时整组测试直接跳过）。
-const ROOT: &str = r"E:\data_km\arcgis_cah";
-/// 已实测的样例服务（CGCS2000 地理坐标系、19 级 LOD、compact cache v1）。
-const TD: &str = "TD_DZZHYHD_G_2025_GCS2000";
+/// 缓存根目录的环境变量名（未设置或目录不存在时整组测试直接跳过）。
+const ROOT_ENV: &str = "GS_TEST_ARCGIS_CACHE";
 
 fn root() -> Option<PathBuf> {
-    let p = Path::new(ROOT);
+    let Ok(value) = std::env::var(ROOT_ENV) else {
+        eprintln!("跳过：未设置 {ROOT_ENV}");
+        return None;
+    };
+    let p = PathBuf::from(value);
     if p.is_dir() {
-        Some(p.to_path_buf())
+        Some(p)
     } else {
+        eprintln!("跳过：{ROOT_ENV} 指向的目录不存在");
         None
     }
+}
+
+/// 枚举缓存根目录下的一级服务目录（排序后返回，保证测试结果可复现）。
+fn service_dirs(root: &Path) -> Vec<PathBuf> {
+    let mut dirs: Vec<PathBuf> = std::fs::read_dir(root)
+        .unwrap()
+        .flatten()
+        .map(|e| e.path())
+        .filter(|p| p.is_dir())
+        .collect();
+    dirs.sort();
+    dirs
 }
 
 /// 打开一个缓存服务：服务根本身或其一级图层子目录都能被 `CacheDocs::load` 找到。
@@ -41,84 +56,88 @@ fn open_service(root: &Path, svc: &str) -> ArcgisCache {
 }
 
 #[test]
-#[ignore = "需要 E 盘真实 ArcGIS 缓存数据"]
-fn td_cache_matches_measured_layout() {
+#[ignore = "需要本地真实 ArcGIS 缓存（GS_TEST_ARCGIS_CACHE）"]
+fn sample_cache_conf_and_probe_agree() {
     let Some(root) = root() else {
-        eprintln!("跳过：{ROOT} 不存在");
-        return;
-    };
-    let ac = open_service(&root, TD);
-
-    // 格式判定：真实产出是 10.x 的 v1（有 .bundlx，且 Conf.xml 里没有 BundleVersion）
-    assert_eq!(ac.version(), CacheVersion::V1);
-    let info = ac.info();
-    assert_eq!(info.crs, "EPSG:4490");
-    assert_eq!(info.tile_cols, 256);
-    assert_eq!(info.packet_size, 128);
-    assert_eq!(info.lods.len(), 19);
-    assert_eq!((info.min_zoom(), info.max_zoom()), (0, 18));
-
-    // _alllayers 的层级清单不能超出 Conf.xml 的 LOD 阶梯，否则寻址会取到不存在的级
-    let probe = ac.probe();
-    assert!(!probe.levels.is_empty());
-    for z in &probe.levels {
-        assert!(info.lods.iter().any(|l| l.level == *z), "L{z:02} 不在 LOD 阶梯内");
-    }
-
-    // conf.cdi 的昆明范围
-    let b = ac.bounds().expect("该缓存有 conf.cdi");
-    assert!(b[0] > 102.2 && b[0] < 102.3, "minx = {}", b[0]);
-    assert!(b[1] > 24.4 && b[1] < 24.5, "miny = {}", b[1]);
-    assert!(b[2] > 102.8 && b[2] < 102.9, "maxx = {}", b[2]);
-    assert!(b[3] > 24.7 && b[3] < 24.8, "maxy = {}", b[3]);
-
-    // LOD → custom grid：范围必须包住数据，且数据四角都能算出网格内的行列
-    let spec = ac.grid_spec("arcgis_td").expect("网格推导");
-    assert_eq!(spec.crs, "EPSG:4490");
-    assert_eq!(spec.levels.len(), 19);
-    assert!(spec.extent[0] <= b[0] && spec.extent[2] >= b[2]);
-    assert!(spec.extent[1] <= b[1] && spec.extent[3] >= b[3]);
-    let z = 10;
-    for (x, y) in [(b[0], b[1]), (b[2], b[3]), (b[0], b[3]), (b[2], b[1])] {
-        let (c, r) = grid::tile_indices(&spec, z, x, y).expect("数据角点应能算出行列");
-        assert!(
-            grid::tile_bounds(&spec, z, c, r).is_some(),
-            "({x},{y}) → col {c} row {r} 越出矩阵 {}x{}",
-            spec.matrix_w[z as usize],
-            spec.matrix_h[z as usize]
-        );
-    }
-
-    // 实测命中的瓦片：v1 列优先的槽位，取错顺序会在这里拿到 None
-    let t = ac
-        .read_tile(z, 1603, 370)
-        .expect("读 L10/R0100C0600 不应报错")
-        .expect("实测该槽位有瓦片");
-    assert!(
-        t.content_type.starts_with("image/"),
-        "Content-Type = {}",
-        t.content_type
-    );
-    assert!(t.bytes.len() > 100, "瓦片仅 {} 字节", t.bytes.len());
-    // 缓存区外（非洲）不得报错，应给空瓦片
-    assert!(ac.read_tile(z, 0, 0).expect("区外读取").is_none());
-}
-
-/// 三个样例都要能打开并推出网格；任何一个环节（编码、大小写、子目录、LOD）
-/// 在真实产出上翻车，这里会指名是哪个服务。
-#[test]
-#[ignore = "需要 E 盘真实 ArcGIS 缓存数据"]
-fn every_sample_cache_opens_and_derives_a_grid() {
-    let Some(root) = root() else {
-        eprintln!("跳过：{ROOT} 不存在");
         return;
     };
     let mut checked = 0usize;
-    for entry in std::fs::read_dir(&root).unwrap().flatten() {
-        let dir = entry.path();
-        if !dir.is_dir() {
-            continue;
+    for dir in service_dirs(&root) {
+        let name = dir.file_name().unwrap().to_string_lossy().to_string();
+        let ac = open_service(&root, &name);
+
+        // 格式判定：真实目录缓存是 v1（有 .bundlx）或 v2（索引内嵌）
+        assert!(
+            matches!(ac.version(), CacheVersion::V1 | CacheVersion::V2),
+            "{name}: 非预期格式 {:?}",
+            ac.version()
+        );
+        let info = ac.info();
+        assert!(!info.crs.is_empty() && info.crs != "EPSG:0", "{name}: 缺少 CRS");
+        assert_eq!(info.tile_cols, 256, "{name}: 瓦片边长应为 256");
+        assert_eq!(info.tile_rows, 256, "{name}: 瓦片边长应为 256");
+        assert!(info.packet_size > 0, "{name}: PacketSize 应为正");
+        assert!(!info.lods.is_empty(), "{name}: LOD 阶梯不应为空");
+
+        // _alllayers 的层级清单不能超出 Conf.xml 的 LOD 阶梯，否则寻址会取到不存在的级
+        let probe = ac.probe();
+        assert!(!probe.levels.is_empty(), "{name}: _alllayers 未探测到层级");
+        for z in &probe.levels {
+            assert!(
+                info.lods.iter().any(|l| l.level == *z),
+                "{name}: L{z:02} 不在 LOD 阶梯内"
+            );
         }
+
+        // LOD → custom grid：范围必须包住数据，且数据四角都能算出网格内的行列
+        let spec = ac.grid_spec(&format!("arcgis_{name}")).unwrap_or_else(|e| {
+            panic!("{name}: 网格推导失败: {e}")
+        });
+        assert_eq!(spec.crs, info.crs, "{name}: 网格 CRS 与 Conf.xml 不一致");
+        assert_eq!(spec.levels.len(), info.lods.len(), "{name}: 网格层级数不一致");
+        if let Some(b) = ac.bounds() {
+            assert!(
+                spec.extent[0] <= b[0] && spec.extent[2] >= b[2],
+                "{name}: 网格东西范围未包住数据"
+            );
+            assert!(
+                spec.extent[1] <= b[1] && spec.extent[3] >= b[3],
+                "{name}: 网格南北范围未包住数据"
+            );
+            let z = probe.levels[probe.levels.len() / 2];
+            for (x, y) in [(b[0], b[1]), (b[2], b[3]), (b[0], b[3]), (b[2], b[1])] {
+                let (c, r) =
+                    grid::tile_indices(&spec, z, x, y).expect("数据角点应能算出行列");
+                assert!(
+                    grid::tile_bounds(&spec, z, c, r).is_some(),
+                    "{name}: ({x},{y}) → col {c} row {r} 越出矩阵 {}x{}",
+                    spec.matrix_w[z as usize],
+                    spec.matrix_h[z as usize]
+                );
+            }
+        }
+
+        // 层级最深一级的区外读取不得报错，应给空瓦片
+        let z = info.max_zoom();
+        assert!(
+            ac.read_tile(z, u32::MAX, u32::MAX).expect("区外读取").is_none(),
+            "{name}: 区外应返回空瓦片"
+        );
+        checked += 1;
+    }
+    assert!(checked > 0, "缓存根目录下没有可识别的服务目录");
+}
+
+/// 每个样例都要能打开并推出网格，且在数据中心邻域取到真实瓦片；任何一个环节
+/// （编码、大小写、子目录、LOD）在真实产出上翻车，这里会指名是哪个服务。
+#[test]
+#[ignore = "需要本地真实 ArcGIS 缓存（GS_TEST_ARCGIS_CACHE）"]
+fn every_sample_cache_opens_and_derives_a_grid() {
+    let Some(root) = root() else {
+        return;
+    };
+    let mut checked = 0usize;
+    for dir in service_dirs(&root) {
         let name = dir.file_name().unwrap().to_string_lossy().to_string();
         let ac = open_service(&root, &name);
         let spec = ac
@@ -162,5 +181,5 @@ fn every_sample_cache_opens_and_derives_a_grid() {
         println!("{name}: {} 级, v{:?}, z{z} 命中 ({cc},{rr}) {len}B", spec.levels.len(), ac.version());
         checked += 1;
     }
-    assert!(checked >= 3, "样例缓存应有 3 个，实际检查 {checked} 个");
+    assert!(checked > 0, "缓存根目录下没有可识别的服务目录");
 }

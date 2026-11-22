@@ -1,31 +1,31 @@
-//! gis-wt arcgisv2webp 插件真实产物的读回验收测试。
+//! 本地缓存写入产物的读回验收测试。
 //!
-//! 与 bundle.rs 里的合成单测不同，这里读的是 gis_invoke 调插件后真实落盘的
-//! `_fixtures/cache_out`（由 gen_fixture.py + TD_Conf_min.xml 生成），验证
-//! reader 与 writer 端到端字节兼容。缓存不在常规测试路径，故默认 #[ignore]。
+//! 与 `bundle.rs` 里的合成单测不同，这里读取的是外部写入端真实落盘的缓存目录，
+//! 验证 reader 与 writer 端到端字节兼容。缓存不在常规测试路径，路径由
+//! `GS_TEST_CACHE_DIR` 指定，故默认 `#[ignore]`；未设置时测试直接跳过。
 //!
-//! 生成 + 验收流程：
-//!   1) python _fixtures/gen_fixture.py
-//!   2) gis_invoke.exe build\plugins gislab.arcgisv2webp @_fixtures\params_build.json
-//!   3) cargo test -p gisserver --features arcgis-cache --test gislab_roundtrip -- --ignored --nocapture
+//! 执行：
+//!
+//! ```text
+//! GS_TEST_CACHE_DIR=/path/to/cache cargo test -p gisserver --features arcgis-cache --test gislab_roundtrip -- --ignored --nocapture
+//! ```
 
-use std::path::Path;
+use std::path::PathBuf;
 
 use gisserver::arcgis_cache::bundle::{ArcgisCache, CacheVersion};
 
-/// 相对 manifest：gisserver -> rust-gisserver -> thirdparty -> 仓库根 -> _fixtures/cache_out
-fn cache_dir() -> std::path::PathBuf {
-    Path::new(env!("CARGO_MANIFEST_DIR"))
-        .join("..")
-        .join("..")
-        .join("..")
-        .join("_fixtures")
-        .join("cache_out")
+/// 缓存目录由环境变量 `GS_TEST_CACHE_DIR` 指定。
+fn cache_dir() -> Option<PathBuf> {
+    let Ok(value) = std::env::var("GS_TEST_CACHE_DIR") else {
+        eprintln!("跳过：未设置 GS_TEST_CACHE_DIR");
+        return None;
+    };
+    Some(PathBuf::from(value))
 }
 
 fn nearest_color(payload: &[u8]) -> Option<&'static str> {
-    // 不做完整 WebP 解码，用魔数 + 已知尺寸/大小粗判；精确颜色校验由 Python
-    // verify_bundle.py 承担（PIL 解码）。这里证明 reader 能按 V2 索引取对瓦片。
+    // 不做完整 WebP 解码，用魔数 + 已知尺寸/大小粗判；这里证明 reader 能按 V2
+    // 索引取对瓦片。
     if payload.starts_with(b"RIFF") && payload.get(8..12) == Some(b"WEBP") {
         Some("webp")
     } else {
@@ -34,10 +34,12 @@ fn nearest_color(payload: &[u8]) -> Option<&'static str> {
 }
 
 #[test]
-#[ignore = "需要先运行 gis_invoke 生成 _fixtures/cache_out"]
-fn gislab_writer_output_readback() {
-    let dir = cache_dir();
-    assert!(dir.is_dir(), "缓存目录不存在（请先跑 gis_invoke build）: {}", dir.display());
+#[ignore = "需要设置 GS_TEST_CACHE_DIR 指向本地缓存产物"]
+fn local_cache_writer_output_readback() {
+    let Some(dir) = cache_dir() else {
+        return;
+    };
+    assert!(dir.is_dir(), "缓存目录不存在: {}", dir.display());
     let ac = ArcgisCache::open(&dir).unwrap_or_else(|e| panic!("打开缓存失败: {e}"));
     assert_eq!(ac.version(), CacheVersion::V2, ".webpdle 产物应判为 V2");
 
@@ -57,5 +59,5 @@ fn gislab_writer_output_readback() {
         got += 1;
     }
     assert_eq!(got, 4, "应有 4 个瓦片可读回");
-    eprintln!("OK: 真实 writer 产物经 reader 读回 4 个 WebP 瓦片，content_type 全部 image/webp");
+    eprintln!("OK: 真实写入端产物经 reader 读回 4 个 WebP 瓦片，content_type 全部 image/webp");
 }

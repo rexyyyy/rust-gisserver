@@ -27,7 +27,7 @@
 //!
 //! 判定保守：正常 UTF-8 路径原样返回；无法确信时不改动。
 //!
-//! > 同步源：gis-wt 主仓 `rust_back_apiserver/crates/gis-encoding`（两仓各持一份，
+//! > 说明：本模块的编码探测逻辑与其他实现共享同一套规则（两处各持一份，
 //!   修改探测逻辑后须双向同步）。
 
 mod tables;
@@ -37,7 +37,7 @@ pub mod dbf;
 use tables::{BIG5_FREQ, GB_FREQ, GBK_FREQ};
 
 // Windows 系统 ANSI 代码页（kernel32）。仅当显式开启 `win-acp` feature 时编译，
-// 默认关闭 → core 零 FFI / 零 unsafe。区域首选由 `.env` 的 `GIS_ENCODING_REGION`
+// 默认关闭 → 本模块零 FFI / 零 unsafe。区域首选由 `.env` 的 `GIS_ENCODING_REGION`
 // 显式声明（见 `config/env/README.md`）。
 #[cfg(all(windows, feature = "win-acp"))]
 extern "system" {

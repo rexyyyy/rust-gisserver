@@ -912,12 +912,12 @@ mod tests {
     #[test]
     fn staging_dir_is_direct_child_of_cache_root() {
         let root = cache_root();
-        let dest = staging_dir(Path::new("some/where/longjie2en.tpk"));
+        let dest = staging_dir(Path::new("some/where/sample.tpk"));
         assert_eq!(dest.parent(), Some(root.as_path()), "不应出现 {}/tpk/…", root.display());
         assert!(dest
             .file_name()
             .unwrap()
             .to_string_lossy()
-            .starts_with("longjie2en-"));
+            .starts_with("sample-"));
     }
 }

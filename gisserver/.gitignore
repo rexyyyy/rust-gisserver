@@ -4,7 +4,7 @@
 /cache/
 *.exit
 
-# manager 子系统已拆分为独立项目：D:\mycomputer\documents\gis-wt\thirdparty\manager
+# manager 子系统已拆分为独立项目，不在本目录维护
 # 本目录残留的 node_modules/target 构建垃圾待清理（可整目录删除）
 manager/
 # 仓库根目录的一次性诊断输出

@@ -1,21 +1,31 @@
 //! `.tpk` 解压目录在运行期被删掉后的「缺失即重解」自愈验收。
 //!
 //! 单开一个测试文件（`cargo test` 按二进制串行执行）：本测试会真删解压目录，放在
-//! `tpk.rs` 里会和同文件并发运行的取瓦用例互相踩踏。样例同 `tpk.rs`，缺失即跳过。
+//! `tpk.rs` 里会和同文件并发运行的取瓦用例互相踩踏。样例同 `tpk.rs`（由
+//! `GS_TEST_TPK` 指定），未设置或文件不存在时跳过。
 
 use std::path::{Path, PathBuf};
 
 use gisserver::arcgis_cache::{grid, ArcgisCache};
 
-const TPK: &str = r"E:\data_km\longjie2en.tpk";
+const TPK_ENV: &str = "GS_TEST_TPK";
 
 /// 两个测试都要真删同一个解压目录：Windows 下别人正打开着 bundle 文件时删除会
 /// `PermissionDenied`，所以让它们串行（同二进制内默认并发）。
 static EXTRACT_LOCK: std::sync::Mutex<()> = std::sync::Mutex::new(());
 
 fn tpk() -> Option<PathBuf> {
-    let p = Path::new(TPK);
-    p.is_file().then(|| p.to_path_buf())
+    let Ok(value) = std::env::var(TPK_ENV) else {
+        eprintln!("跳过：未设置 {TPK_ENV}");
+        return None;
+    };
+    let p = PathBuf::from(value);
+    if p.is_file() {
+        Some(p)
+    } else {
+        eprintln!("跳过：{TPK_ENV} 指向的文件不存在");
+        None
+    }
 }
 
 /// 从 `_alllayers` 逐级向上找到解压根（带 `.extract_ok` 的那一层）。
@@ -31,7 +41,7 @@ fn extract_root(allayers: &Path) -> PathBuf {
 
 /// 在数据中心 ±1 圈邻域找一个真有图的瓦片地址（稀疏层中心槽可能空白）。
 fn find_tile(ac: &ArcgisCache) -> Option<(u32, u32, u32)> {
-    let spec = ac.grid_spec("arcgis_longjie2en").ok()?;
+    let spec = ac.grid_spec("arcgis_tpk").ok()?;
     let b = ac.bounds()?;
     let z = ac.probe().max_zoom;
     let (c, r) = grid::tile_indices(&spec, z, (b[0] + b[2]) / 2.0, (b[1] + b[3]) / 2.0)?;
@@ -53,7 +63,6 @@ fn find_tile(ac: &ArcgisCache) -> Option<(u32, u32, u32)> {
 #[test]
 fn tile_reads_recover_after_extraction_dir_deleted() {
     let Some(path) = tpk() else {
-        eprintln!("跳过：{TPK} 不存在");
         return;
     };
     let _serial = EXTRACT_LOCK.lock().unwrap_or_else(|e| e.into_inner());
@@ -88,14 +97,13 @@ fn tile_reads_recover_after_extraction_dir_deleted() {
         before,
         "重解后的瓦片字节数应与删除前一致（同一源包）"
     );
-    println!("{TPK}: 删目录后自愈成功，z{z} ({col},{row}) = {}B", after.bytes.len());
+    println!("{}: 删目录后自愈成功，z{z} ({col},{row}) = {}B", path.display(), after.bytes.len());
 }
 
 /// 并发请求下只重解一次，且所有请求都拿到图（不能有兄弟请求因节流而 404）。
 #[test]
 fn concurrent_reads_all_recover() {
     let Some(path) = tpk() else {
-        eprintln!("跳过：{TPK} 不存在");
         return;
     };
     let _serial = EXTRACT_LOCK.lock().unwrap_or_else(|e| e.into_inner());
@@ -146,7 +154,6 @@ fn concurrent_reads_all_recover() {
 #[test]
 fn out_of_coverage_reads_stay_empty() {
     let Some(path) = tpk() else {
-        eprintln!("跳过：{TPK} 不存在");
         return;
     };
     let ac = ArcgisCache::open(&path).expect("打开 tpk");

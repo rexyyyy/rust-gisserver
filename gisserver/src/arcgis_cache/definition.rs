@@ -52,7 +52,7 @@ use crate::arcgis_cache::xmlscan;
 pub enum ImageType {
     Png,
     Jpeg,
-    /// gis-wt 定制：WebP 瓦片（bundle 扩展名为 .webpdle）。
+    /// 自定义扩展：WebP 瓦片（bundle 扩展名为 .webpdle）。
     Webp,
     /// 混合：同一缓存里既有 PNG 又有 JPEG（最常见），需按瓦片魔数嗅探。
     Mixed,
@@ -63,11 +63,11 @@ pub enum ImageType {
 impl ImageType {
     pub fn parse(s: &str) -> ImageType {
         match s.trim().to_ascii_uppercase().as_str() {
-            // PNG24 是 ArcGIS 对 24 位真彩 PNG 的写法（E 盘 tpk 样例即为此值），
+            // PNG24 是 ArcGIS 对 24 位真彩 PNG 的写法（实际 tpk 样例即为此值），
             // 与 PNG8 同属 PNG，声明值只作兜底、读取仍按魔数。
             "PNG" | "PNG8" | "PNG24" | "PNG32" => ImageType::Png,
             "JPEG" | "MIXEDJPEG" => ImageType::Jpeg,
-            // WEBPDLE 是 gis-wt 写端在 CacheTileFormat 里打的定制标识；
+            // WEBPDLE 是自定义写端在 CacheTileFormat 里打的定制标识；
             // 也兼容标准 "WEBP"，便于将来读标准 WebP 缓存。
             "WEBP" | "WEBPDLE" => ImageType::Webp,
             "MIXED" => ImageType::Mixed,
@@ -373,7 +373,7 @@ impl CacheDefinition {
         // 空间参考：TileCacheInfo 下常有内嵌 SpatialReference；WKID 有时只在
         // LatestWKID（高版本），因此两条都认。**LatestWKID 优先**：它是
         // 同一空间参考给出的现行官方码（如 Web Mercator 的 WKID=102100 已废弃、
-        // LatestWKID=3857），旧产出里两值相同（本仓库 E 盘样例 4490/4490），
+        // LatestWKID=3857），旧产出里两值相同（本仓库样例 4490/4490），
         // 优先它不改变既有行为。
         let sr = tci
             .child("SpatialReference")

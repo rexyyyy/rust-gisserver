@@ -7,7 +7,8 @@
 核心字节码路径（TIFF/COG 解析、瓦片解码、MVT 编码、PMTiles 归档读写）均依据公开
 格式规范独立实现，不依赖 GDAL/tiff/mapbox 等重型 C 绑定；PROJ 仅作为**可选运行时
 后端**，Windows 下动态解析 C ABI（无编译期链接 / build script），不存在时自动降级
-到内置投影路径。默认构建**零 FFI、零 unsafe**。
+到内置投影路径。除 `projection` 的 PROJ 运行时动态加载后端外，其余模块零 FFI、
+零 unsafe；不启用 PROJ 时完全零 FFI。
 
 ## 模块与 feature
 
@@ -33,16 +34,16 @@
 | `ogcapi_tiles` | `ogcapi-tiles` | OGC API - Tiles 1.0.0 |
 
 `features = ["full"]` 一次全量启用；`win-acp` 为可选的 Windows ANSI 代码页兜底
-（默认关闭，core 零 FFI）。
+（默认关闭，关闭时 `encoding` 模块零 FFI）。
 
 ## 使用
 
 ```toml
 [dependencies]
 # 全量
-gisserver = "0.1"
+gisserver = "0.8"
 # 或按需（只取 mvt + 投影，不编译 PostGIS/foyer 等重依赖）
-gisserver = { version = "0.1", default-features = false, features = ["mvt", "projection"] }
+gisserver = { version = "0.8", default-features = false, features = ["mvt", "projection"] }
 ```
 
 ```rust
@@ -62,4 +63,4 @@ cargo test --features full
 
 gisserver 采用 **MIT OR Apache-2.0** 双许可（任选其一），全文见 [LICENSE](LICENSE)。
 
-Copyright (c) 2026 rex yan 853740877@qq.com and contributors.
+Copyright (c) 2026 rex yang <13556388@qq.com> and contributors.
