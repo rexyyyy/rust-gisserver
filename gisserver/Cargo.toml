@@ -4,9 +4,10 @@
 [package]
 name = "gisserver"
 description = "Core library family of rust-gisserver: bespoke COG/BigTIFF reader, tile rendering, MVT encoding, PMTiles/MBTiles archives, WMS/WFS/OGC API protocols, projections and PostGIS source - pure Rust, no GDAL binding."
-version = "0.8.0"
+version = "0.8.1"
 edition = "2021"
 license = "MIT OR Apache-2.0"
+repository = "https://github.com/rexyyyy/rust-gisserver"
 readme = "README.md"
 
 [features]

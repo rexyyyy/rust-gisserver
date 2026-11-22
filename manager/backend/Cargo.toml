@@ -1,6 +1,6 @@
 [package]
 name = "manager"
-version = "0.8.0"
+version = "0.8.1"
 edition = "2021"
 description = "rust-gisserver 系统管理后端（axum + tokio-postgres，仅 PostgreSQL）"
 license = "AGPL-3.0-only"

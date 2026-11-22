@@ -7,7 +7,7 @@ resolver = "2"
 members = ["services/*"]
 
 [workspace.package]
-version = "0.8.0"
+version = "0.8.1"
 edition = "2021"
 # 服务层引擎：AGPL-3.0-only + 商业授权例外（Commercial License Exception，
 # 全文见 LICENSE 末尾）。SPDX 无「AGPL + 例外」标准标识，故 license 字段仍
@@ -16,8 +16,8 @@ license = "AGPL-3.0-only"
 
 [workspace.dependencies]
 # --- Core library (single package, feature-gated modules) -------------------
-# path 供本地联调；publish 时 Cargo 剥掉 path，改用 crates.io 上的 0.8.0。
-gisserver = { version = "0.8.0", path = "../gisserver", features = ["full"] }
+# path 供本地联调；publish 时 Cargo 剥掉 path，改用 crates.io 上的 0.8.1。
+gisserver = { version = "0.8.1", path = "../gisserver", features = ["full"] }
 # --- Runtime / async --------------------------------------------------------
 tokio = { version = "1", features = ["full"] }
 futures = "0.3"
