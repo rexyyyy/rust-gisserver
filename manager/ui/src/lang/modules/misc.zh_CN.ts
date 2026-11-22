@@ -202,7 +202,7 @@ export default {
     text48: '停止',
     text49: '暂停',
     delete: '删除',
-    copyright20182026OfLiAllRightsReserved: 'Copyright © 2018-2026 疯狂的狮子Li All Rights Reserved.',
+    copyrightAllRightsReserved: 'Copyright © 2026 rust-gisserver All Rights Reserved.',
     of2: '对不起，您正在寻找的页面不存在。尝试检查',
     ofByBrowserofRefreshButtonofContent: '的错误，然后按浏览器上的刷新按钮或尝试在我们的应用程序中找到其他内容。',
     imageFormatError: '图片格式错误!',

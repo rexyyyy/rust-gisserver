@@ -1,4 +1,4 @@
-//! 统一响应封装，字段与 plus-ui 的请求拦截器对齐：
+//! 统一响应封装，字段与前端请求拦截器对齐：
 //! `code`（200 为成功）、`msg`，列表数据额外在顶层给出 `rows` / `total`。
 use axum::Json;
 use serde::Serialize;

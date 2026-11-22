@@ -2,7 +2,7 @@ import i18n from '@/lang';
 import axios from 'axios';
 import FileSaver from 'file-saver';
 import { getErrorCode } from '@/utils/errorCode';
-import { blobValidate } from '@/utils/ruoyi';
+import { blobValidate } from '@/utils/common';
 import { LoadingInstance } from 'element-plus/es/components/loading/src/loading';
 import { globalHeaders } from '@/utils/request';
 

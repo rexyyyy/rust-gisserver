@@ -126,7 +126,7 @@
     "瓦片配置缺少分辨率阶梯 resolutions": "Tile config is missing the resolutions ladder",
     "瓦片配置缺少有效的 extent[4]": "Tile config is missing a valid extent[4]",
     "瓦片配置缺少有效的 origin[x,y]": "Tile config is missing a valid origin[x,y]",
-    "天地图 LOD 仅适用于 EPSG:4490（CGCS2000 经纬度）": "Tianditu LOD applies only to EPSG:4490 (CGCS2000 geographic)",
+    "CGCS2000 经纬度 LOD 仅适用于 EPSG:4490": "CGCS2000 geographic LOD applies only to EPSG:4490",
     "未知原因": "Unknown reason",
     "响应构造失败": "Failed to build response",
     "构建流式响应失败": "Failed to build streaming response",

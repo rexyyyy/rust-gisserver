@@ -1,6 +1,6 @@
 # manager —— rust-gisserver 管理系统（独立项目）
 
-rust-gisserver 的「系统管理 + 地图服务管理」控制台：后端用 Rust（axum + tokio-postgres，仅 PostgreSQL）重写若依（RuoYi-Vue 5.X）的系统管理接口，前端沿用 plus-ui-5.X 的 Element Plus 实现并裁剪。
+rust-gisserver 的「系统管理 + 地图服务管理」控制台：后端用 Rust（axum + tokio-postgres，仅 PostgreSQL）实现系统管理接口，前端基于 Element Plus 实现并裁剪。
 
 **独立项目**：2026-10-26 起从 `rust-gisserver/manager` 拆出，位于 `thirdparty/manager`，git 独立管理（拆分前历史保留在 rust-gisserver 仓库，最后共同提交 `ce576ae`）。与 rust-gisserver（map-api，8080）的对接关系见 rust-gisserver 仓库 `docs/manager-scope-analysis-2026-10-26.md`。
 
@@ -225,9 +225,9 @@ python tools/ui_smoke.py
 ## 动态路由契约（getRouters）
 
 前端登录后调 `GET /system/menu/getRouters` 拿动态路由树，用 `router.addRoute()` 逐条注册。
-**下发的 path/component 必须与上游 RuoYi-Vue-Plus 5.X 完全一致**，否则整棵动态路由注册失败、侧边栏一点就 404。
+**下发的 path/component 必须与既定的动态路由约定完全一致**，否则整棵动态路由注册失败、侧边栏一点就 404。
 
-后端实现在 `backend/src/perm.rs::to_routers`，严格镜像上游 `SysMenuServiceImpl.buildMenus` + `SysMenu.getRouterPath/getComponentInfo`：
+后端实现在 `backend/src/perm.rs::to_routers`，严格遵循既定的目录 / 菜单构建规则：
 
 | 场景 | 判定条件 | path | component |
 |---|---|---|---|
@@ -238,7 +238,7 @@ python tools/ui_smoke.py
 | 真外链 | `is_frame='0'` + http 地址 | 原 http 地址（不补 `/`） | `Layout` |
 | 内链 | `is_frame='1'` + http 地址 | `innerLinkReplaceEach` 转义 | `InnerLink` |
 
-`is_frame` 语义（上游 `SystemConstants`）：`"0"`=是外链（YES_FRAME，新窗口打开）、`"1"`=否（NO_FRAME，站内嵌）。
+`is_frame` 语义：`"0"`=是外链（YES_FRAME，新窗口打开）、`"1"`=否（NO_FRAME，站内嵌）。
 `meta.noCache` 取 `is_cache == "1"`；`meta.link` 仅当 path 是 http 时赋值；`meta.activeMenu` 取 remark 以 `/` 开头的值。
 
 ### 排查要点
@@ -257,17 +257,17 @@ python tools/dump_routers.py http://127.0.0.1:6180/manager-api routers_after.jso
 
 后端在 `backend/src/perm.rs::allows` 做 URL 级 + 按钮级校验（替代 casbin）。
 
-**不做通用路径推导**：上游 RuoYi 用控制器注解 `@SaCheckPermission("...")` 显式声明权限，
+**不做通用路径推导**：接口显式声明权限码，
 同一资源下不同端点的权限码可能不同（`GET /system/user/{id}` 是 `query` 而非 `list`），
 带 id 的路径也无法从路径反推动作名 —— `DELETE /system/post/7` 会误推成 `system:post:7`，
 导致**非超管角色的写操作全部被拒**。
 
-因此 `perm.rs` 维护两张显式表，逐条对齐上游注解：
+因此 `perm.rs` 维护两张显式表，逐条对齐权限码：
 
-| 表 | 作用 | 上游对应 |
+| 表 | 作用 | 权限码来源 |
 |---|---|---|
-| `PERM_RULES` | (方法, 路径模式, 权限码)，`:x` 段通配任意单段 | 各控制器的 `@SaCheckPermission` |
-| `NO_PERM_PATTERNS` | 上游**明确无注解**的端点，只需登录态 | `SysProfileController`、`getInfo`、`myself` 等 |
+| `PERM_RULES` | (方法, 路径模式, 权限码)，`:x` 段通配任意单段 | 各接口声明的权限码 |
+| `NO_PERM_PATTERNS` | **明确无需权限码**的端点，只需登录态 | 个人资料、`getInfo`、`myself` 等 |
 
 | 场景 | 判定 | 权限码 |
 |---|---|---|

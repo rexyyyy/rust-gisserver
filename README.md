@@ -92,7 +92,7 @@ MBTiles 同时支持 PNG/JPEG/WebP 栅格与 gzip pbf 矢量包，TMS 行号自�
 - **双坐标接口**：`/{z}/{x}/{y}.pbf`（EPSG:3857）与 `/{srid}/{z}/{x}/{y}.pbf`（源 CRS 自身单位，如 4543 米、4326 度，服务端不做 `ST_Transform`）；TileJSON 按接口分别宣告 bounds/crs/grid。
 - **为高并发而设计**：按 DSN 共享连接池，版本预检 PG≥11 / PostGIS≥3.0，启动自检 GiST 索引；编码前按瓦片 bbox 预过滤，低 z 用 `ST_SimplifyPreserveTopology` 分级简化；输出缓存命中约 16–25ms，可选磁盘 L2 跨重启保留。
 - **免落表发布**：`from` 表达式直接发布 SQL / 视图图层；bounds/count 走统计估计，缺失自动回退精确扫描。
-- **传统矢量资产同路上云**：Shapefile 走管理后台「导入 SHP」（`shp2pgsql`，从 `.prj` 自动识别 CGCS2000 / WGS84）；FileGDB 通过**专用转换工具**转为 PostGIS 表（读取端可基于 Esri 开源 FileGDB API）。二者入库后统一为 `postgis_table`，可发布动态 MVT / WFS / OAF；转换在服务外完成，服务端只消费转换结果，核心库保持纯 Rust。
+- **传统矢量资产同路上云**：Shapefile 走管理后台「导入 SHP」（`shp2pgsql`，从 `.prj` 自动识别 CGCS2000 / WGS84）；FileGDB 通过**专用转换工具**转为 PostGIS 表（读取端可基于开源 FileGDB 解析库）。二者入库后统一为 `postgis_table`，可发布动态 MVT / WFS / OAF；转换在服务外完成，服务端只消费转换结果，核心库保持纯 Rust。
 
 发布与调优见 [MVT 指南](docs/services/mvt.zh-CN.md) 与 [架构说明](docs/architecture.md)。
 

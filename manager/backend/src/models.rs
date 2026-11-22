@@ -227,9 +227,9 @@ pub fn menu_from_row(row: &Row) -> MenuVO {
     }
 }
 
-/// `getRouters` 返回的动态路由节点（字段与 plus-ui permission store 对齐）。
+/// `getRouters` 返回的动态路由节点（字段与前端 permission store 对齐）。
 ///
-/// 字段名/省略规则与 `RouterVo` 一致：
+/// 字段名/省略规则与路由契约一致：
 /// * `JsonInclude(NON_EMPTY)` → 空值字段不下发
 /// * `alwaysShow` 仅在目录节点置 `true`
 #[derive(Debug, Serialize)]
@@ -244,7 +244,7 @@ pub struct RouterVO {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub query: Option<String>,
     pub hidden: bool,
-    /// 有子路由时置 `true`（`RouterVo.alwaysShow`）。
+    /// 有子路由时置 `true`（`alwaysShow`）。
     #[serde(skip_serializing_if = "Option::is_none")]
     pub always_show: Option<bool>,
     #[serde(skip_serializing_if = "Option::is_none")]

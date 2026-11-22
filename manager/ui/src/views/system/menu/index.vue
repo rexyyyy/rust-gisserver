@@ -173,7 +173,7 @@
               <el-input v-model="form.perms" :placeholder="$t('system.auto.pleaseEnterPermissionKey')" maxlength="100" />
               <template #label>
                 <span>
-                  <el-tooltip :content="$t('system.auto.permissionKeyDefinedInTheControllerEGSaChe')" placement="top">
+                  <el-tooltip :content="$t('system.auto.permissionKeyDefinedInTheController')" placement="top">
                     <el-icon>
                       <question-filled />
                     </el-icon>

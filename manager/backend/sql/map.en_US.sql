@@ -3,7 +3,7 @@
 -- ---------------------------------------------------------------------
 -- Purpose: rust-gisserver manager map business baseline with two top-level directories:
 --       (1) Data Services (top dir 6): Workspace / Data Source / Data Layer / Published Service
---          GeoServer Data Group semantics - source organization + publish ledger only;
+--          Data Group semantics - source organization + publish ledger only;
 --       (2) Map Services (top dir 7): Service inventory / Access log / Style library / Service trash /
 --          Operations dashboard / Cache management / Runtime config / 3D Tiles / Raster / Vector / Tile /
 --          Engine management - ops surface for published services.
@@ -126,7 +126,7 @@ insert into sys_role_menu values ('3', '1053') on conflict do nothing;
 -- (2) New: Access Log / Style Library (2026-10-27 P0/P1 features)
 insert into sys_menu values('111', 'Access Log', '7', '2', 'log',      'map/log/index',         '', '1', '0', 'C', '0', '0', 'map:log:list',       'log-map', 103, 1, now(), null, null, 'Service access log and audit query')
   on conflict (menu_id) do nothing;
-insert into sys_menu values('112', 'Style Library', '7', '3', 'style',    'map/style/index',       '', '1', '0', 'C', '0', '0', 'map:style:list',     'brush',   103, 1, now(), null, null, 'SLD style library management ( QGIS editing guidance )')
+insert into sys_menu values('112', 'Style Library', '7', '3', 'style',    'map/style/index',       '', '1', '0', 'C', '0', '0', 'map:style:list',     'brush',   103, 1, now(), null, null, 'SLD style library management ( SLD style guide )')
   on conflict (menu_id) do nothing;
 insert into sys_menu values('1054', 'Service Health', '110', '4', '', '', '', '1', '0', 'F', '0', '0', 'map:service:check',  '#', 103, 1, now(), null, null, '')
   on conflict (menu_id) do nothing;
@@ -312,14 +312,14 @@ comment on column sys_service_meta.service_group is 'Group Path" Level 1/ Level 
 -- =====================================================================
 -- §5 Organization layer (Workspace / Store / Resource / Published Service)
 -- ---------------------------------------------------------------------
--- GeoServer-style org layer: Workspace → Data Source → Data Layer → Published Service.
+-- Org layer: Workspace → Data Source → Data Layer → Published Service.
 -- Metadata only: no data/features - just pointers + probe results.
 -- Menu 122 "Data Catalog Overview" hangs under "Data Services" (6).
 -- =====================================================================
 
 -- ---------- A. Org layer tables ----------
 
--- Workspace: namespace container (GeoServer workspace semantics). Default seed: ws1.
+-- Workspace: namespace container (workspace semantics). Default seed: ws1.
 create table if not exists sys_workspace (
   id          bigserial    primary key,
   name        varchar(64)  not null,
@@ -457,7 +457,7 @@ insert into sys_role_menu values ('3', '1061') on conflict do nothing;
 -- =====================================================================
 -- §6 Data Services module menus (top dir 6)
 -- ---------------------------------------------------------------------
--- GeoServer splits Data into Workspaces / Stores / Layer previews etc as independent entry points,
+-- Data is split into Workspaces / Stores / Layer previews etc as independent entry points,
 -- manager mirrors this: Workspace / Data Source / Data Layer / Published Service each get a page.
 --   124 Workspace / 125 Data Source / 126 Data Layer / 127 Published Service (C)
 --   1062..1066 buttons (F)
@@ -470,19 +470,19 @@ insert into sys_menu values('6', 'Data Services', '0', '2', 'data', null, '', '1
   on conflict (menu_id) do nothing;
 
 -- ---------- B. Function menus (C) ----------
--- 124 Workspace: namespace container (sys_workspace), GeoServer "Workspaces".
+-- 124 Workspace: namespace container (sys_workspace).
 insert into sys_menu values('124', 'Workspace', '6', '1', 'workspace', 'map/catalog/workspace', '', '1', '0', 'C', '0', '0', 'map:catalog:list', 'workspace', 103, 1, now(), null, null, 'Workspace inventory with CRUD and data source / live service counts')
   on conflict (menu_id) do nothing;
 
--- 125 Data Source: directory or PostGIS connection pointer (sys_store), GeoServer "Stores".
+-- 125 Data Source: directory or PostGIS connection pointer (sys_store).
 insert into sys_menu values('125', 'Data Source', '6', '2', 'store', 'map/catalog/store', '', '1', '0', 'C', '0', '0', 'map:catalog:list', 'store', 103, 1, now(), null, null, 'Data source (directory / PostGIS): create, connection test, read-only discovery and trash restore')
   on conflict (menu_id) do nothing;
 
--- 126 Data Layer: discovered resource (sys_resource) → publish, GeoServer "Layers / Feature types".
+-- 126 Data Layer: discovered resource (sys_resource) → publish.
 insert into sys_menu values('126', 'Data Layer', '6', '3', 'resource', 'map/catalog/resource', '', '1', '0', 'C', '0', '0', 'map:catalog:list', 'layers', 103, 1, now(), null, null, 'Discovered data layers and publish wizard ( protocol options come from the engine capability matrix )')
   on conflict (menu_id) do nothing;
 
--- 127 Published Service: publish ledger (sys_published_layer) lifecycle + endpoint preview, GeoServer "Layer previews".
+-- 127 Published Service: publish ledger (sys_published_layer) lifecycle + endpoint preview.
 insert into sys_menu values('127', 'Published Services', '6', '4', 'published', 'map/catalog/published', '', '1', '0', 'C', '0', '0', 'map:catalog:list', 'published', 103, 1, now(), null, null, 'Live services grouped by protocol and data type: start/stop/pause/delete and endpoint preview')
   on conflict (menu_id) do nothing;
 
@@ -574,7 +574,7 @@ insert into sys_role_menu values ('3', '1067') on conflict do nothing;
 -- §7 Normalize top-level directory sort order
 -- ---------------------------------------------------------------------
 -- Target order: 1 System Admin / 6 Data Services / 7 Map Services / 2 System Monitor /
---           3 System Tools / 4 PLUS Site / 5 Test Menu
+--           3 System Tools / 7 Test Menu
 -- Same rule as system.sql §5: running map.sql alone also sorts top-level dirs correctly.
 -- Lookup by menu_id (parent_id = 0 top-level rows); re-runs write same values back.
 -- =====================================================================
@@ -583,7 +583,6 @@ update sys_menu set order_num = 2 where menu_id = '6' and parent_id = 0; -- Data
 update sys_menu set order_num = 3 where menu_id = '7' and parent_id = 0; -- Map Services
 update sys_menu set order_num = 4 where menu_id = '2' and parent_id = 0; -- System Monitor
 update sys_menu set order_num = 5 where menu_id = '3' and parent_id = 0; -- System Tools
-update sys_menu set order_num = 6 where menu_id = '4' and parent_id = 0; -- PLUS Official Site
 update sys_menu set order_num = 7 where menu_id = '5' and parent_id = 0; -- Test Menu
 
 -- ---------------------------------------------------------------------

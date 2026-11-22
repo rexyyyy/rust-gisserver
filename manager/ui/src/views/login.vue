@@ -50,7 +50,7 @@
     </el-form>
     <!--  底部  -->
     <div class="el-login-footer">
-      <span>{{ $t('misc.auto.copyright20182026OfLiAllRightsReserved') }}</span>
+      <span>{{ $t('misc.auto.copyrightAllRightsReserved') }}</span>
     </div>
   </div>
 </template>

@@ -286,7 +286,7 @@ const parseXml = async () => {
   }
 };
 
-// 用户切换坐标系后，保证网格模式与坐标系匹配（投影坐标不能保留 OGC/天地图）
+// 用户切换坐标系后，保证网格模式与坐标系匹配（投影坐标不能保留 OGC/CGCS2000 经纬度）
 watch(
   () => form.srcCrs,
   (v) => {
@@ -517,7 +517,7 @@ const save = async () => {
     serviceTypes: form.serviceTypes,
     remark: form.remark.trim(),
     gridMode: form.is3dtiles ? '' : form.gridMode,
-    // 仅自定义 LOD 需要携带网格定义；标准/天地图/原生由后端按模式生成快照
+    // 仅自定义 LOD 需要携带网格定义；标准/CGCS2000 经纬度/原生由后端按模式生成快照
     grid: !form.is3dtiles && form.gridMode === 'custom' ? customGrid.value : null
   };
   try {

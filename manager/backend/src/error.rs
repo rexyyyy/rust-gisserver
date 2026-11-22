@@ -26,7 +26,7 @@ pub enum AppError {
 }
 
 impl AppError {
-    /// HTTP 状态码。业务错误一律 200 + code 字段（与 plus-ui 拦截器约定一致），
+    /// HTTP 状态码。业务错误一律 200 + code 字段（与前端拦截器约定一致），
     /// 只有鉴权失败按前端拦截器要求返回真实 401。
     pub fn status(&self) -> StatusCode {
         match self {

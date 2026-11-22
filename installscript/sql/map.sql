@@ -3,7 +3,7 @@
 -- ---------------------------------------------------------------------
 -- 用途：rust-gisserver 管理端的地图业务底座，包含两个顶级目录：
 --       ① 数据服务（顶级目录 6）：工作空间 / 数据源 / 数据图层 / 已发布服务
---          —— GeoServer Data 组语义：只管数据源组织与发布账本；
+--          —— Data 组语义：只管数据源组织与发布账本；
 --       ② 地图服务（顶级目录 7）：服务清单 / 访问日志 / 样式库 / 服务垃圾箱 /
 --          运营仪表盘 / 缓存管理 / 运行配置 / 3D Tiles / 栅格 / 矢量 / 瓦片 /
 --          服务引擎管理 —— 已发布出去的服务的运维面。
@@ -312,14 +312,14 @@ comment on column sys_service_meta.service_group is '分组路径「一级/二�
 -- =====================================================================
 -- §5 组织层四表（Workspace / Store / Resource / 已发布服务）
 -- ---------------------------------------------------------------------
--- GeoServer 式组织层：工作区 → 数据源 → 数据图层 → 已发布服务。
+-- 组织层：工作区 → 数据源 → 数据图层 → 已发布服务。
 -- 纯元数据：不存数据、不存要素，只存指针与探测结果。
 -- 菜单 122「数据目录总览」挂到「数据服务」(6) 下。
 -- =====================================================================
 
 -- ---------- A. 组织层四表 ----------
 
--- 工作区：命名空间容器（GeoServer workspace 语义），默认种子 ws1。
+-- 工作区：命名空间容器（工作空间语义），默认种子 ws1。
 create table if not exists sys_workspace (
   id          bigserial    primary key,
   name        varchar(64)  not null,
@@ -457,7 +457,7 @@ insert into sys_role_menu values ('3', '1061') on conflict do nothing;
 -- =====================================================================
 -- §6 数据服务板块菜单（顶级目录 6）
 -- ---------------------------------------------------------------------
--- GeoServer 把 Data 组拆成 Workspaces / Stores / Layer previews 等独立入口，
+-- Data 组拆分为 Workspaces / Stores / Layer previews 等独立入口，
 -- 管理端照此拆：工作空间 / 数据源 / 数据图层 / 已发布服务各占一个菜单页。
 --   124 工作空间 / 125 数据源 / 126 数据图层 / 127 已发布服务（C）
 --   1062..1066 按钮（F）
@@ -470,19 +470,19 @@ insert into sys_menu values('6', '数据服务', '0', '2', 'data', null, '', '1'
   on conflict (menu_id) do nothing;
 
 -- ---------- B. 功能菜单（C）----------
--- 124 工作空间：命名空间容器（sys_workspace），对应 GeoServer「Workspaces」。
+-- 124 工作空间：命名空间容器（sys_workspace），对应「工作空间」。
 insert into sys_menu values('124', '工作空间', '6', '1', 'workspace', 'map/catalog/workspace', '', '1', '0', 'C', '0', '0', 'map:catalog:list', 'workspace', 103, 1, now(), null, null, '工作空间清单与增删改（含其下数据源/在线服务计数）')
   on conflict (menu_id) do nothing;
 
--- 125 数据源：目录型或 PostGIS 型连接指针（sys_store），对应 GeoServer「Stores」。
+-- 125 数据源：目录型或 PostGIS 型连接指针（sys_store），对应「数据源」。
 insert into sys_menu values('125', '数据源', '6', '2', 'store', 'map/catalog/store', '', '1', '0', 'C', '0', '0', 'map:catalog:list', 'store', 103, 1, now(), null, null, '数据源（目录 / PostGIS 连接）新建、连接测试、只读发现与垃圾箱恢复')
   on conflict (menu_id) do nothing;
 
--- 126 数据图层：只读发现得到的资源（sys_resource）→ 发布为服务，对应 GeoServer「Layers / Feature types」。
+-- 126 数据图层：只读发现得到的资源（sys_resource）→ 发布为服务，对应「图层 / 要素类型」。
 insert into sys_menu values('126', '数据图层', '6', '3', 'resource', 'map/catalog/resource', '', '1', '0', 'C', '0', '0', 'map:catalog:list', 'layers', 103, 1, now(), null, null, '发现出的数据图层清单与发布向导（服务协议勾选口径来自引擎能力矩阵）')
   on conflict (menu_id) do nothing;
 
--- 127 已发布服务：发布账本（sys_published_layer）生命周期与端点预览，对应 GeoServer「Layer previews」。
+-- 127 已发布服务：发布账本（sys_published_layer）生命周期与端点预览，对应「图层预览」。
 insert into sys_menu values('127', '已发布服务', '6', '4', 'published', 'map/catalog/published', '', '1', '0', 'C', '0', '0', 'map:catalog:list', 'published', 103, 1, now(), null, null, '按 服务协议 × 数据类型 分组的在服清单：启停 / 暂停 / 删除与端点预览')
   on conflict (menu_id) do nothing;
 
@@ -574,7 +574,6 @@ insert into sys_role_menu values ('3', '1067') on conflict do nothing;
 -- §7 顶级目录排序归一
 -- ---------------------------------------------------------------------
 -- 目标顺序：1 系统管理 / 6 数据服务 / 7 地图服务 / 2 系统监控 /
---           3 系统工具 / 4 PLUS官网 / 5 测试菜单
 -- 与 system.sql §5 同一口径：map.sql 单独执行时也能把顶级目录排到位。
 -- 按 menu_id 定位（parent_id = 0 的顶级行），重复执行只写回同一值。
 -- =====================================================================
@@ -583,7 +582,6 @@ update sys_menu set order_num = 2 where menu_id = '6' and parent_id = 0; -- 数�
 update sys_menu set order_num = 3 where menu_id = '7' and parent_id = 0; -- 地图服务
 update sys_menu set order_num = 4 where menu_id = '2' and parent_id = 0; -- 系统监控
 update sys_menu set order_num = 5 where menu_id = '3' and parent_id = 0; -- 系统工具
-update sys_menu set order_num = 6 where menu_id = '4' and parent_id = 0; -- PLUS官网
 update sys_menu set order_num = 7 where menu_id = '5' and parent_id = 0; -- 测试菜单
 
 -- ---------------------------------------------------------------------

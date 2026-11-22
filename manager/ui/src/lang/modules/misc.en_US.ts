@@ -202,7 +202,7 @@ export default {
     text48: 'Stopped',
     text49: 'Paused',
     delete: 'Delete',
-    copyright20182026OfLiAllRightsReserved: 'Copyright © 2018-2026 Crazy Lion Li. All rights reserved.',
+    copyrightAllRightsReserved: 'Copyright © 2026 rust-gisserver All Rights Reserved.',
     of2: 'Sorry, the page you are looking for does not exist. Check',
     ofByBrowserofRefreshButtonofContent: ' for errors, then press the browser refresh button or look for other content in this application.',
     imageFormatError: 'Unsupported image format!',

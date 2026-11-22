@@ -80,7 +80,7 @@ async fn serve(
                 return plain(StatusCode::BAD_REQUEST, msg);
             }
         }
-        // 发布时选定的网格（OGC 标准 / 天地图 / Conf.xml 自定义）优先：切片包络
+        // 发布时选定的网格（OGC 标准 / CGCS2000 经纬度 / Conf.xml 自定义）优先：切片包络
         // 必须与该网格的 origin 与分辨率一致，否则前端按自定义 LOD 寻址会错位。
         // `3857` 显式接口除外——那条路径走 ST_TileEnvelope 的原生 Web Mercator。
         let grid = if matches!(

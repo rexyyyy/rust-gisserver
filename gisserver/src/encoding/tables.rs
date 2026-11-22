@@ -1,5 +1,4 @@
-//! 频度表：由 IdentifyEncoding.cs (lion / Microshaoft.Text) 机械移植生成，勿手改。
-//! GB_FREQ[94][94] 用于 GB2312 区位，GBK_FREQ[126][191] 用于 GBK 扩展区。
+//! 频度表：GB_FREQ[94][94] 用于 GB2312 区位，GBK_FREQ[126][191] 用于 GBK 扩展区。
 
 const fn build_gb_freq() -> [[u16; 94]; 94] {
     let mut t = [[0u16; 94]; 94];

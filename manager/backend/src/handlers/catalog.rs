@@ -2016,7 +2016,7 @@ pub struct PublishBody {
     pub service_types: Vec<String>,
     #[serde(default)]
     pub remark: String,
-    /// Tile grid mode: `ogc` (standard LOD) / `tdt` (Tianditu LOD) / `custom` (Conf.xml).
+    /// Tile grid mode: `ogc` (standard LOD) / `tdt` (CGCS2000 geographic LOD) / `custom` (Conf.xml).
     /// Empty string = unspecified, use engine default (WebMercatorQuad).
     #[serde(default)]
     pub grid_mode: String,
@@ -2167,7 +2167,7 @@ fn build_service_body(
     if let Some(b) = bbox {
         body["extent"] = json!(b);
     }
-    // Tile grid: `grids` references grid id; non-preset grids (Tianditu / Conf.xml) also send
+    // Tile grid: `grids` references grid id; non-preset grids (CGCS2000 geographic / Conf.xml) also send
     // `custom_grids`; engine writes and hot-reloads, then tiles and previews use that grid.
     if kind != "3dtiles" {
         if let Some(g) = grid {
@@ -2319,7 +2319,7 @@ fn preset_grid_snapshot(id: &str, crs: &str) -> Value {
     })
 }
 
-/// Tianditu LOD (EPSG:4490 lat/lon): origin [-180,90], 256px, levels 1–18,
+/// CGCS2000 geographic LOD (EPSG:4490 lat/lon): origin [-180,90], 256px, levels 1–18,
 /// resolution 0.703125 / 2^(level-1). Treated as custom grid (engine `custom_grids`).
 fn tianditu_grid_snapshot() -> Value {
     let levels: Vec<u32> = (1..=18).collect();
@@ -2480,7 +2480,7 @@ fn resolve_publish_grid(
         "tdt" => {
             if code != Some(4490) {
                 return Err(AppError::Param(
-                    "天地图 LOD 仅适用于 EPSG:4490（CGCS2000 经纬度）".into(),
+                    "CGCS2000 经纬度 LOD 仅适用于 EPSG:4490".into(),
                 ));
             }
             Ok(Some(tianditu_grid_snapshot()))

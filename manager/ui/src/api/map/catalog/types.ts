@@ -178,7 +178,7 @@ export interface NativeGrid {
   min_zoom: number | null;
   max_zoom: number | null;
   levels: NativeGridLevel[];
-  /** 网格模式：ogc（标准 LOD）| tdt（天地图）| custom（Conf.xml）| native（ArcGIS 原生） */
+  /** 网格模式：ogc（标准 LOD）| tdt（CGCS2000 经纬度）| custom（Conf.xml）| native（ArcGIS 原生） */
   mode?: string;
   /** 引擎侧网格 id（grids 引用名） */
   id?: string;
@@ -353,7 +353,7 @@ export interface PublishBody {
   remark: string;
   /** 瓦片网格模式：ogc | tdt | custom；留空沿用引擎默认（WebMercatorQuad） */
   gridMode?: string;
-  /** 自定义/天地图网格快照，或标准预设的账本快照 */
+  /** 自定义/CGCS2000 经纬度网格快照，或标准预设的账本快照 */
   grid?: NativeGrid | null;
 }
 

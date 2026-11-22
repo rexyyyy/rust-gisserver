@@ -23,7 +23,7 @@ mapserver/
 
 | 协议 | 入口 | 说明 |
 |---|---|---|
-| **WMS** 1.1.1 / 1.3.0 | `/wms` | GetCapabilities / GetMap / GetFeatureInfo（栅格采样 + 矢量命中测试，INFO_FORMAT 支持 text/plain、text/html、application/json，无命中返回 200 空体——同 GeoServer）/ GetLegendGraphic（符号图例 PNG，默认高度随行数自适应），1.3.0 轴序处理、ServiceException/ExceptionReport |
+| **WMS** 1.1.1 / 1.3.0 | `/wms` | GetCapabilities / GetMap / GetFeatureInfo（栅格采样 + 矢量命中测试，INFO_FORMAT 支持 text/plain、text/html、application/json，无命中返回 200 空体——符合 OGC 惯例）/ GetLegendGraphic（符号图例 PNG，默认高度随行数自适应），1.3.0 轴序处理、ServiceException/ExceptionReport |
 | **PostGIS 动态矢量瓦片** | `/mvt/{layer}/…` | 双坐标接口：`/{z}/{x}/{y}.pbf`（EPSG:3857 经纬度 XYZ）与 `/{srid}/{z}/{x}/{y}.pbf`（源 CRS 自身单位建矩阵，如 4543 米制、4326 度数，无 ST_Transform）；TileJSON 按接口分别宣告 bounds/crs/grid 与 vector_layers 字段类型；foyer output 缓存（命中 ~2-25ms；`server.disk_cache` 可选磁盘 L2 跨重启保留）；仅当图层配置 `source.type: postgis` 时启用（按 DSN 共享连接池，版本预检 PG≥11/PostGIS≥3.0）。P3 增强：`simplify`（低 z 服务端 `ST_SimplifyPreserveTopology` 分级简化）；`from` 表达式发布**SQL/视图图层**（免落表）；OAF items 支持 `sortby` 下推；启动自检 GiST 索引、bounds/count 走统计估计（缺失自动回退精确扫描） |
 | **WMTS** 1.0.0 | `/wmts`、`/wmts/1.0.0/WMTSCapabilities.xml`、`/wmts/rest/...`、`/tileMatrixSets/:id` | KVP + RESTful + 能力文档；预设 TileMatrixSet（WebMercatorQuad / WorldCRS84Quad）及自定义 |
 | **TMS** 1.0.0 | `/tms/1.0.0/{layer}/{z}/{x}/{y}.png` | 底行起算 y-flip |
@@ -300,7 +300,7 @@ CRS 链路落在正确地面范围。
 - **并发模型**：渲染/编码/文件 IO 一律走 `tokio::task::spawn_blocking`（tokio worker 不被阻塞，health 等轻请求零排队）；本地文件与 HTTP Range 源全部定位读（Windows `seek_read` / Unix `read_at`，不改共享 fd 游标，并发无竞态）；**远程源**的同步 HTTP 读取跑在专用 rayon 池（8 线程），慢源不会占满本地 COG 解码的全局 rayon 池。
 - **缓存（foyer，`services/map-api/src/cache.rs` 的 `CacheHub` 统一收口；output 为 `HybridCache`，`server.disk_cache` 可选磁盘 L2 跨重启保留）**：五段缓存——① 输出瓦片（`output`，weigher 按字节计量，预算 `cache_mib`）；② 图层索引（`layers`，name → `Arc<LayerRuntime>`，替代 `AppState::layer` 的线性扫描，未命中名不做负缓存）；③ 元数据文档（`docs`，能力文档/OGC API 文档/TileJSON/style，按 `(服务,版本,base)` 等全量入 key，字节预算 32MiB）；④ 目录元数据（`catalog`，OGC API collections/tiled collections/advertised grids 单条目，构建时零 FeatureCollection clone）；⑤ 要素键值缓存（`features`，`(collectionId, featureId)` → 单要素 GeoJSON，替原整表 clone+线性扫描）。另保留解码瓦片缓存（`gisserver::storage::TileCache`，容量按**实际最大 tile_px** 估算，杜绝 512px 层的 4 倍内存超配）。
 - **缓存刷新机制（三层）**：① **TTL**——`server.cache_ttl_secs`（默认 300s）从写入时刻起算（非空闲计时），数据集换盘后最多一个 TTL 窗口自动刷新；② **手动 purge**——`POST /api/cache/purge?scope=all|output|docs|catalog|features|layers`（`all` 同时清解码瓦片缓存），返回清理条目数；`GET /api/cache` 输出各缓存 entries/bytes/TTL/purge 计数；③ **周期维护**——`cache_stats_secs`（默认 60s）的 tokio 任务落一条统计日志（foyer 按访问驱逐，无需强制维护，0=关闭）。条目计数用 `entries()`（`clear()` 后同步归零）；`usage()` 为异步记账，仅作近似展示。
-- **SLD 符号渲染（`crates/renderer/src/sld.rs` + `vector.rs`，零 XML 依赖）**：完整文档模型（NamedLayer → UserStyle → FeatureTypeStyle → Rule → Symbolizer），GeoServer 语义求值——所有匹配规则的符号器按画家序叠加（面填充→面描边→线→点→标注），`ElseFilter` 在同 FTS 无前置命中时生效；Filter 支持 6 种比较 / Between / Like（`*` `?` 转义）/ IsNull / And / Or / Not（数值与字符串自动判别；空间过滤与 `ogc:Function` 解析为不匹配并一次性告警）；Min/MaxScaleDenominator 按帧计算比例尺分母（0.28mm 标准像素）；PolygonSymbolizer（fill/opacity/stroke/width/dasharray）、LineSymbolizer（含虚线）、PointSymbolizer（circle/square/triangle/star/cross/x/arrow/hexagon/pentagon 九种 mark，fill+stroke 双通道）、TextSymbolizer（Label 属性/字面量 + Font 字号/粗体 + Halo 白晕 + AnchorPoint/Displacement，内置 5×7 位图字体，`font.rs`）。图层带同名 `.sld`（见 `Layer::sld`）即走 styled 路径，否则回退 legacy 平面样式（MapLibre JSON paint / 默认绿）；WMS GetMap 与瓦片路由同源。样例：`config/vector/places.sld`（pop 分类 + 名称标注 + ElseFilter + 虚线）。
+- **SLD 符号渲染（`crates/renderer/src/sld.rs` + `vector.rs`，零 XML 依赖）**：完整文档模型（NamedLayer → UserStyle → FeatureTypeStyle → Rule → Symbolizer），按 SLD 语义求值——所有匹配规则的符号器按画家序叠加（面填充→面描边→线→点→标注），`ElseFilter` 在同 FTS 无前置命中时生效；Filter 支持 6 种比较 / Between / Like（`*` `?` 转义）/ IsNull / And / Or / Not（数值与字符串自动判别；空间过滤与 `ogc:Function` 解析为不匹配并一次性告警）；Min/MaxScaleDenominator 按帧计算比例尺分母（0.28mm 标准像素）；PolygonSymbolizer（fill/opacity/stroke/width/dasharray）、LineSymbolizer（含虚线）、PointSymbolizer（circle/square/triangle/star/cross/x/arrow/hexagon/pentagon 九种 mark，fill+stroke 双通道）、TextSymbolizer（Label 属性/字面量 + Font 字号/粗体 + Halo 白晕 + AnchorPoint/Displacement，内置 5×7 位图字体，`font.rs`）。图层带同名 `.sld`（见 `Layer::sld`）即走 styled 路径，否则回退 legacy 平面样式（MapLibre JSON paint / 默认绿）；WMS GetMap 与瓦片路由同源。样例：`config/vector/places.sld`（pop 分类 + 名称标注 + ElseFilter + 虚线）。
 - **GetLegendGraphic**：SLD 图层按 (rule, symbolizer) 逐行渲染符号；legacy 图层按几何类型渲染；栅格图层渲染调色板色带；支持 `layer`/`style`/`rule`/`format=image/png`/`width`/`height`；未传 `height` 时高度随样式行数自适应（`20 + 18×行数`，上限 512，多规则样式不会被压成 2px 行）。
 - **MVT**：spec 2.1，extent 4096，ZigZag/varint 自编码，key/value 去重字典；编码前按瓦片 lon/lat bbox 做保守预过滤（bbox 不相交的要素直接跳过，不再全量 clone + 全量编码）。
 - **PMTiles**：v3 127B header、Hilbert TileID（含 conformance 向量测试）、列式 varint 目录（5 列）、根目录/叶子目录二分查找、gzip 目录解码（上限 256MiB）、打包器（Hilbert 聚类、blob 去重、可选 gzip 重编码）；共享 fd 定位读（并发隔离有单测：8 线程 × 16 瓦片交叉校验）。
@@ -458,16 +458,15 @@ mapserver 默认采用 **AGPL-3.0-only** 授权——这是一种「网络 copyl
 - ✅ 可闭源集成到任何商业产品（包括 C++ DLL、C# NuGet、Python wheel 等桥接层）
 - ✅ 无需购买任何授权
 - ✅ 无需保留衍生代码开源义务
-- ✅ Apache-2.0 额外提供**明确的专利授权**（消除侵权风险）
+- ✅ Apache-2.0 同时包含**明确的专利授权**条款
 
-### 商业合作 / 收购咨询
+### 商业合作
 
-本项目的核心技术卖点（**纯 Rust 自研 COG/BigTIFF 解析、零 GDAL/tiff/mapbox 重型 C 绑定、高性能瓦片渲染与缓存**）可闭源授权或整体收购：
+本项目的核心技术（**纯 Rust 自研 COG/BigTIFF 解析、零 GDAL/tiff/mapbox 重型 C 绑定、高性能瓦片渲染与缓存**）可提供闭源商业授权：
 
-- **企业级 GIS 厂商**（如超图、中地数码、Esri 中国）→ 可将自研内核集成到商业 GIS 平台，替换旧 GDAL 依赖
-- **云服务商**（如阿里云、腾讯云）→ 可作为 GIS 云服务的瓦片/OGC API 引擎
-- **创业团队/个人开发者** → 可基于商业授权快速推出垂直 SaaS 产品
-- **整体收购** → 核心库 + 服务端 + 管理后台全栈技术交接
+- **企业级 GIS 平台** → 集成自研内核，替换旧 GDAL 依赖
+- **云服务** → 作为 GIS 云服务的瓦片 / OGC API 引擎
+- **创业团队与个人开发者** → 基于商业授权快速推出垂直 SaaS 产品
 
 **联系方式**：rex yan 853740877@qq.com
 

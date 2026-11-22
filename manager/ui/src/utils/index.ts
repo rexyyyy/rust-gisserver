@@ -1,5 +1,5 @@
 import i18n from '@/lang';
-import { parseTime } from '@/utils/ruoyi';
+import { parseTime } from '@/utils/common';
 
 /**
  * 表格时间格式化

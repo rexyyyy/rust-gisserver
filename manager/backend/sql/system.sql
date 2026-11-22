@@ -13,7 +13,7 @@
 --              sys_logininfor / sys_notice
 --   §2 头像字段与日志表主键序列补丁
 --   §3 初始化数据：系统菜单 / 角色 / 用户 / 部门 / 岗位 / 字典 / 参数 / 公告
---   §4 在线用户菜单补丁（上游 5.X 种子缺失，本项目补齐）
+--   §4 在线用户菜单补丁（历史种子缺失，本项目补齐）
 --   §5 顶级目录排序归一
 -- ---------------------------------------------------------------------
 -- 幂等性：建表 create if not exists；索引 create index if not exists；
@@ -84,7 +84,7 @@ end $$;
 
 
 -- =====================================================================
--- §1 建表脚本（源自 RuoYi-Vue-Plus 5.X，裁剪 social/oss/client/tenant/gen/test）
+-- §1 建表脚本（系统管理表结构，裁剪 social/oss/client/tenant/gen/test）
 -- =====================================================================
 
 create table if not exists sys_dept
@@ -701,7 +701,6 @@ COMMIT;
 insert into sys_menu values('1', '系统管理', '0', '1', 'system',           null, '', '1', '0', 'M', '0', '0', '', 'system',   103, 1, now(), null, null, '系统管理目录') on conflict do nothing;
 insert into sys_menu values('2', '系统监控', '0', '4', 'monitor',          null, '', '1', '0', 'M', '0', '0', '', 'monitor',  103, 1, now(), null, null, '系统监控目录') on conflict do nothing;
 insert into sys_menu values('3', '系统工具', '0', '5', 'tool',             null, '', '1', '0', 'M', '0', '0', '', 'tool',     103, 1, now(), null, null, '系统工具目录') on conflict do nothing;
-insert into sys_menu values('4', 'PLUS官网', '0', '6', 'https://gitee.com/dromara/RuoYi-Vue-Plus', null, '', '0', '0', 'M', '0', '0', '', 'external', 103, 1, now(), null, null, 'RuoYi-Vue-Plus官网地址') on conflict do nothing;
 insert into sys_menu VALUES('5', '测试菜单', '0', '7', 'demo',             null, '', '1', '0', 'M', '0', '0', null, 'star',       103, 1, now(), null, null, '测试菜单') on conflict do nothing;
 insert into sys_menu values('100', '用户管理', '1', '1', 'user',             'system/user/index',            '', '1', '0', 'C', '0', '0', 'system:user:list',            'user',          103, 1, now(), null, null, '用户管理菜单') on conflict do nothing;
 insert into sys_menu values('101', '角色管理', '1', '2', 'role',             'system/role/index',            '', '1', '0', 'C', '0', '0', 'system:role:list',            'peoples',       103, 1, now(), null, null, '角色管理菜单') on conflict do nothing;
@@ -777,7 +776,7 @@ insert into sys_dept values(106, 101, '0,100,101',  '财务部门',   null,4, nu
 insert into sys_dept values(107, 101, '0,100,101',  '运维部门',   null,5, null, '15888888888', 'xxx@qq.com', '0', '0', 103, 1, now(), null, null) on conflict do nothing;
 insert into sys_dept values(108, 102, '0,100,102',  '市场部门',   null,1, null, '15888888888', 'xxx@qq.com', '0', '0', 103, 1, now(), null, null) on conflict do nothing;
 insert into sys_dept values(109, 102, '0,100,102',  '财务部门',   null,2, null, '15888888888', 'xxx@qq.com', '0', '0', 103, 1, now(), null, null) on conflict do nothing;
-insert into sys_user values(1, 103, 'admin', '疯狂的狮子Li', 'sys_user', 'crazyLionLi@163.com', '15888888888', '1', null, '$2a$10$7JB720yubVSZvUI0rEqK/.VqGOZTH.ulu33dHOiBE8ByOhJIrdAu2', '0', '0', '127.0.0.1', now(), 103, 1, now(), null, null, '管理员') on conflict do nothing;
+insert into sys_user values(1, 103, 'admin', 'admin', 'sys_user', 'admin@example.com', '15888888888', '1', null, '$2a$10$7JB720yubVSZvUI0rEqK/.VqGOZTH.ulu33dHOiBE8ByOhJIrdAu2', '0', '0', '127.0.0.1', now(), 103, 1, now(), null, null, '管理员') on conflict do nothing;
 insert into sys_user VALUES(3, 108, 'test', '本部门及以下 密码666666', 'sys_user', '', '', '0', null, '$2a$10$b8yUzN0C71sbz.PhNOCgJe.Tu1yWC3RNrTyjSQ8p1W0.aaUXUJ.Ne', '0', '0', '127.0.0.1', now(), 103, 1, now(), 3, now(), NULL) on conflict do nothing;
 insert into sys_user VALUES(4, 102, 'test1', '仅本人 密码666666', 'sys_user', '', '', '0', null, '$2a$10$b8yUzN0C71sbz.PhNOCgJe.Tu1yWC3RNrTyjSQ8p1W0.aaUXUJ.Ne', '0', '0', '127.0.0.1', now(), 103, 1, now(), 4, now(), NULL) on conflict do nothing;
 insert into sys_post values(1, 103, 'ceo',  null, '董事长',    1, '0', 103, 1, now(), null, null, '') on conflict do nothing;
@@ -911,7 +910,7 @@ insert into sys_notice values('2', '维护通知：2018-07-01 系统凌晨维护
 -- =====================================================================
 -- §4 在线用户菜单补丁
 -- ---------------------------------------------------------------------
--- 上游 5.X 的 sys_menu 有 109（在线用户，parent=2 系统监控）与 1046/1047/1048
+-- 历史种子中 sys_menu 有 109（在线用户，parent=2 系统监控）与 1046/1047/1048
 -- 三个按钮权限，本项目初始种子缺失，导致前端 monitor/online 页面无入口。
 -- =====================================================================
 
@@ -939,7 +938,6 @@ insert into sys_role_menu values ('3', '1048') on conflict (role_id, menu_id) do
 -- §5 顶级目录排序归一
 -- ---------------------------------------------------------------------
 -- 目标顺序：1 系统管理 / 6 数据服务 / 7 地图服务 / 2 系统监控 /
---           3 系统工具 / 4 PLUS官网 / 5 测试菜单
 -- 按 menu_id 定位（parent_id = 0 的顶级行），重复执行只写回同一值。
 -- =====================================================================
 update sys_menu set order_num = 1 where menu_id = '1' and parent_id = 0; -- 系统管理
@@ -947,5 +945,4 @@ update sys_menu set order_num = 2 where menu_id = '6' and parent_id = 0; -- 数�
 update sys_menu set order_num = 3 where menu_id = '7' and parent_id = 0; -- 地图服务
 update sys_menu set order_num = 4 where menu_id = '2' and parent_id = 0; -- 系统监控
 update sys_menu set order_num = 5 where menu_id = '3' and parent_id = 0; -- 系统工具
-update sys_menu set order_num = 6 where menu_id = '4' and parent_id = 0; -- PLUS官网
 update sys_menu set order_num = 7 where menu_id = '5' and parent_id = 0; -- 测试菜单

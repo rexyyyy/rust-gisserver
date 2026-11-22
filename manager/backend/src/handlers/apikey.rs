@@ -35,7 +35,7 @@ pub fn routes() -> Router<Arc<AppState>> {
         .route("/map/apikeys/{keyId}", axum::routing::put(update).delete(remove))
 }
 
-/// 生成/编辑请求体（前端 plus-ui 统一用 camelCase：keyName / expiresAt）。
+/// 生成/编辑请求体（前端统一用 camelCase：keyName / expiresAt）。
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ApiKeyBody {
@@ -405,7 +405,7 @@ mod tests {
 
     #[test]
     fn body_deserializes_camel_case_from_ui() {
-        // 前端 plus-ui 发 keyName / expiresAt；少了 rename_all 会静默变成空值，
+        // 前端发 keyName / expiresAt；少了 rename_all 会静默变成空值，
         // 表现为「名称不能为空」且排查困难，这里锁死契约。
         let b: ApiKeyBody = serde_json::from_str(
             r#"{"keyName":"client-a","purpose":"data","status":"0","expiresAt":"2026-12-31","remark":""}"#,

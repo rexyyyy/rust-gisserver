@@ -1,7 +1,7 @@
 {
   "$schema": "https://json.schemastore.org/package",
   "name": "manager-ui",
-  "version": "0.8.0",
+  "version": "0.8.1",
   "description": "rust-gisserver 管理控制台前端（manager-ui）",
   "license": "MIT",
   "type": "module",
@@ -18,7 +18,7 @@
   },
   "repository": {
     "type": "git",
-    "url": "https://gitee.com/JavaLionLi/plus-ui.git"
+    "url": "https://github.com/rexyyyy/rust-gisserver"
   },
   "dependencies": {
     "@codemirror/commands": "^6.11.1",

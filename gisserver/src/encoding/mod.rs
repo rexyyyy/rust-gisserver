@@ -1,8 +1,7 @@
 //! GIS 能力底座 · 路径编码检测与归一化（语言区域驱动）。
 //!
-//! 参照 `G:\net\编码检测\编码检测\IdentifyEncoding.cs`（lion, Microshaoft.Text, 2005）
-//! 的概率打分思路移植（GBK/BIG5 频度表为原表机械移植）；EUC-KR / EUC-TW /
-//! Shift_JIS / CP932 按同构打分法实现。
+//! 基于字符频度的编码概率打分实现：GBK/BIG5 频度表用于字节序列打分，
+//! EUC-KR / EUC-TW / Shift_JIS / CP932 按同构打分法实现。
 //!
 //! **探测集合由语言区域（locale）决定**，UTF-8/ASCII 恒为公共候选：
 //!

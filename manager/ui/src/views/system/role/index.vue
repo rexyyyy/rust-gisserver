@@ -107,7 +107,7 @@
         <el-form-item prop="roleKey">
           <template #label>
             <span>
-              <el-tooltip :content="$t('system.auto.permissionKeyDefinedInTheControllerEGSaChe2')" placement="top">
+              <el-tooltip :content="$t('system.auto.roleKeyDefinedInTheController')" placement="top">
                 <el-icon><question-filled /></el-icon>
               </el-tooltip>
               {{ $t('system.auto.permissionKey2') }}

@@ -84,7 +84,7 @@ end $$;
 
 
 -- =====================================================================
--- §1 DDL scripts (derived from RuoYi-Vue-Plus 5.X; trimmed: social/oss/client/tenant/gen/test)
+-- §1 DDL scripts (system management schema; trimmed: social/oss/client/tenant/gen/test)
 -- =====================================================================
 
 create table if not exists sys_dept
@@ -701,7 +701,6 @@ COMMIT;
 insert into sys_menu values('1', 'System Administration', '0', '1', 'system',           null, '', '1', '0', 'M', '0', '0', '', 'system',   103, 1, now(), null, null, 'System Administration') on conflict do nothing;
 insert into sys_menu values('2', 'System Monitor', '0', '4', 'monitor',          null, '', '1', '0', 'M', '0', '0', '', 'monitor',  103, 1, now(), null, null, 'System Monitor') on conflict do nothing;
 insert into sys_menu values('3', 'System Tools', '0', '5', 'tool',             null, '', '1', '0', 'M', '0', '0', '', 'tool',     103, 1, now(), null, null, 'System Tools directory') on conflict do nothing;
-insert into sys_menu values('4', 'PLUS Official Site', '0', '6', 'https://gitee.com/dromara/RuoYi-Vue-Plus', null, '', '0', '0', 'M', '0', '0', '', 'external', 103, 1, now(), null, null, 'RuoYi-Vue-Plus official site URL') on conflict do nothing;
 insert into sys_menu VALUES('5', 'Test Menu', '0', '7', 'demo',             null, '', '1', '0', 'M', '0', '0', null, 'star',       103, 1, now(), null, null, 'Test Menu') on conflict do nothing;
 insert into sys_menu values('100', 'User Management', '1', '1', 'user',             'system/user/index',            '', '1', '0', 'C', '0', '0', 'system:user:list',            'user',          103, 1, now(), null, null, 'User Management') on conflict do nothing;
 insert into sys_menu values('101', 'Role Management', '1', '2', 'role',             'system/role/index',            '', '1', '0', 'C', '0', '0', 'system:role:list',            'peoples',       103, 1, now(), null, null, 'Role Management') on conflict do nothing;
@@ -777,7 +776,7 @@ insert into sys_dept values(106, 101, '0,100,101',  'Finance Dept',   null,4, nu
 insert into sys_dept values(107, 101, '0,100,101',  'Operations Dept',   null,5, null, '15888888888', 'xxx@qq.com', '0', '0', 103, 1, now(), null, null) on conflict do nothing;
 insert into sys_dept values(108, 102, '0,100,102',  'Marketing Dept',   null,1, null, '15888888888', 'xxx@qq.com', '0', '0', 103, 1, now(), null, null) on conflict do nothing;
 insert into sys_dept values(109, 102, '0,100,102',  'Finance Dept',   null,2, null, '15888888888', 'xxx@qq.com', '0', '0', 103, 1, now(), null, null) on conflict do nothing;
-insert into sys_user values(1, 103, 'admin', 'Crazy Lion Li', 'sys_user', 'crazyLionLi@163.com', '15888888888', '1', null, '$2a$10$7JB720yubVSZvUI0rEqK/.VqGOZTH.ulu33dHOiBE8ByOhJIrdAu2', '0', '0', '127.0.0.1', now(), 103, 1, now(), null, null, 'Administrator') on conflict do nothing;
+insert into sys_user values(1, 103, 'admin', 'admin', 'sys_user', 'admin@example.com', '15888888888', '1', null, '$2a$10$7JB720yubVSZvUI0rEqK/.VqGOZTH.ulu33dHOiBE8ByOhJIrdAu2', '0', '0', '127.0.0.1', now(), 103, 1, now(), null, null, 'Administrator') on conflict do nothing;
 insert into sys_user VALUES(3, 108, 'test', 'This dept and below (password 666666)', 'sys_user', '', '', '0', null, '$2a$10$b8yUzN0C71sbz.PhNOCgJe.Tu1yWC3RNrTyjSQ8p1W0.aaUXUJ.Ne', '0', '0', '127.0.0.1', now(), 103, 1, now(), 3, now(), NULL) on conflict do nothing;
 insert into sys_user VALUES(4, 102, 'test1', 'Self only (password 666666)', 'sys_user', '', '', '0', null, '$2a$10$b8yUzN0C71sbz.PhNOCgJe.Tu1yWC3RNrTyjSQ8p1W0.aaUXUJ.Ne', '0', '0', '127.0.0.1', now(), 103, 1, now(), 4, now(), NULL) on conflict do nothing;
 insert into sys_post values(1, 103, 'ceo',  null, 'Chairman',    1, '0', 103, 1, now(), null, null, '') on conflict do nothing;
@@ -939,7 +938,7 @@ insert into sys_role_menu values ('3', '1048') on conflict (role_id, menu_id) do
 -- §5 Normalize top-level directory sort order
 -- ---------------------------------------------------------------------
 -- Target order: 1 System Admin / 6 Data Services / 7 Map Services / 2 System Monitor /
---           3 System Tools / 4 PLUS Site / 5 Test Menu
+--           3 System Tools / 7 Test Menu
 -- Lookup by menu_id (parent_id = 0 top-level rows); re-runs write same values back.
 -- =====================================================================
 update sys_menu set order_num = 1 where menu_id = '1' and parent_id = 0; -- System Admin
@@ -947,5 +946,4 @@ update sys_menu set order_num = 2 where menu_id = '6' and parent_id = 0; -- Data
 update sys_menu set order_num = 3 where menu_id = '7' and parent_id = 0; -- Map Services
 update sys_menu set order_num = 4 where menu_id = '2' and parent_id = 0; -- System Monitor
 update sys_menu set order_num = 5 where menu_id = '3' and parent_id = 0; -- System Tools
-update sys_menu set order_num = 6 where menu_id = '4' and parent_id = 0; -- PLUS Official Site
 update sys_menu set order_num = 7 where menu_id = '5' and parent_id = 0; -- Test Menu

@@ -477,7 +477,7 @@ const publishedOf = (row: ResourceVO) => published.value.filter((p) => p.resourc
 const is3dOrTerrain = (row: ResourceVO) => ['3dtiles', 'terrain'].includes((row.dataType || '').toLowerCase());
 
 /** 源坐标系不是 WebMercator 的数据源：发布时必须选对应网格（4490 → CGCS2000Quad /
- *  天地图 LOD / 自定义 XML），否则发布后用默认 WebMercator 预览或浏览会白屏。
+ *  CGCS2000 经纬度 LOD / 自定义 XML），否则发布后用默认 WebMercator 预览或浏览会白屏。
  *  3dtiles / terrain 本身按 WGS 84/ECEF 规范渲染，不走瓦片网格，跳过。 */
 const needsNativeGrid = (row: ResourceVO) => {
   if (is3dOrTerrain(row)) return false;

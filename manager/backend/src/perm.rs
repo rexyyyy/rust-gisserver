@@ -397,7 +397,7 @@ pub fn build_tree(items: Vec<crate::models::MenuVO>) -> Vec<crate::models::MenuV
 
 /// 菜单 → 前端动态路由节点。
 ///
-/// 路由构建规则（`buildMenus` / `getRouterPath` / `getComponentInfo`）：
+/// 路由构建规则：
 ///
 /// * `is_frame`：`"0"`=是外链（YES_FRAME，新窗口打开），`"1"`=非外链（NO_FRAME，站内嵌）
 /// * 一级目录（parent_id=0 且 type=M 且 is_frame="1"）→ path 补前导 `/`，component=`Layout`
@@ -426,7 +426,7 @@ pub fn to_routers(items: Vec<crate::models::MenuVO>) -> Vec<crate::models::Route
                 format!("{}{}", capitalize(&m.path), m.menu_id)
             };
 
-            // path（getRouterPath）
+            // path
             let path = if !is_top && is_inner_link {
                 inner_link_replace_each(&m.path)
             } else if is_top && m.menu_type == "M" && m.is_frame == "1" {
@@ -437,7 +437,7 @@ pub fn to_routers(items: Vec<crate::models::MenuVO>) -> Vec<crate::models::Route
                 m.path.clone()
             };
 
-            // component（getComponentInfo）
+            // component
             let component = if has_component && !is_menu_frame {
                 raw_component.to_string()
             } else if !has_component && !is_top && is_inner_link {

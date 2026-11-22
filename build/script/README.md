@@ -183,9 +183,9 @@ nssm start manager
 ### 4.6 PROJ 资产不入库
 - `proj_9.dll` 等 10 个 DLL 与 `proj.db` **不进 git**（见 `.gitignore`）。换机器/干净检出时，必须从 `gis-wt\build` / `dist` / `GDAL3.13\dll` 置备，否则 `bin\` 缺 `proj_9.dll`、PROJ 坐标变换不可用（`/health` 返回 `proj:false`）。
 
-### 4.7 `manager.xml` 注释乱码（上游源问题，非安装引入）
+### 4.7 `manager.xml` 注释乱码（源文件编码问题，非安装引入）
 - 源 `manager\backend\config\manager.xml` 的 XML 声明为 `encoding="UTF-8"`，但注释字节实为 GBK，被读取时显示乱码。
-- 这是**上游源文件本身的编码不一致**，安装拷贝/改写不改变配置值（server addr、static_dir、db url 均为 ASCII/合法），不影响解析与运行。如需根治，应修正上游源文件的编码声明或注释文本。
+- 这是**源文件本身的编码不一致**，安装拷贝/改写不改变配置值（server addr、static_dir、db url 均为 ASCII/合法），不影响解析与运行。如需根治，应修正源文件的编码声明或注释文本。
 
 ---
 

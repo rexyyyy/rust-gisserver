@@ -4,7 +4,7 @@
 @use './element-ui.scss';
 @use './sidebar.scss';
 @use './btn.scss';
-@use './ruoyi.scss';
+@use './common.scss';
 @use 'animate.css';
 @use 'element-plus/dist/index.css';
 // 主题覆写必须放在最后，才能盖住 element-plus 的默认主色与按钮配色
