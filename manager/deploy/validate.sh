@@ -73,8 +73,7 @@ probe 'map-api /health' "$MAP_API_BASE/health" || true
 
 # 2b) PROJ 后端（/health 的 proj 字段）：跨 CRS 重投影（EPSG:4490 / 高斯-克吕格
 # 45xx / UTM）依赖 PROJ 库 + proj.db。proj=false 不阻断启动，但跨 CRS 请求会
-# 失败，故报 WARN 提醒。真正的可用性判据是 proj_create_crs_to_crs 能否成功，
-# 见 mapserver/THIRD-PARTY-NOTICES.md §2.2。
+# 失败，故报 WARN 提醒。真正的可用性判据是 proj_create_crs_to_crs 能否成功。
 health_body="$(curl -s --max-time 10 "$MAP_API_BASE/health" 2>/dev/null)"
 if grep -q '"proj"[[:space:]]*:[[:space:]]*true' <<<"$health_body"; then
     add 'PROJ 后端' 'PASS' 'proj_loaded=true（跨 CRS 重投影可用）'

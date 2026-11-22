@@ -52,8 +52,7 @@ $null = Probe 'map-api /health' "$MapApiBase/health"
 # 2b) PROJ backend (the `proj` field of /health): cross-CRS reprojection
 # (EPSG:4490 / Gauss-Kruger 45xx / UTM) needs the PROJ library + proj.db.
 # proj=false does not block startup but cross-CRS requests will fail -> WARN.
-# The real usability criterion is whether proj_create_crs_to_crs succeeds
-# (see mapserver/THIRD-PARTY-NOTICES.md §2.2).
+# The real usability criterion is whether proj_create_crs_to_crs succeeds.
 try {
     $hj = Invoke-RestMethod -Uri "$MapApiBase/health" -Headers $headers -TimeoutSec 10
     if ($hj.proj -eq $true) {

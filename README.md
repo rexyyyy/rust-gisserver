@@ -310,6 +310,6 @@ HTTP (axum 0.8 / tokio)     mapserver/services/map-api
 ## 许可证
 
 - `gisserver/`（核心库）：**MIT OR Apache-2.0** 双许可，见 [gisserver/LICENSE](gisserver/LICENSE)
-- `mapserver/` 与 `manager/`：**AGPL-3.0-only** + 商业授权例外，见各自 `LICENSE`；第三方组件声明见 [mapserver/THIRD-PARTY-NOTICES.md](mapserver/THIRD-PARTY-NOTICES.md)
+- `mapserver/` 与 `manager/`：**AGPL-3.0-only** + 商业授权例外，见各自 `LICENSE`
 
 Copyright (c) 2026 rex yan 853740877@qq.com and contributors.

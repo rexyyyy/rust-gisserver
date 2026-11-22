@@ -230,7 +230,7 @@ XML → 内部结构的映射约定见 `services/map-api/src/xmlcfg.rs` 模块�
   对应安装包 `bin/` + `share/proj/` 布局，服务从任意 CWD 启动均可）。PROJ ≥ 8 均可
   （实测用 PostGIS 自带的 `libproj_8_2.dll` + `proj.db`）。未找到时只禁用**跨 CRS**
   互转，内置 4326↔3857 与「请求 CRS == 源 CRS」的原生产物直出不受影响。
-  部署时**不要**设置 `PROJ_LIB`（系统 PostGIS 常指向旧版 proj.db），详见 `THIRD-PARTY-NOTICES.md`。
+  部署时**不要**设置 `PROJ_LIB`（系统 PostGIS 常指向旧版 proj.db）。
 
 ## 坐标系支持
 

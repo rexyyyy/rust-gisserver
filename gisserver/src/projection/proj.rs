@@ -314,8 +314,7 @@ fn lib_candidates(
 /// PROJ 数据目录（含 `proj.db`）候选路径，按优先级排列：
 /// 显式参数 > `PROJ_DATA` > `<cwd>/share/proj`（旧行为）> `<exe>/share/proj` >
 /// `<exe>/../share/proj`（安装包布局：`bin/` 与 `share/proj/` 同级）。
-/// 注意不读 `PROJ_LIB`：该变量常被系统 PostGIS 的旧版 proj.db 占用，见
-/// `mapserver/THIRD-PARTY-NOTICES.md` 的部署约束。
+/// 注意不读 `PROJ_LIB`：该变量常被系统 PostGIS 的旧版 proj.db 占用。
 fn data_candidates(
     explicit: Option<&str>,
     env_data: Option<&str>,

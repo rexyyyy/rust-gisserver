@@ -311,6 +311,6 @@ Roadmap directions, without a fixed schedule:
 ## License
 
 - `gisserver/` (core library): **MIT OR Apache-2.0**, see [gisserver/LICENSE](gisserver/LICENSE)
-- `mapserver/` and `manager/`: **AGPL-3.0-only** with a commercial license exception, see each `LICENSE`; third-party notices in [mapserver/THIRD-PARTY-NOTICES.md](mapserver/THIRD-PARTY-NOTICES.md)
+- `mapserver/` and `manager/`: **AGPL-3.0-only** with a commercial license exception, see each `LICENSE`
 
 Copyright (c) 2026 rex yan 853740877@qq.com and contributors.
