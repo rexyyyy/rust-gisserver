@@ -41,6 +41,16 @@ installscript/数据库/
 /manager/deploy.zip
 /installscript/nssm
 
+# Local deployment copies and editor state
+/test-deploy/
+/.trae/
+
+# Installer staging copies (canonical manifest lives in build/script/)
+/mapserver/install/windows/PROJ_RUNTIME_MANIFEST.csv
+
+# Local PostGIS layer configs may contain plaintext DSN credentials
+/mapserver/config/postgis/
+
 # installscript: keep only numbered PDFs and install.nsi; drop duplicated sources/docs
 /installscript/package.json
 /installscript/package-lock.json
