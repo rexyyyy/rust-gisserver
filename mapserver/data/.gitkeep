@@ -1,0 +1,2 @@
+Default data_root placeholder. Real datasets in this directory are gitignored;
+set DATA_ROOT in .env only when data lives on another drive.

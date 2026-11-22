@@ -1,0 +1,96 @@
+{
+  "label": "after2",
+  "scenarios": [
+    {
+      "label": "getmap_512",
+      "total": 20,
+      "conc": 1,
+      "qps": 40.3,
+      "codes": {
+        "200": 20
+      },
+      "p50_ms": 28.87,
+      "p99_ms": 40.46,
+      "max_ms": 40.46,
+      "rss_mib_after": 13.0
+    },
+    {
+      "label": "getmap_1024",
+      "total": 10,
+      "conc": 1,
+      "qps": 19.8,
+      "codes": {
+        "200": 10
+      },
+      "p50_ms": 49.18,
+      "p99_ms": 65.36,
+      "max_ms": 65.36,
+      "rss_mib_after": 12.8
+    },
+    {
+      "label": "tms_cold",
+      "total": 128,
+      "conc": 16,
+      "qps": 1092.4,
+      "codes": {
+        "200": 128
+      },
+      "p50_ms": 8.79,
+      "p99_ms": 34.72,
+      "max_ms": 35.14,
+      "rss_mib_after": 14.3
+    },
+    {
+      "label": "tms_hot",
+      "total": 256,
+      "conc": 16,
+      "qps": 1496.2,
+      "codes": {
+        "200": 256
+      },
+      "p50_ms": 7.81,
+      "p99_ms": 22.12,
+      "max_ms": 26.81,
+      "rss_mib_after": 14.9
+    },
+    {
+      "label": "mvt_cold",
+      "total": 128,
+      "conc": 16,
+      "qps": 852.8,
+      "codes": {
+        "200": 128
+      },
+      "p50_ms": 10.4,
+      "p99_ms": 51.85,
+      "max_ms": 61.62,
+      "rss_mib_after": 14.8
+    },
+    {
+      "label": "mbt_cold",
+      "total": 128,
+      "conc": 16,
+      "qps": 1359.1,
+      "codes": {
+        "200": 128
+      },
+      "p50_ms": 8.86,
+      "p99_ms": 29.87,
+      "max_ms": 32.15,
+      "rss_mib_after": 14.8
+    },
+    {
+      "label": "health_conc",
+      "total": 128,
+      "conc": 16,
+      "qps": 1624.1,
+      "codes": {
+        "200": 128
+      },
+      "p50_ms": 6.89,
+      "p99_ms": 23.4,
+      "max_ms": 27.02,
+      "rss_mib_after": 15.1
+    }
+  ]
+}

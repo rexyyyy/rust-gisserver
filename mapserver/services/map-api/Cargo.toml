@@ -1,0 +1,47 @@
+[package]
+name = "r-mapserver"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "HTTP map server: WMS / WMTS / TMS / MVT / PMTiles / ArcGIS tile cache / COG tile services (axum + tokio)."
+
+[lib]
+# The binary refers to this crate as `map_api::...`. Cargo derives the lib
+# target name from the package name by default, so pin it explicitly now that
+# the published package name differs from the lib target name.
+name = "map_api"
+path = "src/lib.rs"
+
+[[bin]]
+# Keep the executable name stable: start/install scripts and the NSIS
+# service registration all refer to map-api.exe.
+name = "mapserve"
+path = "src/main.rs"
+
+[dependencies]
+gisserver = { workspace = true }
+tokio-postgres = { workspace = true }
+# SHP 导入（/admin/pg-import-shp）通过 COPY 流式写库，需要 Sink 接口与 Bytes 缓冲。
+bytes = { workspace = true }
+futures-util = { workspace = true }
+pinyin = "0.11"
+rusqlite = { workspace = true }
+
+axum = { workspace = true }
+tokio = { workspace = true }
+tower-http = { workspace = true }
+# http-body 1.x：axum 0.8 与 tower-http 0.6 均使用 http-body 1.x，
+# 三者版本对齐，可直接用于压缩谓词的类型约束。
+http-body = "1.1"
+serde = { workspace = true }
+serde_json = { workspace = true }
+clap = { workspace = true }
+anyhow = { workspace = true }
+tracing = { workspace = true }
+tracing-subscriber = { workspace = true }
+foyer = { workspace = true }
+# pbf 冷瓦一次性 gzip（热态直接回传压缩字节），flate2 与 workspace 其它 crate 同源。
+flate2 = { workspace = true }
+
+[dev-dependencies]
+tower = { workspace = true }

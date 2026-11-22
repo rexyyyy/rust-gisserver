@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  rust-gisserver manager backend config (PostgreSQL only)
+  =============================================================================
+  Config is XML: attributes hold tag strings; <item> marks list elements.
+  =============================================================================
+  Secret keys / passwords (MANAGER_DB_PASSWORD, MANAGER_JWT_SECRET) are injected
+  through environment variables, never stored in plaintext in this file.
+  host/port fall back to non-sensitive defaults (localhost:5434 / 127.0.0.1:8080).
+  Set these two env vars before a local run; in containers they are auto-injected
+  by the deploy compose file.
+-->
+<config>
+  <server addr="0.0.0.0:6180" base_api="/manager-api" static_dir="manager/ui/dist">
+    <!-- Allowed CORS origins (frontend dev server / vite port) -->
+    <cors_origins>
+      <item>http://localhost:5100</item>
+      <item>http://127.0.0.1:5100</item>
+    </cors_origins>
+  </server>
+  <database url="postgresql://postgres:${MANAGER_DB_PASSWORD}@${MANAGER_DB_HOST:-localhost}:${MANAGER_DB_PORT:-5434}/mapserver-manager" pool_max="16"/>
+  <!-- Avatar local storage root. Relative paths resolve against the backend
+       process working directory. For production prefer an absolute path
+       (e.g. /var/lib/rust-gisserver/avatar) to ease mounting a data disk. -->
+  <storage avatar_dir="storage/avatar"/>
+  <!-- Management proxy to map-api (the rust-gisserver server) -->
+  <mapsvc base_url="http://${MAPSRV_HOST:-127.0.0.1}:${MAPSRV_PORT:-8080}"/>
+  <!-- DSN 落库加密：dsn_cipher=des（默认）/sm4；dsn_key 留空时由 jwt_secret 派生。
+       生产建议显式设置 MANAGER_DSN_KEY（本地安装与容器部署都支持）。 -->
+  <security jwt_secret="${MANAGER_JWT_SECRET}" token_expire_minutes="1440" captcha_enabled="false" dsn_cipher="des" dsn_key="${MANAGER_DSN_KEY}">
+    <!-- Auth-bypass whitelist (paths relative to base_api) -->
+    <white_list>
+      <item>/auth/login</item>
+      <item>/auth/code</item>
+      <item>/captchaImage</item>
+    </white_list>
+  </security>
+</config>

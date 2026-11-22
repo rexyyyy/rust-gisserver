@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- gisserver / rust-gisserver 透明背景图标：只保留三联折叠地图 mark，无深色底板 -->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64">
+  <defs>
+    <linearGradient id="rustM" x1="0.1" y1="0" x2="0.9" y2="1">
+      <stop offset="0" stop-color="#F8A15C"/>
+      <stop offset="0.55" stop-color="#D9642A"/>
+      <stop offset="1" stop-color="#A8320C"/>
+    </linearGradient>
+    <linearGradient id="steelM" x1="0" y1="0" x2="0.6" y2="1">
+      <stop offset="0" stop-color="#66BB6A"/>
+      <stop offset="1" stop-color="#2E7D32"/>
+    </linearGradient>
+  </defs>
+  <polygon points="8,24.5 23,9.5 23,39.5 8,54.5" fill="url(#steelM)"/>
+  <polygon points="41,24.5 56,9.5 56,39.5 41,54.5" fill="url(#steelM)"/>
+  <polygon points="39.5,54.5 24.5,39.5 24.5,9.5 39.5,24.5" fill="url(#rustM)"/>
+</svg>

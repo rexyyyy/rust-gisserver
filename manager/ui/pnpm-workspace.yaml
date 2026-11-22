@@ -1,0 +1,8 @@
+# pnpm v11+ 配置入口（单包 workspace）：批准依赖的安装脚本。
+# pnpm v11 起 onlyBuiltDependencies 已移除、改为 allowBuilds 映射，
+# v12 默认 strictDepBuilds —— 未批准的 postinstall 会让安装直接失败
+# （ERR_PNPM_IGNORED_BUILDS）。esbuild/@parcel/watcher 的平台二进制由
+# optional 包提供，postinstall 仅做校验，无网络下载。
+allowBuilds:
+  esbuild: true
+  '@parcel/watcher': true

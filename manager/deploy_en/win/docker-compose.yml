@@ -1,0 +1,86 @@
+# ============================================================================
+# rust-gisserver 数据底座 — 英语 / Windows 部署入口（deploy_en/win）
+#
+# 目录矩阵：语言（zh-cn / en）× 平台（win / linux），四个独立 compose 项目。
+# 本目录＝英文种子 + Windows 宿主机；Linux 宿主机用同语言的 ../linux/。
+# 公共资产（config 模板 / .env 样例 / 一键脚本 / 文档）在 ../../deploy/。
+# 语言差异：首建库跑英文基线 system.en_US.sql → map.en_US.sql（../dbinit/00-init.sql）。
+# 库级英文种子只影响菜单/字典等 DB 文本；中间件无 en→zh 路径，面向纯英语环境。
+# 平台差异：仅一键脚本（.ps1 / .sh）与卷隔离，镜像与 compose 服务定义一致。
+#
+# 使用（在本目录执行）：
+#   cp ..\..\deploy\.env.example .env     # 填 MANAGER_JWT_SECRET
+#   docker compose up -d --build
+#   pwsh -File ..\..\deploy\start.ps1 -Dir .
+#
+# 相对路径（从本目录算）：仓库根 ../../..  manager/ ../..  dbinit ../dbinit
+# 四个项目端口相同（6180 / 8080 / MAPSERVER_DB_PORT），不能同时起；卷按项目名隔离。
+# ============================================================================
+name: gis-data-base-en-win
+
+services:
+  postgis:
+    image: postgis/postgis:16-3.4
+    container_name: gis-postgis
+    environment:
+      POSTGRES_DB: "mapserver-manager"
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${MAPSERVER_DB_PASSWORD:-123456}
+    ports:
+      - "${MAPSERVER_DB_PORT:-5434}:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ../../backend/sql:/sql:ro
+      - ../dbinit:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U \"$$POSTGRES_USER\" -d 'mapserver-manager'"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+    restart: unless-stopped
+
+  map-api:
+    build:
+      context: ../../..
+      dockerfile: mapserver/Dockerfile
+    image: gis/map-api:0.1
+    container_name: gis-map-api
+    depends_on:
+      postgis:
+        condition: service_healthy
+    environment:
+      MAPSERVER_DB_PASSWORD: ${MAPSERVER_DB_PASSWORD:-123456}
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+    volumes:
+      - ../../deploy/config/mapserver:/app/config.template:ro
+      - map_cache:/app/cache
+      - ${GISDATA_DIR:-./gisdata}:/app/data:ro
+    ports:
+      - "8080:8080"
+    restart: unless-stopped
+
+  manager:
+    build:
+      context: ../..
+      dockerfile: Dockerfile
+    image: gis/manager:0.1
+    container_name: gis-manager
+    depends_on:
+      postgis:
+        condition: service_healthy
+    environment:
+      MAPSERVER_DB_PASSWORD: ${MAPSERVER_DB_PASSWORD:-123456}
+      MANAGER_JWT_SECRET: ${MANAGER_JWT_SECRET:?MANAGER_JWT_SECRET 未设置，请在 .env 中配置}
+      MANAGER_DSN_KEY: ${MANAGER_DSN_KEY:-}
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+    volumes:
+      - ../../deploy/config/manager:/app/config.template:ro
+      - mgr_storage:/app/storage
+    ports:
+      - "6180:6180"
+    restart: unless-stopped
+
+volumes:
+  pgdata:
+  map_cache:
+  mgr_storage:

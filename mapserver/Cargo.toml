@@ -1,0 +1,81 @@
+# mapserver —— rust-gisserver 的地图服务器（引擎，经 path 依赖核心库 gisserver）
+#
+# Core library `gisserver` is a single package with feature-gated modules;
+# the engine enables everything via features = ["full"].
+[workspace]
+resolver = "2"
+members = ["services/*"]
+
+[workspace.package]
+version = "0.8.2"
+edition = "2021"
+# 服务层引擎：AGPL-3.0-only + 商业授权例外（Commercial License Exception，
+# 全文见 LICENSE 末尾）。SPDX 无「AGPL + 例外」标准标识，故 license 字段仍
+# 声明 AGPL-3.0-only，例外条款以 LICENSE 附加文本为准。
+license = "AGPL-3.0-only"
+
+[workspace.dependencies]
+# --- Core library (single package, feature-gated modules) -------------------
+# path 供本地联调；publish 时 Cargo 剥掉 path，改用 crates.io 上的 0.8.2。
+gisserver = { version = "0.8.2", path = "../gisserver", features = ["full"] }
+# --- Runtime / async --------------------------------------------------------
+tokio = { version = "1", features = ["full"] }
+futures = "0.3"
+# Sink trait for PostGIS COPY streaming; keep the full futures facade out of
+# the dependency graph.
+futures-util = { version = "0.3", default-features = false, features = ["sink"] }
+
+# --- HTTP stack -------------------------------------------------------------
+# axum 0.8 uses `{param}` / `{*rest}`; the 0.7 `:param` form panics at route
+# registration under matchit 0.8 instead of failing at compile time.
+axum = { version = "0.8.9", features = ["macros"] }
+hyper = { version = "1", features = ["full"] }
+tower = { version = "0.5", features = ["util"] }
+# tower-http 0.6 pairs with axum 0.8 (http-body 1.x). compression-* serves
+# Capabilities / OGC JSON / WFS GeoJSON; image/* and already-compressed pbf
+# are skipped by NoRecompress. request-id emits and returns x-request-id.
+tower-http = { version = "0.6.11", features = ["cors", "trace", "compression-gzip", "compression-br", "compression-zstd", "request-id", "timeout"] }
+
+# --- Serialization ----------------------------------------------------------
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+bytes = "1"
+
+# --- Tile payload codecs ----------------------------------------------------
+# Payload codecs only; COG container, IFD parsing, tiling and windowed reads
+# are implemented in this workspace.
+flate2 = "1"      # DEFLATE (zlib) + gzip (PMTiles directories)
+crc32fast = "1"   # PNG CRCs
+weezl = "0.1"     # LZW (TIFF variant)
+zstd = "0.13"     # ZSTD (TIFF compression 50000)
+png = "0.17"      # PNG encode for tile / map output
+
+# --- Remote sources & request signing ---------------------------------------
+# Sync HTTP client for range reads over http(s):// COGs.
+ureq = "2"
+# AWS SigV4 for s3:// COG sources (MinIO / RustFS / AWS); pure Rust.
+hmac = "0.12"
+sha2 = "0.10"
+
+# --- Caching & parallel decode ----------------------------------------------
+# foyer is the sole cache backend: hybrid for output tiles, in-memory for the
+# other process caches. "serde" enables disk serialization of serde types.
+foyer = { version = "0.22", features = ["serde"] }
+rayon = "1"
+
+# --- Observability / errors / CLI / tests -----------------------------------
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter", "json"] }
+thiserror = "1"
+anyhow = "1"
+clap = { version = "4", features = ["derive", "env"] }
+tempfile = "3"
+
+# --- Data stores ------------------------------------------------------------
+# MBTiles (SQLite); bundled builds libsqlite3 from source.
+rusqlite = { version = "0.40", features = ["bundled"] }
+# PostGIS source for dynamic vector tiles and feature queries. A pool is built
+# only when a `source.type: postgis` layer is configured.
+tokio-postgres = "0.7"
+deadpool-postgres = "0.14"
+semver = "1"

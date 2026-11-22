@@ -1,0 +1,144 @@
+/**
+ * 经典主题样式覆写
+ *
+ * 本文件必须在 index.scss 中**最后引入**，才能盖住 element-plus/dist/index.css
+ * 里的默认主色与按钮配色，避免出现「改了没生效」。
+ *
+ * 色值说明见 @/utils/gsTheme。
+ */
+
+:root,
+html.dark {
+  /* ---- Element Plus 主色预置（消除首屏闪一下默认蓝）----
+     运行时 handleThemeStyle() 会在 documentElement 上写 inline style，
+     优先级高于这里的 :root 规则，切换主题仍然生效。
+     暗色模式同样预置，避免 html.dark 里 element-plus 自带的 #409eff 首帧闪现。 */
+  --el-color-primary: #0092c8;
+  --el-color-primary-light-1: #199ccd;
+  --el-color-primary-light-2: #33a7d3;
+  --el-color-primary-light-3: #4cb2d8;
+  --el-color-primary-light-4: #66bdde;
+  --el-color-primary-light-5: #7fc8e3;
+  --el-color-primary-light-6: #99d3e9;
+  --el-color-primary-light-7: #b2deee;
+  --el-color-primary-light-8: #cce9f4;
+  --el-color-primary-light-9: #e5f4f9;
+  --el-color-primary-dark-1: #0083b4;
+  --el-color-primary-dark-2: #0074a0;
+  --el-color-primary-dark-3: #00668c;
+  --el-color-primary-dark-4: #005778;
+  --el-color-primary-dark-5: #004964;
+  --el-color-primary-dark-6: #003a50;
+  --el-color-primary-dark-7: #002b3c;
+  --el-color-primary-dark-8: #001d27;
+  --el-color-primary-dark-9: #000e13;
+}
+
+:root {
+  /* ---- 主题设计令牌 ---- */
+  --gs-navbar-top: #0076a1;
+  --gs-navbar-bottom: #0091c6;
+  --gs-navbar-text: #ffffff;
+  --gs-accent: #c6e09b;
+  --gs-accent-border: #9cc45c;
+  --gs-accent-text: #3f5e1e;
+  --gs-accent-faint: #f2f8e8;
+  --gs-accent-line: #cee4a8;
+  --gs-divider: #dadada;
+  --gs-group-divider: #a3ab98;
+  --gs-group-divider-soft: #d7e1c9;
+  --gs-title: #0082b6;
+  --gs-link: #0076a1;
+  --gs-border: #dddddd;
+}
+
+/* ---- 顶部蓝色导航带（白色页眉 + 绿线 + 蓝带）---- */
+.navbar {
+  background: linear-gradient(180deg, var(--gs-navbar-top) 0%, var(--gs-navbar-bottom) 100%) !important;
+  border-bottom: 2px solid var(--gs-accent) !important;
+  color: var(--gs-navbar-text);
+
+  .right-menu-item {
+    color: var(--gs-navbar-text);
+  }
+
+  .right-menu-item.hover-effect:hover {
+    background: rgba(255, 255, 255, 0.14);
+    color: #ffffff;
+  }
+
+  .hamburger-container:hover {
+    background: rgba(255, 255, 255, 0.14);
+  }
+}
+
+/* 顶部蓝色带上的面包屑 / 菜单文字统一为白色 */
+.app-breadcrumb.el-breadcrumb {
+  .no-redirect {
+    color: rgba(255, 255, 255, 0.75);
+  }
+
+  .el-breadcrumb__inner,
+  .el-breadcrumb__inner a {
+    color: rgba(255, 255, 255, 0.85);
+  }
+
+  .el-breadcrumb__inner a:hover {
+    color: #ffffff;
+  }
+}
+
+/* 顶部菜单模式（TOP）：菜单文字跟随蓝带为白色 */
+.topbar-menu.el-menu--horizontal > .el-menu-item,
+.topbar-menu.el-menu--horizontal > .el-sub-menu .el-sub-menu__title {
+  color: #ffffff !important;
+}
+
+.topbar-menu.el-menu--horizontal > .el-menu-item.is-active,
+.topbar-menu.el-menu--horizontal > .el-sub-menu .el-sub-menu__title.is-active {
+  color: var(--gs-accent) !important;
+}
+
+/* ---- 主按钮：「浅绿底 + 深绿字」----
+   --gs-btn-* 由 utils/theme.ts 的 applyButtonAccent() 运行时注入；
+   切换到其它主题色时会退回主题色本身。 */
+.el-button--primary {
+  --el-button-bg-color: var(--gs-btn-bg, var(--el-color-primary));
+  --el-button-border-color: var(--gs-btn-border, var(--el-color-primary));
+  --el-button-text-color: var(--gs-btn-text, #ffffff);
+  --el-button-hover-bg-color: var(--gs-btn-hover-bg, var(--el-color-primary-light-3));
+  --el-button-hover-border-color: var(--gs-btn-hover-border, var(--el-color-primary-light-3));
+  --el-button-hover-text-color: var(--gs-btn-hover-text, #ffffff);
+  --el-button-active-bg-color: var(--gs-btn-active-bg, var(--el-color-primary-dark-2));
+  --el-button-active-border-color: var(--gs-btn-active-border, var(--el-color-primary-dark-2));
+  --el-button-disabled-bg-color: var(--gs-btn-bg, var(--el-color-primary));
+  --el-button-disabled-border-color: var(--gs-btn-border, var(--el-color-primary));
+  --el-button-disabled-text-color: var(--gs-btn-text, #ffffff);
+}
+
+.el-button--primary.is-plain {
+  --el-button-bg-color: var(--gs-btn-plain-bg, var(--el-color-primary-light-9));
+  --el-button-border-color: var(--gs-btn-plain-border, var(--el-color-primary-light-5));
+  --el-button-text-color: var(--gs-btn-plain-text, var(--el-color-primary));
+  --el-button-hover-bg-color: var(--gs-btn-bg, var(--el-color-primary));
+  --el-button-hover-border-color: var(--gs-btn-border, var(--el-color-primary));
+  --el-button-hover-text-color: var(--gs-btn-text, #ffffff);
+  --el-button-active-bg-color: var(--gs-btn-active-bg, var(--el-color-primary-dark-2));
+  --el-button-active-border-color: var(--gs-btn-active-border, var(--el-color-primary-dark-2));
+  --el-button-active-text-color: var(--gs-btn-text, #ffffff);
+}
+
+/* ---- 表单区块标题：蓝色标题 + 淡绿双层横线 ---- */
+.form-header {
+  color: var(--gs-title);
+  border-bottom: 2px solid var(--gs-accent-line);
+  box-shadow: 0 1px 0 0 var(--gs-accent-faint);
+}
+
+/* ---- 输入框 / 表格边框：浅灰细边框 ----
+   focus 态沿用 element-ui.scss 的 2px 光晕，这里不覆盖，避免丢失聚焦提示 */
+.el-input__wrapper,
+.el-textarea__inner,
+.el-select__wrapper {
+  box-shadow: 0 0 0 1px var(--gs-border) inset;
+}

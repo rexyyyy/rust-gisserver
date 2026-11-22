@@ -1,0 +1,61 @@
+import i18n from '@/lang';
+/**
+ * 坐标系（CRS）能力口径与写法工具。
+ *
+ * 口径必须与 rust-gisserver README《坐标系支持》一致，分三层：
+ * ① 内置数学 EPSG:4326 / CRS:84 / EPSG:3857（服务端自写 Web Mercator，零依赖）；
+ * ② 恒等路径——请求 CRS 与源 CRS 相同时不做任何投影数学，因此 CGCS2000
+ *    （EPSG:4490）或高斯-克吕格分带图层在没有 PROJ 的机器上也能直出；
+ * ③ 跨 CRS 互转依赖运行时 PROJ ≥ 8 后端（PROJ_DLL / PROJ_DATA），受理的码由
+ *    服务端 crs::is_supported 判定：地理系 4326/4490/4214/4258，投影带
+ *    4491..=4554（CGCS2000/北京 54/西安 80 的 3°、6° 高斯-克吕格）、
+ *    4800..=4999、32648..=32660（WGS84 UTM 48N–60N）。
+ *
+ * 因此 `proj_loaded === false` 不等于「只能用 4326/3857」，UI 文案不能这么写，
+ * 否则运维会误判同源直出的图层也坏了。
+ */
+
+/** 三层能力全量说明，用于表单/详情里的悬浮提示。 */
+export const CRS_SUPPORT_HINT =
+  i18n.global.t('misc.auto.threeTierCRSSupport1BuiltInEPSG4326CRS84EP') +
+  i18n.global.t('misc.auto.n2WhenRequestCRSEqualsSourceCRSTilesPassThr') +
+  i18n.global.t('misc.auto.n3CrossCRSConversionRequiresPROJ8AtRuntimeE');
+
+/** PROJ 未加载时的真实影响，用于运行状态标签。 */
+export const PROJ_MISSING_HINT =
+  i18n.global.t('misc.auto.projNotLoadedCrossCRSConversionIsUnavailab') + i18n.global.t('misc.auto.builtIn4326CRS843857AndNativeOutputWhenReq');
+
+/** 源坐标系输入框占位：常见 datum 都给例子，别只写 4326 让人以为不支持别的。 */
+export const SRC_CRS_PLACEHOLDER = i18n.global.t('misc.auto.epsg4326EPSG4490CGCS2000EPSG45433DegreeZon');
+
+/** 图层配置里可填的地理系与投影带族（与服务端 is_supported 同源，供校验/提示用）。 */
+export const CRS_FAMILY_HINT =
+  i18n.global.t('misc.auto.availableCRSGeographicEPSG43264490CGCS2000') +
+  i18n.global.t('misc.auto.projectedZonesEPSG44914554CGCS2000Beijing5') +
+  i18n.global.t('misc.auto.n3264832660WGS84UTM48N60NShortNamesURNUrnOg') +
+  'def-URI（http://www.opengis.net/def/crs/EPSG/0/4490）写法同等接受。';
+
+/** 地理系（度）CRS 码：范围数值可直接当经纬度用。 */
+const GEOGRAPHIC_CODES = ['4326', '4490', '4214', '4258'];
+
+/**
+ * 从任意 CRS 写法里取 EPSG 码（与服务端 crs::normalize 一样宽容）。
+ *
+ * 取的是**尾部**数字：`EPSG:4543`、`urn:ogc:def:crs:EPSG::4543`、
+ * `http://www.opengis.net/def/crs/EPSG/0/4543` 都得 4543；
+ * `CRS:84` 各写法返回 4326（同一 datum，只是轴序不同）。
+ * 取不到返回 null，调用方按缺省 4326 处理。
+ */
+export function epsgCode(crs?: string): string | null {
+  const raw = (crs || '').trim();
+  if (!raw) return null;
+  if (/(?:CRS:84|CRS84)$/i.test(raw)) return '4326';
+  const m = raw.match(/(\d+)\s*$/);
+  return m ? m[1] : null;
+}
+
+/** 该 CRS 的范围是不是度数（可当经纬度直接用）；投影带返回 false（单位是米）。 */
+export function isGeographicCrs(crs?: string): boolean {
+  const code = epsgCode(crs);
+  return code !== null && GEOGRAPHIC_CODES.includes(code);
+}

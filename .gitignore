@@ -1,0 +1,60 @@
+# Rust
+target/
+**/*.rs.bk
+Cargo.lock
+
+# IDE / OS
+.vs/
+.vscode/
+.idea/
+*.db
+*.sqlite
+.DS_Store
+Thumbs.db
+
+# installscript 编译产物 / 临时文件
+installscript/rust-gisserver_Setup.exe
+installscript/compile*.log
+installscript/*.exe
+installscript/*.zip
+installscript/nssm/101.zip
+installscript/nssm/nssm224.zip
+
+# installscript PDF 转换器依赖（不要入库，需要时 npm install）
+installscript/node_modules/
+
+# 数据库安装包（几十 MB，用户自备）
+installscript/数据库/
+
+# Trae / WorkBuddy
+.workbuddy/
+
+# 测试输出
+
+# Runtime cache and compiled artifacts (do not track)
+/cache/foyer/
+/run-env/
+
+# Generated deploy archives (do not track)
+/dist/*.zip
+/manager/deploy.zip
+/installscript/nssm
+
+# Local deployment copies and editor state
+/test-deploy/
+/.trae/
+
+# Installer staging copies (canonical manifest lives in build/script/)
+/mapserver/install/windows/PROJ_RUNTIME_MANIFEST.csv
+
+# Local PostGIS layer configs may contain plaintext DSN credentials
+/mapserver/config/postgis/
+
+# installscript: keep only numbered PDFs and install.nsi; drop duplicated sources/docs
+/installscript/package.json
+/installscript/package-lock.json
+/installscript/*.md
+/installscript/*.html
+/installscript/*.mjs
+/installscript/installation-docs.pdf
+/installscript/README-install.pdf

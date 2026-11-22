@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<layer kind="postgis" name="demo_points_layer" src_crs="EPSG:4326" title="Demo Points">
+  <extent>
+    <item>116.322</item>
+    <item>39.8949</item>
+    <item>116.3975</item>
+    <item>40.0029</item>
+  </extent>
+  <source dsn="postgresql://postgres:123456@127.0.0.1:5434/gis" geometry_column="geom" schema="public" srid="4326" table="demo_points" type="postgis"/>
+</layer>

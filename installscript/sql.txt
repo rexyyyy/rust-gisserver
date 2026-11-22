@@ -1,0 +1,7 @@
+
+ -Port 5432 -Password 123456
+
+# 方式 B：分步执行
+psql -U postgres -p 5432 -f 01-init-database.sql
+psql -U postgres -p 5432 -d "mapserver-manager" -f system.sql
+psql -U postgres -p 5432 -d "mapserver-manager" -f map.sql

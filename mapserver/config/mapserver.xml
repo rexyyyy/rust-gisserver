@@ -1,0 +1,96 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  rust-gisserver 服务端通用配置
+  =============================================================================
+  本文件只放 **server 级** 配置（监听、缓存、图层目录根）。
+  图层相关的配置一律放在图层配置文件里：
+  
+  config/
+  ├─ mapserver.xml   本文件：仅 server 级配置
+  ├─ cog/             栅格图层（COG），每图层一个 *.xml
+  ├─ vector/          矢量图层（GeoJSON），每图层一个 *.xml
+  ├─ pmtiles/         PMTiles 图层，每图层一个 *.xml
+  ├─ mbtiles/         MBTiles 图层（SQLite 瓦片包），每图层一个 *.xml
+  ├─ arcgis/          ArcGIS 预切片缓存图层（compact cache v1/v2 read-through），
+  │                   每图层一个 *.xml；网格/比例尺由缓存自己的 Conf.xml 推导
+  ├─ postgis/         PostGIS 动态矢量图层（MVT + WMS/WFS/OGC API）
+  ├─ terrain/         quantized-mesh 地形包（*.terrainpack）
+  ├─ mvt/             （预留：MVT 输出由 vector/pmtiles/mbtiles 图层自动提供）
+  ├─ osgb/            （预留：OSGB 经 gis-wt 转为 3D Tiles 后落在 3dtiles/）
+  ├─ 3dtiles/         3D Tiles 服务，每个 *.xml 一个服务（/3dtiles/{name}/...）
+  └─ styles/          样式 XML
+  
+  图层文件格式 = 旧版内联 layers: 条目 + 可选 `custom_grids:`（自定义瓦片矩阵
+  定义，被该图层 grids: 引用；定义随图层文件走，重名先到先得）。阶梯不等长于
+  0..N 时可附 `<levels>`（每级的 LevelID）与 `<scales>`（源声明的比例尺分母），
+  缺省则数组下标即层级、比例尺按 OGC 0.28 mm/像素反算。
+  `source.type` 必须与目录名一致，重名图层先到先得、后到告警跳过。
+  
+  矢量图层样式（SLD）：vector/ 图层可在同名同目录下放 `<图层名>.sld`
+  （如 vector/recon_fp.xml ↔ vector/recon_fp.sld），map-api 会自动发现并
+  用它驱动 WMS GetMap / WMTS 的矢量栅格化出图（取第一个 Polygon/Line/Point
+  Symbolizer 的颜色/宽度/透明度/点大小，单规则基础样式，不求值 Filter 分类）。
+  亦可在图层 xml 里显式写 `sld: path/to.x.sld` 覆盖自动发现；未提供则回退
+  style XML 的 paint.fill-color，再回退内置默认色。MVT 输出不受 SLD 影响。
+  
+  启动前先生成示例数据：执行 map-api 的 cog-create 子命令
+  （完整命令见 README《快速开始》；XML 注释内不得出现连续连字符，
+  故此处不直接书写命令行），生成 fixtures/sample.tif 渐变 COG。
+-->
+<config>
+  <!-- catalog_scan_secs：周期重扫 catalog（秒，0=关闭，默认）。
+       集群部署时各节点重读共享 XML，另一节点 admin 改的图层无需手工 reload
+       即在本节点生效；单机部署不需要（admin 本地已热重载）。
+       重扫会重开数据源并清缓存，间隔建议 30~60 秒。 -->
+  <!-- 缓存预算（开发态小配置；上生产再按机器内存 / 磁盘扩容）：
+       cache_mib        = RGBA 解码瓦片缓存（按条目数折算）
+       foyer_cache_mib  = foyer 输出缓存 L1 内存（按字节计量，缺省跟随 cache_mib）
+       disk_cache.capacity_mib = foyer L2 磁盘（重启可复用）
+       当前：内存两档各 512 MiB，L2 磁盘 1 GiB（1024 MiB）。
+       动态 PostGIS MVT 瓦片在冷生成时已 gzip 一次，同样预算约可放 2 倍瓦片。 -->
+  <!-- data_root：默认取启动工作目录下的 data 子目录，无需配置环境变量。
+       安装布局下 start-*.bat 先 cd 到安装目录，即 <安装目录>\data；
+       源码开发从 mapserver/ 目录启动时即 mapserver/data。该目录由
+       install.bat 创建（源码树里留了 .gitkeep 占位）。只有把影像/瓦片
+       放到外置数据盘时才需要在 .env 里设 DATA_ROOT 覆盖，例如
+       DATA_ROOT=E:\data\1；容器模板另用固定的 /app/data。 -->
+  <server host="0.0.0.0" port="8080" cache_mib="512" foyer_cache_mib="512" cache_ttl_secs="300" cache_stats_secs="60" data_root="${DATA_ROOT:-data}">
+    <disk_cache dir="cache/foyer" capacity_mib="1024"/>
+    <!-- s3 全局凭证：图层 source path 写 s3://bucket/key 时必配。
+         path-style 寻址，兼容 MinIO / RustFS / AWS 及各类 S3 兼容云。
+         region 对 MinIO/RustFS 任意值均可（惯例 auto）；AWS 填桶所在区域。 -->
+    <!--
+    <s3 endpoint="http://172.17.11.6:9000" region="auto"
+        access_key="minioadmin" secret_key="minioadmin"/>
+    -->
+    <!-- data_token（可选）：数据面鉴权。配置后，所有 OGC 瓦片/要素请求
+         （/wms /wfs /wmts /tiles /mvt /pmtiles /mbtiles /cog /3dtiles /terrain）
+         必须携带令牌，否则返回 401；令牌三种携带方式：请求头 X-Data-Token /
+         Authorization: Bearer / 查询参数 ?token=（便于浏览器/viewer 拼在 URL）。
+         未配置则数据面不设防（零配置向后兼容）。与 admin.token 定位相同：
+         令牌护栏而非完整鉴权体系，角色/ACL 交给网关或 manager。 -->
+    <!-- API Key（rust-gisserver「地图服务 → API Key 管理」生成）：
+         配置主令牌开启校验后，主令牌**或**共享库 sys_api_key 中启用且未过期的
+         data key 均被认可（每 15 秒同步、无需重启）；未配置主令牌则不设防。 -->
+    <!-- <data_token>changeme</data_token> -->
+  </server>
+  <catalog root="config" backend="files"/>
+  <!-- 归属管理端（可选）：map-api 是纯地图引擎，界面与预览由 manager 托管。
+       启动时对 url 发一次 GET /health：
+         连通   = 受管模式，/health 返回 mode=managed 与该 manager 地址；
+         未连通 = 独立引擎模式，不挂任何预览 / 页面路由，只提供数据服务。
+       未配置或 url 留空 = 不探测，直接独立运行（零配置向后兼容）。
+       跨机部署把 MAPSERVER_MANAGER_URL 注入为可达的 manager 地址即可。 -->
+  <manager url="${MAPSERVER_MANAGER_URL:-http://127.0.0.1:6180}" probe_timeout_ms="1500"/>
+  <!-- admin 的 token 属性是管理面主令牌（X-Admin-Token）；配置后，主令牌或
+       共享库 sys_api_key 中启用且未过期的 admin key 均被认可。rust-gisserver 的
+       「API Key 管理 → 应用到引擎」会把生成的 admin key 写入默认引擎。 -->
+  <admin dsn="postgresql://postgres:${MAPSERVER_DB_PASSWORD}@${MAPSERVER_DB_HOST:-localhost}:${MAPSERVER_DB_PORT:-5434}/mapserver-manager"/>
+  <!-- PMTiles 独立归档：name -> 绝对路径，暴露为 /pmtiles/{name}（Range 读取）。
+       与同名 pmtiles 图层二选一；此处用归档映射，无需 config/pmtiles/*.xml。 -->
+  <archives>
+    <!-- 与 server.data_root 同一默认值；用 / 分隔，Windows / Linux 均可解析。
+         该 demo 归档仅在本地放了 wuhua_buildings.pmtiles 时生效，缺失不影响其余服务。 -->
+    <wuhua_buildings>${DATA_ROOT:-data}/pmtiles/wuhua_buildings.pmtiles</wuhua_buildings>
+  </archives>
+</config>
