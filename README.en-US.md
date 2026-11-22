@@ -44,6 +44,41 @@ rust-gisserver/
 
 See [mapserver/README.md](mapserver/README.md) for measurements and implementation notes.
 
+### Performance tuning parameters (dev vs production)
+
+Tuning order: **pick the right call path first, then tune caches** — MVT for vectors, XYZ/WMTS for rasters, WMS GetMap as a fallback. Make sure COG overviews are complete and PostGIS geometry columns have GiST indexes. Cache knobs live in `config/mapserver.xml`:
+
+| Parameter | What it controls | Development | Production |
+| --- | --- | --- | --- |
+| `<server cache_mib>` | Decoded RGBA tile cache cap in MiB (`0` disables; entry count derived from the largest `tile_px`) | 256–512 | 1024–4096, sized by RAM and tile pixel size |
+| `<server foyer_cache_mib>` | Foyer output cache L1, weighed in bytes (absent = follow `cache_mib`) | 256–512 | 2048–8192; raise independently for MVT-heavy services without inflating the RGBA cache |
+| `<disk_cache capacity_mib>` | Foyer output cache L2 on disk, reusable after restarts | 512–1024 | 8192–32768 or scaled to free SSD space |
+| `<server cache_ttl_secs>` | Shared TTL for all cache segments, in seconds (`0` = never expire) | 300 | 3600–86400 for static data; 300–600 for frequently updated data |
+| `<server cache_stats_secs>` | Cache stats log / housekeeping interval in seconds (`0` disables) | 60 | 60–300 |
+| `<server catalog_scan_secs>` | Periodic re-scan of shared layer XML in seconds (`0` disables); re-scan reopens sources and purges caches | 0 | 30–60 for multi-node shared config; keep 0 on a single node |
+
+The development profile is deliberately small: **512 MiB for each in-memory tier and 1 GiB disk L2**, so local runs start fast and stay light. In production, start at **2–4× the dev values** and tune with `GET /api/cache` (entries/bytes/TTL), RSS and P99 latency; keep the two L1 budgets at roughly 30–50% of physical RAM so the OS and other processes have headroom. Dynamic PostGIS MVT tiles are gzipped once on the cold path, so the same budget holds roughly twice as many vector tiles.
+
+```xml
+<!-- Development: small budgets -->
+<server host="0.0.0.0" port="8080"
+        cache_mib="512" foyer_cache_mib="512"
+        cache_ttl_secs="300" cache_stats_secs="60">
+  <disk_cache dir="cache/foyer" capacity_mib="1024"/>
+</server>
+
+<!-- Production example: 16 GiB RAM + SSD; scale to the actual machine -->
+<server host="0.0.0.0" port="8080"
+        cache_mib="2048" foyer_cache_mib="4096"
+        cache_ttl_secs="3600" cache_stats_secs="60">
+  <disk_cache dir="cache/foyer" capacity_mib="16384"/>
+</server>
+```
+
+> `<disk_cache dir>` resolves relative to the process working directory. Fix the working directory in production (set `AppDirectory` for Windows services) to avoid scattered caches. Lowering `capacity_mib` only changes the logical cap; **it does not delete existing cache files**. After a dataset swap, call `POST /api/cache/purge?scope=all` or wait for one TTL window.
+
+More cache-segment details and load-test steps: [mapserver/README.md](mapserver/README.md).
+
 ---
 
 ## Advanced data compatibility and migration

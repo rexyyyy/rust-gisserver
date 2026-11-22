@@ -44,6 +44,41 @@ rust-gisserver/
 
 详细实测与实现要点见 [mapserver/README.md](mapserver/README.md)。
 
+### 性能参数与缓存预算（开发 / 生产）
+
+调优顺序是 **先选对调用方式，再调缓存**：矢量优先 MVT、栅格优先 XYZ/WMTS，WMS GetMap 作为兜底；COG 要有完整 overview，PostGIS geometry 要有 GiST 索引。缓存参数集中在 `config/mapserver.xml`：
+
+| 参数 | 作用 | 调试环境 | 生产环境 |
+| --- | --- | --- | --- |
+| `<server cache_mib>` | 解码后 RGBA 瓦片缓存上限（MiB，0=禁用；按最大 `tile_px` 折算条目数） | 256–512 | 1024–4096，按内存与瓦片尺寸上调 |
+| `<server foyer_cache_mib>` | foyer 输出缓存 L1（按字节计量；缺省跟随 `cache_mib`） | 256–512 | 2048–8192；动态 MVT 多时单独加大，不会撑大 RGBA 缓存 |
+| `<disk_cache capacity_mib>` | foyer 输出缓存 L2 磁盘，重启后仍可复用 | 512–1024 | 8192–32768 或按 SSD 空闲空间放大 |
+| `<server cache_ttl_secs>` | 各缓存段统一 TTL（秒，0=不过期） | 300 | 静态数据 3600–86400；频繁更新数据 300–600 |
+| `<server cache_stats_secs>` | 缓存统计日志与维护周期（秒，0=关闭） | 60 | 60–300 |
+| `<server catalog_scan_secs>` | 周期重扫共享图层 XML（秒，0=关闭）；重扫会重开数据源并清缓存 | 0 | 多节点共享配置时 30–60，单机保持 0 |
+
+开发态默认就是“小预算”：两档内存缓存各 **512 MiB**、磁盘 L2 **1 GiB**，便于快速启动、少占本机资源。上生产建议先按 **2–4 倍调试值**起步，再用 `GET /api/cache` 看各段 entries/bytes/TTL、结合 RSS 与 P99 调整；两档 L1 合计建议控制在物理内存的 30%–50% 左右，留足系统与其他进程余量。动态 PostGIS MVT 冷生成时已 gzip 一次，同样预算约可多放一倍矢量瓦片。
+
+```xml
+<!-- 调试：小预算 -->
+<server host="0.0.0.0" port="8080"
+        cache_mib="512" foyer_cache_mib="512"
+        cache_ttl_secs="300" cache_stats_secs="60">
+  <disk_cache dir="cache/foyer" capacity_mib="1024"/>
+</server>
+
+<!-- 生产示例：16 GiB 内存 + SSD，按实际机器缩放 -->
+<server host="0.0.0.0" port="8080"
+        cache_mib="2048" foyer_cache_mib="4096"
+        cache_ttl_secs="3600" cache_stats_secs="60">
+  <disk_cache dir="cache/foyer" capacity_mib="16384"/>
+</server>
+```
+
+> `<disk_cache dir>` 相对启动工作目录解析，生产环境请固定工作目录（Windows 服务设 `AppDirectory`），避免散落多份缓存；缩小 `capacity_mib` 只改变逻辑上限，**不会自动删除旧缓存文件**。数据换盘后执行 `POST /api/cache/purge?scope=all` 立即刷新，或等待一个 TTL 窗口。
+
+更多缓存段说明与压测方法见 [mapserver/README.md](mapserver/README.md)。
+
 ---
 
 ## 先进性与数据兼容（迁移友好）
