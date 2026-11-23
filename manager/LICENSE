@@ -249,6 +249,7 @@ A commercial license grants you, subject to the terms of the written agreement:
 
 For commercial licensing, enterprise support, or acquisition inquiries, contact:
   rex yang <13556388@qq.com>
+  Business-license inquiries may also be directed to rex yan <853740877@qq.com>; both addresses reach the same copyright holder.
 
 This Commercial License Exception applies only to the manager component. Other rust-gisserver components retain their own licenses:
   * gisserver core library (../gisserver) — MIT OR Apache-2.0 (permissive, no commercial license required for closed-source use)

@@ -51,11 +51,14 @@ REM ---- 3/6 PROJ libs (linear scan, NO nested parens) ----
 echo [3/6] Copying PROJ runtime...
 set "PROJ_SRC="
 REM Prefer the DLL set produced by the local Rust build (known-compatible).
-if exist "%~dp0..\..\mapserver\target\debug"            set "PROJ_SRC=%~dp0..\..\mapserver\target\debug"
-if "%PROJ_SRC%"=="" if exist "%~dp0..\..\..\mapserve" set "PROJ_SRC=%~dp0..\..\..\mapserve"
-if "%PROJ_SRC%"=="" if exist "%~dp0..\..\..\build"      set "PROJ_SRC=%~dp0..\..\..\build"
-if "%PROJ_SRC%"=="" if exist "%~dp0..\..\..\dist"       set "PROJ_SRC=%~dp0..\..\..\dist"
-if "%PROJ_SRC%"=="" if exist "%~dp0..\..\..\GDAL3.13\dll" set "PROJ_SRC=%~dp0..\..\..\GDAL3.13\dll"
+if exist "%~dp0..\target\release\proj_9.dll"        set "PROJ_SRC=%~dp0..\target\release"
+if "%PROJ_SRC%"=="" if exist "%~dp0..\target\debug\proj_9.dll" set "PROJ_SRC=%~dp0..\target\debug"
+if "%PROJ_SRC%"=="" if exist "%~dp0..\..\mapserver\target\debug\proj_9.dll" set "PROJ_SRC=%~dp0..\..\mapserver\target\debug"
+if "%PROJ_SRC%"=="" if exist "%~dp0..\..\run-env\bin\proj_9.dll" set "PROJ_SRC=%~dp0..\..\run-env\bin"
+if "%PROJ_SRC%"=="" if exist "%~dp0..\..\..\mapserve\proj_9.dll" set "PROJ_SRC=%~dp0..\..\..\mapserve"
+if "%PROJ_SRC%"=="" if exist "%~dp0..\..\..\build\proj_9.dll"      set "PROJ_SRC=%~dp0..\..\..\build"
+if "%PROJ_SRC%"=="" if exist "%~dp0..\..\..\dist\proj_9.dll"       set "PROJ_SRC=%~dp0..\..\..\dist"
+if "%PROJ_SRC%"=="" if exist "%~dp0..\..\..\GDAL3.13\dll\proj_9.dll" set "PROJ_SRC=%~dp0..\..\..\GDAL3.13\dll"
 
 set "PROJ_DLL_FOUND=0"
 for %%D in (proj_9 sqlite3 libcurl tiff zlib libssh2 brotlidec brotlicommon jpeg62 libcrypto-3-x64) do (
@@ -112,47 +115,45 @@ REM Keep in sync with mapserver/config/env/.env.* presets and README section 3.3
 REM REQUIRED = the placeholder has no ":-default" in the config XML, so an
 REM unset value expands to an empty string and the service cannot start.
 echo [6/6] Generating .env.example...
-(
-echo # rust-gisserver runtime environment
-echo # Copy to .env and replace every REQUIRED value before starting.
-echo # start-mapserver.bat / start-manager.bat load .env into the process env.
-echo.
-echo # ==== REQUIRED: no default in config XML ====
-echo # manager DSN password  ^(config/manager/manager.xml^)
-echo MANAGER_DB_PASSWORD=change-me
-echo # manager JWT signing secret  ^(generate: openssl rand -hex 32^)
-echo MANAGER_JWT_SECRET=change-me-random-secret
-echo # manager DSN encryption key ^(optional^): derived from JWT secret when empty;
-echo #   rotate with care - old ciphertext becomes undecryptable; switch dsn_cipher=des/sm4 in config/manager.xml
-echo # MANAGER_DSN_KEY=change-me-random-32-bytes-key
-echo # map-api admin DSN password  ^(config/mapserver.xml^)
-echo MAPSERVER_DB_PASSWORD=change-me
-echo.
-echo # ==== OPTIONAL: config XML supplies these defaults ====
-echo MANAGER_DB_HOST=localhost
-echo MANAGER_DB_PORT=5434
-echo MAPSERVER_DB_HOST=localhost
-echo MAPSERVER_DB_PORT=5434
-echo MAPSRV_HOST=127.0.0.1
-echo MAPSRV_PORT=8080
-echo MAPSERVER_MANAGER_URL=http://127.0.0.1:6180
-echo # Data root defaults to the data\ subdirectory next to start-*.bat
-echo # ^(already created by install.bat^). Set DATA_ROOT only when the COG /
-echo # vector / mbtiles / pmtiles / 3dtiles data lives on another drive.
-echo # DATA_ROOT=E:\data\1
-echo.
-echo # User region for legacy path/filename encoding: zh-CN / zh-TW / en / ko / ja
-echo # Independent from the UI display language (browser LangSelect).
-echo GIS_ENCODING_REGION=zh-CN
-echo # e2e conversion fixture root ^(demo layers only^)
-echo # TESTDATA_ROOT=
-echo # Absolute path to shp2pgsql.exe, only needed for SHP import
-echo # SHPPGSQL_BIN=
-echo # PROJ_DLL / PROJ_DATA / PROJ_LIB are set by start-*.bat; do not set here.
-echo # Deprecated, no longer read: MAPSERVER_PORT ^(use config/mapserver.xml^),
-echo #   MAPSERVER_DATA_DIR, MAPSERVER_CACHE_DIR, API_KEY. Data root defaults
-echo #   to data\ and can be overridden with DATA_ROOT.
-) > "%INSTALL_DIR%\.env.example"
+echo # rust-gisserver runtime environment> "%INSTALL_DIR%\.env.example"
+echo # Copy to .env and replace every REQUIRED value before starting.>> "%INSTALL_DIR%\.env.example"
+echo # start-mapserver.bat / start-manager.bat load .env into the process env.>> "%INSTALL_DIR%\.env.example"
+echo.>> "%INSTALL_DIR%\.env.example"
+echo # ==== REQUIRED: no default in config XML ====>> "%INSTALL_DIR%\.env.example"
+echo # manager DSN password  (config/manager/manager.xml)>> "%INSTALL_DIR%\.env.example"
+echo MANAGER_DB_PASSWORD=change-me>> "%INSTALL_DIR%\.env.example"
+echo # manager JWT signing secret  (generate: openssl rand -hex 32)>> "%INSTALL_DIR%\.env.example"
+echo MANAGER_JWT_SECRET=change-me-random-secret>> "%INSTALL_DIR%\.env.example"
+echo # manager DSN encryption key (optional): derived from JWT secret when empty;>> "%INSTALL_DIR%\.env.example"
+echo #   rotate with care - old ciphertext becomes undecryptable; switch dsn_cipher=des/sm4 in config/manager.xml>> "%INSTALL_DIR%\.env.example"
+echo # MANAGER_DSN_KEY=change-me-random-32-bytes-key>> "%INSTALL_DIR%\.env.example"
+echo # map-api admin DSN password  (config/mapserver.xml)>> "%INSTALL_DIR%\.env.example"
+echo MAPSERVER_DB_PASSWORD=change-me>> "%INSTALL_DIR%\.env.example"
+echo.>> "%INSTALL_DIR%\.env.example"
+echo # ==== OPTIONAL: config XML supplies these defaults ====>> "%INSTALL_DIR%\.env.example"
+echo MANAGER_DB_HOST=localhost>> "%INSTALL_DIR%\.env.example"
+echo MANAGER_DB_PORT=5434>> "%INSTALL_DIR%\.env.example"
+echo MAPSERVER_DB_HOST=localhost>> "%INSTALL_DIR%\.env.example"
+echo MAPSERVER_DB_PORT=5434>> "%INSTALL_DIR%\.env.example"
+echo MAPSRV_HOST=127.0.0.1>> "%INSTALL_DIR%\.env.example"
+echo MAPSRV_PORT=8080>> "%INSTALL_DIR%\.env.example"
+echo MAPSERVER_MANAGER_URL=http://127.0.0.1:6180>> "%INSTALL_DIR%\.env.example"
+echo # Data root defaults to the data\ subdirectory next to start-*.bat>> "%INSTALL_DIR%\.env.example"
+echo # (already created by install.bat). Set DATA_ROOT only when the COG />> "%INSTALL_DIR%\.env.example"
+echo # vector / mbtiles / pmtiles / 3dtiles data lives on another drive.>> "%INSTALL_DIR%\.env.example"
+echo # DATA_ROOT=E:\data\1>> "%INSTALL_DIR%\.env.example"
+echo.>> "%INSTALL_DIR%\.env.example"
+echo # User region for legacy path/filename encoding: zh-CN / zh-TW / en / ko / ja>> "%INSTALL_DIR%\.env.example"
+echo # Independent from the UI display language (browser LangSelect).>> "%INSTALL_DIR%\.env.example"
+echo GIS_ENCODING_REGION=zh-CN>> "%INSTALL_DIR%\.env.example"
+echo # e2e conversion fixture root (demo layers only)>> "%INSTALL_DIR%\.env.example"
+echo # TESTDATA_ROOT=>> "%INSTALL_DIR%\.env.example"
+echo # Absolute path to shp2pgsql.exe, only needed for SHP import>> "%INSTALL_DIR%\.env.example"
+echo # SHPPGSQL_BIN=>> "%INSTALL_DIR%\.env.example"
+echo # PROJ_DLL / PROJ_DATA / PROJ_LIB are set by start-*.bat; do not set here.>> "%INSTALL_DIR%\.env.example"
+echo # Deprecated, no longer read: MAPSERVER_PORT (use config/mapserver.xml),>> "%INSTALL_DIR%\.env.example"
+echo #   MAPSERVER_DATA_DIR, MAPSERVER_CACHE_DIR, API_KEY. Data root defaults>> "%INSTALL_DIR%\.env.example"
+echo #   to data\ and can be overridden with DATA_ROOT.>> "%INSTALL_DIR%\.env.example"
 
 REM ---- per-region env presets ----
 if exist "%~dp0..\..\mapserver\config\env" (

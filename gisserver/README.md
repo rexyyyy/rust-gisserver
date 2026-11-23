@@ -7,8 +7,8 @@
 核心字节码路径（TIFF/COG 解析、瓦片解码、MVT 编码、PMTiles 归档读写）均依据公开
 格式规范独立实现，不依赖 GDAL/tiff/mapbox 等重型 C 绑定；PROJ 仅作为**可选运行时
 后端**，Windows 下动态解析 C ABI（无编译期链接 / build script），不存在时自动降级
-到内置投影路径。除 `projection` 的 PROJ 运行时动态加载后端外，其余模块零 FFI、
-零 unsafe；不启用 PROJ 时完全零 FFI。
+到内置投影路径。默认 features 下零 unsafe；可选后端（PROJ 运行时动态加载、
+Windows ACP 编码）含必要 FFI，默认不启用。
 
 ## 模块与 feature
 
@@ -24,7 +24,7 @@
 | `vector_query` | `vector-query` | 内存 GeoJSON 要素查询（bbox/分页/GML/GeoJSON/CSV） |
 | `storage` | `storage` | RangeSource 定位读（本地/HTTP(S)/S3 预签名）+ foyer 瓦片缓存 |
 | `pg_source` | `postgis` | PostGIS 数据源：连接池 / SQL 模板 / OGC-Filter→SQL 下推 |
-| `cog` | `cog` | 自研 COG/BigTIFF 解析（IFD 链、overviews、predictor、LZW/ZSTD）+ 写入器 |
+| `cog` | `cog` | 按公开格式规范实现的 COG/BigTIFF 解析（IFD 链、overviews、predictor、LZW/ZSTD）+ 写入器 |
 | `renderer` | `renderer` | 窗口重采样、调色板、PNG 编码、SLD 符号渲染 |
 | `pmtiles` | `pmtiles` | PMTiles v3 读取 + 打包（Hilbert TileID、列式 varint 目录） |
 | `arcgis_cache` | `arcgis-cache` | ESRI compact cache v1/v2（bundle/tpk）读取 |

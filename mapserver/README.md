@@ -292,7 +292,7 @@ CRS 链路落在正确地面范围。
 ## 实现要点
 
 - **HTTP 框架**：axum **0.8.9** + tower-http 0.6.11（`Cargo.toml` 的 workspace 依赖统一版本）。路由参数语法用 axum 0.8 的花括号形式 `{param}` / 通配 `{*rest}`——**0.7 的 `:param` / `*rest` 在 matchit 0.8 下不是编译错误，而是注册路由时直接 panic**（`Path segments must not start with ':'`），即"编译通过 ≠ 能跑起来"。因此 `handlers::tests::routes_use_axum08_brace_syntax` 会扫描全部路由字面量，禁止旧语法回流。`Path<(A, B)>` 元组提取器的元素个数必须与路由的参数段数严格一致。中间件若要可选地读取 `ConnectInfo`，用 `Option<Extension<ConnectInfo<T>>>`——axum 0.8 移除了 `Option<T>` 的 blanket `FromRequestParts` 实现（改为 `OptionalFromRequestParts`）。
-- **COG 解析（自研）**：经典 TIFF + BigTIFF（magic `II`/`MM`、42/43），IFD 链，跳过 `NewSubfileType` bit 2 之外的子文件；标签覆盖宽度/高度/位深/压缩/光度/每样本位数/预测器/平铺/`ModelPixelScale`/`ModelTiepoint`；`read_window_rgba` 按 overview 缩放因子选层、rayon 并行解码。
+- **COG 解析（按公开格式规范实现）**：经典 TIFF + BigTIFF（magic `II`/`MM`、42/43），IFD 链，跳过 `NewSubfileType` bit 2 之外的子文件；标签覆盖宽度/高度/位深/压缩/光度/每样本位数/预测器/平铺/`ModelPixelScale`/`ModelTiepoint`；`read_window_rgba` 按 overview 缩放因子选层、rayon 并行解码。
 - **瓦片解码**：compression 1 / 5(LZW) / 8·32946(DEFLATE) / 50000(ZSTD)；predictor 2（8/16bit，16bit 分端序）、3（float 反字节差分+解交织）；1bit 位图展开；16bit 无符号 `>>8`、有符号重映射、float 钳制到 8bit。JPEG/WEBP 瓦片零填充并在响应中说明不支持。
 - **渲染**：输出像素中心 → native 像素 → 选中 overview 层，两次重采样（nearest/bilinear），全出界返回透明，瓦片对齐窗口 +1px margin。
 - **渲染投影快速路径**：请求 CRS 与源 CRS 相同（identity）且源 geotransform 为仿射时，output→native 像素映射整体双线性，由 4 个输出角点求解 + 画布中点投影校验（偏差 >0.05px 则回退逐像素）。512×256 GetMap 的 262,144 次逐点投影降为 5 次：**8.94ms → 3.11ms（2.9×，release micro-bench，`cargo test --release -p r-mapserver -- --nocapture pass1`）**；快速路径与逐像素参考逐点一致（单测断言 <1e-6）。
@@ -462,9 +462,9 @@ mapserver 默认采用 **AGPL-3.0-only** 授权——这是一种「网络 copyl
 
 ### 商业合作
 
-本项目的核心技术（**纯 Rust 自研 COG/BigTIFF 解析、零 GDAL/tiff/mapbox 重型 C 绑定、高性能瓦片渲染与缓存**）可提供闭源商业授权：
+本项目的核心技术（**纯 Rust 实现的 COG/BigTIFF 解析、零 GDAL/tiff/mapbox 重型 C 绑定、高性能瓦片渲染与缓存**）可提供闭源商业授权：
 
-- **企业级 GIS 平台** → 集成自研内核，替换旧 GDAL 依赖
+- **企业级 GIS 平台** → 集成该内核，替换旧 GDAL 依赖
 - **云服务** → 作为 GIS 云服务的瓦片 / OGC API 引擎
 - **创业团队与个人开发者** → 基于商业授权快速推出垂直 SaaS 产品
 

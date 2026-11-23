@@ -41,6 +41,12 @@ goto :after_msvc
 echo [WARN] MSVC not found, use default toolchain
 
 :after_msvc
+REM ---- Windows SDK fallback for C deps (cc-rs / lz4-sys etc.) ----
+REM vcvars64.bat sometimes omits UCRT/UM paths; add them when present.
+set "WSDK_DIR=C:\Program Files (x86)\Windows Kits\10"
+if exist "%WSDK_DIR%\Include\10.0.26100.0\ucrt\stdlib.h" set "INCLUDE=%INCLUDE%;%WSDK_DIR%\Include\10.0.26100.0\um;%WSDK_DIR%\Include\10.0.26100.0\shared;%WSDK_DIR%\Include\10.0.26100.0\ucrt"
+if exist "%WSDK_DIR%\Lib\10.0.26100.0\um\x64\kernel32.lib" set "LIB=%LIB%;%WSDK_DIR%\Lib\10.0.26100.0\um\x64;%WSDK_DIR%\Lib\10.0.26100.0\ucrt\x64"
+
 REM ---- build mapserver ----
 echo.
 echo [1/2] mapserver (release)...
@@ -83,8 +89,15 @@ where pnpm >nul 2>&1
 if errorlevel 1 goto :try_npm
 echo [UI] pnpm
 call pnpm install
-if errorlevel 1 goto :done
+if errorlevel 1 (
+    echo [ERROR] frontend install failed
+    exit /b 1
+)
 call pnpm run build:prod
+if errorlevel 1 (
+    echo [ERROR] frontend build failed
+    exit /b 1
+)
 goto :done
 
 :try_npm
@@ -92,8 +105,15 @@ where npm >nul 2>&1
 if errorlevel 1 goto :skip_ui
 echo [UI] npm
 call npm install
-if errorlevel 1 goto :done
+if errorlevel 1 (
+    echo [ERROR] frontend install failed
+    exit /b 1
+)
 call npm run build
+if errorlevel 1 (
+    echo [ERROR] frontend build failed
+    exit /b 1
+)
 goto :done
 
 :skip_ui

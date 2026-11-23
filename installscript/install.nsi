@@ -25,7 +25,7 @@ RequestExecutionLevel admin
 
 !define APP_NAME       "rust-gisserver"
 !define APP_PUBLISHER  "rust-gisserver"
-!define APP_VERSION    "0.8.1.0"
+!define APP_VERSION    "0.8.2.0"
 
 ; 服务名（NSSM 注册用，实际进程 mapserve.exe / manager.exe）
 !define SVC_MAP_NAME   "mapserve"
@@ -215,7 +215,7 @@ Function ConfigCreate
   Pop $hMgrPort
 
   ; 说明
-  ${NSD_CreateLabel} 0 128u 100% 60u "数据库密码默认 123456（PostgreSQL 端口 5434），安装后请在 $INSTDIR\.env 中修改 MANAGER_DB_PASSWORD。$\n数据库仅供本机/内网使用：不要对所有 IP 开放（PostgreSQL listen_addresses 与 pg_hba.conf）。$\nJWT 签名密钥将在安装时随机生成，无需手工填写。"
+  ${NSD_CreateLabel} 0 128u 100% 60u "数据库需先安装 PostgreSQL 16 + PostGIS；安装包不自动建库。$\n安装后执行 $INSTDIR\sql\init_all.ps1 初始化（端口 5432），并在 .env 修改密码。$\nJWT 密钥安装时随机生成；数据库勿对所有 IP 开放。"
   Pop $0
 
   ; 选项

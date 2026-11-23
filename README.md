@@ -4,9 +4,9 @@
 | -------------------------- | --------------- |
 | [English](README.en-US.md) | [中文](README.md) |
 
-> **先说重点：rust-gisserver 支持的服务类型非常多。** 一套引擎同时提供 WMS 1.1.1/1.3.0、WMTS 1.0.0、TMS/XYZ、MVT 矢量瓦片（含 PostGIS 动态矢量）、WFS、OGC API - Features、OGC API - Tiles、3D Tiles/terrain 直通，以及 COG / PMTiles / MBTiles / ArcGIS 紧凑缓存（`.tpk`/`.tpkx`）直读；并面向 CGCS2000、高斯-克吕格 3°/6° 分带、UTM 等中国常用坐标系提供恒等直出与可选 PROJ 跨坐标转换。
+> **先说重点：rust-gisserver 支持的服务类型非常多。** 一套引擎同时提供 WMS 1.1.1/1.3.0、WMTS 1.0.0、TMS/XYZ、MVT 矢量瓦片（含 PostGIS 动态矢量）、WFS、OGC API - Features、OGC API - Tiles、3D Tiles/terrain 直通，以及 COG / PMTiles / MBTiles / ArcGIS 紧凑缓存（`.tpk`/`.tpkx`）直读；原生支持 WGS84（EPSG:4326）、Web Mercator（EPSG:3857）等常用坐标系，并兼容 CGCS2000、高斯-克吕格/UTM 投影与自定义瓦片网格；同坐标系恒等直出，跨坐标系可选 PROJ 转换。
 
-**rust-gisserver** 基于 Rust 开发，**运行资源占用低、运行性能很高、并发量很大**，是面向国产化坐标系与大规模并发场景的新一代开放 GIS 服务器标杆产品。核心字节码路径（TIFF/COG 解析、瓦片解码、MVT 编码、PMTiles 归档读写、投影）均依据公开格式规范，不依赖 GDAL 等重型 C 绑定；PROJ 仅作为可选运行时后端，缺失时自动降级到内置投影路径。
+**rust-gisserver** 基于 Rust 开发，**运行资源占用低、性能高、并发量大**，是面向多坐标系兼容与大规模并发场景的开放 GIS 服务器。一套引擎覆盖从传统瓦片到 COG、动态 MVT、3D Tiles 等各类服务，既能直接挂接已有数据资产，也能发布新型标准数据，安装即用、配置简单。
 
 > **四个先进性支点（迁移友好）：**
 > ① **传统瓦片格式平滑迁移** —— XYZ/TMS 目录、MBTiles、PMTiles 直接挂接，**不重切图、不转格式**；
@@ -36,13 +36,47 @@ rust-gisserver/
 
 ## 为什么快
 
-- **零重型依赖**：纯 Rust 实现，无 GDAL/tiff/mapbox C 绑定；PROJ 为可选动态后端，默认构建零 FFI、零 unsafe。
-- **调用方式优先**：MVT 缓存命中 16–19ms，XYZ 栅格瓦片 10–21ms/片，归档/COG/3D Tiles 走 HTTP Range 零解码直通；WMS GetMap 是兜底，不当底图缩放主链路。
-- **五段缓存**：输出瓦片、图层索引、元数据文档、目录元数据、要素键值缓存，统一由 `CacheHub` 收口，支持 TTL、手动 purge、可选磁盘 L2。
-- **并发模型**：渲染/编码/阻塞 IO 全部走 `spawn_blocking`，tokio worker 只做调度；本地文件与 HTTP Range 源全部定位读（`read_at`/`seek_read`），共享 fd 并发无竞态；远程源隔离到专用 rayon 池。
-- **渲染快速路径**：请求 CRS == 源 CRS 且 geotransform 仿射时，512×256 GetMap 的 262,144 次逐点投影降为 5 次（release micro-bench 2.9×）。
+- **调用方式直出**：矢量优先 MVT、栅格优先 XYZ/WMTS；归档与 COG 只按请求范围取数据，不整幅解码。WMS GetMap 作为兜底。
+- **多级缓存**：瓦片输出、图层索引、元数据与要素等分层缓存，支持 TTL 与手动刷新；可选磁盘 L2，重启后缓存仍可复用。
+- **轻量部署**：不依赖 GDAL 等重型组件，安装体积小、启动快；跨坐标系转换可选 PROJ，没有也能启动并使用核心服务。
+- **实测数据**：MVT 缓存命中约 16–19ms，XYZ 栅格瓦片约 10–21ms/片；动态 MVT 输出缓存命中约 16–25ms。
 
 详细实测与实现要点见 [mapserver/README.md](mapserver/README.md)。
+
+### 性能参数与缓存预算（开发 / 生产）
+
+调优顺序是 **先选对调用方式，再调缓存**：矢量优先 MVT、栅格优先 XYZ/WMTS，WMS GetMap 作为兜底；COG 要有完整 overview，PostGIS geometry 要有 GiST 索引。缓存参数集中在 `config/mapserver.xml`：
+
+| 参数 | 作用 | 调试环境 | 生产环境 |
+| --- | --- | --- | --- |
+| `<server cache_mib>` | 解码后 RGBA 瓦片缓存上限（MiB，0=禁用；按最大 `tile_px` 折算条目数） | 256–512 | 1024–4096，按内存与瓦片尺寸上调 |
+| `<server foyer_cache_mib>` | foyer 输出缓存 L1（按字节计量；缺省跟随 `cache_mib`） | 256–512 | 2048–8192；动态 MVT 多时单独加大，不会撑大 RGBA 缓存 |
+| `<disk_cache capacity_mib>` | foyer 输出缓存 L2 磁盘，重启后仍可复用 | 512–1024 | 8192–32768 或按 SSD 空闲空间放大 |
+| `<server cache_ttl_secs>` | 各缓存段统一 TTL（秒，0=不过期） | 300 | 静态数据 3600–86400；频繁更新数据 300–600 |
+| `<server cache_stats_secs>` | 缓存统计日志与维护周期（秒，0=关闭） | 60 | 60–300 |
+| `<server catalog_scan_secs>` | 周期重扫共享图层 XML（秒，0=关闭）；重扫会重开数据源并清缓存 | 0 | 多节点共享配置时 30–60，单机保持 0 |
+
+开发态默认就是“小预算”：两档内存缓存各 **512 MiB**、磁盘 L2 **1 GiB**，便于快速启动、少占本机资源。上生产建议先按 **2–4 倍调试值**起步，再用 `GET /api/cache` 看各段 entries/bytes/TTL、结合 RSS 与 P99 调整；两档 L1 合计建议控制在物理内存的 30%–50% 左右，留足系统与其他进程余量。动态 PostGIS MVT 冷生成时已 gzip 一次，同样预算约可多放一倍矢量瓦片。
+
+```xml
+<!-- 调试：小预算 -->
+<server host="0.0.0.0" port="8080"
+        cache_mib="512" foyer_cache_mib="512"
+        cache_ttl_secs="300" cache_stats_secs="60">
+  <disk_cache dir="cache/foyer" capacity_mib="1024"/>
+</server>
+
+<!-- 生产示例：16 GiB 内存 + SSD，按实际机器缩放 -->
+<server host="0.0.0.0" port="8080"
+        cache_mib="2048" foyer_cache_mib="4096"
+        cache_ttl_secs="3600" cache_stats_secs="60">
+  <disk_cache dir="cache/foyer" capacity_mib="16384"/>
+</server>
+```
+
+> `<disk_cache dir>` 相对启动工作目录解析，生产环境请固定工作目录（Windows 服务设 `AppDirectory`），避免散落多份缓存；缩小 `capacity_mib` 只改变逻辑上限，**不会自动删除旧缓存文件**。数据换盘后执行 `POST /api/cache/purge?scope=all` 立即刷新，或等待一个 TTL 窗口。
+
+更多缓存段说明与压测方法见 [mapserver/README.md](mapserver/README.md)。
 
 ---
 
@@ -55,7 +89,7 @@ rust-gisserver/
 | 已有资产 | 迁移方式 | 直接获得的服务 |
 | --- | --- | --- |
 | `z/x/y.{png,jpg,pbf}` 标准目录树 | 放入图层目录即可发现 | XYZ / TMS / WMTS（顶行/底行 y-flip 自动处理） |
-| MBTiles（SQLite 瓦片包） | 只读直读，内置连接池 + `prepare_cached` | XYZ / TMS / WMTS / MVT 全部前端 |
+| MBTiles（SQLite 瓦片包） | 只读直读，内置连接池 | XYZ / TMS / WMTS / MVT 全部前端 |
 | PMTiles v3 归档 | HTTP Range 整档直出 | `/pmtiles/{name}` 与 `pmtiles://` 客户端直连 |
 | 静态 `z/x/y` 瓦片目录 | 可选打包为 PMTiles | Hilbert 聚类、blob 去重、gzip 重编码 |
 
@@ -72,7 +106,7 @@ MBTiles 同时支持 PNG/JPEG/WebP 栅格与 gzip pbf 矢量包，TMS 行号自�
 | `.tpkx`（Pro Compact Tile Package） | ZIP | compact v2（索引内嵌、行优先） | `root.json` |
 | gis-wt `.webpdle`（WTC v1，自有） | 目录 | WTC v1 稀疏索引 | `Conf.xml` + `conf.cdi` |
 
-- **一套逻辑**：四类形态的网格方案统一归一为 `gisserver::arcgis_cache::definition::CacheDefinition`；差异只在目录布局与瓦片字节布局，读瓦片代码只有一套。
+- **一套逻辑**：四类形态统一读取，差异只在目录布局与瓦片字节布局，无需为每种形态分别维护代码。
 - **定义记录复用**：按内容指纹（CRS、原点、瓦片尺寸、DPI、LOD、PacketSize、瓦片根目录名）复用；同一套网格装不同范围的数据也共享记录，不重复建条目。
 - **一键导入**：`POST /admin/import-tpk` 完成解压 → 提升缓存根 → 原子发布到 `data_root/arcgis_tpk/`；临时目录 + 原子改名，失败不留半成品，同名重导覆盖且可回滚。
 - **实测样本**：`road.tpk`（EPSG:4490，compact v1，L00–L08）、`bai.tpkx`（EPSG:4522，compact v2，L00–L04）导入后均被 `/admin/discover` 识别为 `arcgis` 且可发布。
@@ -82,21 +116,21 @@ MBTiles 同时支持 PNG/JPEG/WebP 栅格与 gzip pbf 矢量包，TMS 行号自�
 ### 3) 新型 COG：直接服务，无需切片入库
 
 - Cloud Optimized GeoTIFF 直接读取：本地路径或 HTTP(S) / S3 预签名 URL，走 **HTTP Range 206** 按字节取数据，QGIS / rasterio 可远程打开，GB 级影像不整读进内存。
-- 自研 TIFF / BigTIFF 解析（经典 TIFF 与 BigTIFF 的 IFD 链、overview 金字塔选层、rayon 并行解码），**无 GDAL 等重型 C 绑定**。
+- 基于公开格式规范实现的 TIFF / BigTIFF 解析，支持 overview 金字塔分层读取，**无需 GDAL 等重型组件**。
 - 一份 COG 同时服务 WMS / WMTS / TMS / XYZ，避免"先切片、再入库、再发布"的冗长链路；`/cog/{layer}` 提供零解码直通端点。
-- 兼容 CGCS2000、高斯-克吕格 3°/6° 分带、UTM 等常用坐标系；同坐标系恒等直出，跨坐标系交给可选 PROJ 后端。
+- 主流与国产坐标系全覆盖：内置 WGS84（EPSG:4326）↔ Web Mercator（EPSG:3857），兼容 CGCS2000、高斯-克吕格/UTM 等各类投影及自定义瓦片网格；同坐标系恒等直出，跨坐标系交给可选 PROJ 后端。
 
 ### 4) 基于 PostGIS 的高性能动态 MVT 瓦片
 
 - **改库即改图**：从 PostGIS 空间表、视图或 SQL 表达式实时生成 MVT 矢量瓦片，无需预切瓦片、无需刷新缓存目录。
 - **双坐标接口**：`/{z}/{x}/{y}.pbf`（EPSG:3857）与 `/{srid}/{z}/{x}/{y}.pbf`（源 CRS 自身单位，如 4543 米、4326 度，服务端不做 `ST_Transform`）；TileJSON 按接口分别宣告 bounds/crs/grid。
-- **为高并发而设计**：按 DSN 共享连接池，版本预检 PG≥11 / PostGIS≥3.0，启动自检 GiST 索引；编码前按瓦片 bbox 预过滤，低 z 用 `ST_SimplifyPreserveTopology` 分级简化；输出缓存命中约 16–25ms，可选磁盘 L2 跨重启保留。
+- **为高并发而设计**：共享数据库连接池，按瓦片范围预过滤并分级简化要素；输出缓存命中约 16–25ms，可选磁盘 L2 跨重启保留。
 - **免落表发布**：`from` 表达式直接发布 SQL / 视图图层；bounds/count 走统计估计，缺失自动回退精确扫描。
 - **传统矢量资产同路上云**：Shapefile 走管理后台「导入 SHP」（`shp2pgsql`，从 `.prj` 自动识别 CGCS2000 / WGS84）；FileGDB 通过**专用转换工具**转为 PostGIS 表（读取端可基于开源 FileGDB 解析库）。二者入库后统一为 `postgis_table`，可发布动态 MVT / WFS / OAF；转换在服务外完成，服务端只消费转换结果，核心库保持纯 Rust。
 
 发布与调优见 [MVT 指南](docs/services/mvt.zh-CN.md) 与 [架构说明](docs/architecture.md)。
 
-> **为什么这更先进**：传统 GIS 服务器把"格式转换 + 金字塔切片 + 入库"当作发布前置条件，数据一变就要重跑整条链路。rust-gisserver 把字节层做到自研，直接面向已有资产（传统瓦片、ArcGIS 紧凑缓存）与新型标准（COG、PostGIS 动态 MVT）：**迁移零重切、新数据零预处理、发布即服务**；叠加纯 Rust 的零重型依赖、五段缓存、定位读与 `spawn_blocking` 并发模型，在国产化坐标系与大规模并发场景下兼具兼容性与性能优势。
+> **为什么这更先进**：传统 GIS 服务器把"格式转换 + 金字塔切片 + 入库"当作发布前置条件，数据一变就要重跑整条链路。rust-gisserver 直接面向已有资产（传统瓦片、ArcGIS 紧凑缓存）与新型标准（COG、PostGIS 动态 MVT）：**迁移零重切、新数据零预处理、发布即服务**；叠加多级缓存与轻量部署，在多坐标系混合与大规模并发场景下兼顾兼容与性能。
 
 ---
 
@@ -208,6 +242,16 @@ export PROJ_DATA=/usr/share/proj
 
 ## Windows 安装
 
+### 0) 前置条件：先装 PostgreSQL + PostGIS
+
+**安装包不安装数据库，也不会自动建库建表。** 无论用下面的源码构建方式还是 `rust-gisserver_Setup.exe`，都要先把数据库准备好：
+
+1. 安装 **PostgreSQL 16 x64**，端口保持默认 **5432**，记住 `postgres` 超级用户密码。
+2. 安装 **PostGIS 3.5**，必须装到与 PostgreSQL **完全相同的目录**，否则 `CREATE EXTENSION postgis` 会失败。
+3. 确认 Windows 服务 `postgresql-x64-16` 正在运行。
+
+完整步骤见随安装包附带的中英文说明 `01-PostgreSQL-PostGIS-zh-CN.pdf` / `02-PostgreSQL-PostGIS-en.pdf`。
+
 ### 1) 构建与安装
 
 环境：Windows 10/11 x64、Rust MSVC toolchain、VS 2019/2022 Build Tools、可选 Node.js + pnpm。
@@ -222,7 +266,20 @@ cd <repo>\build\script
 
 安装目录生成 `bin\`（`mapserve.exe` / `manager.exe` / PROJ DLL）、`config\`、`web\`、`data\`、`cache\`、`logs\`、`share\proj\`、`start-mapserver.bat`、`start-manager.bat`。复制 `.env.example` 为 `.env`，至少设置 `MANAGER_DB_PASSWORD`、`MANAGER_JWT_SECRET`、`MAPSERVER_DB_PASSWORD`。完整路径与踩坑见 [build/script/README.md](build/script/README.md)。
 
-### 2) 以 Windows 服务运行（NSSM）
+### 2) 初始化数据库（安装后必做）
+
+安装包**只复制 SQL 脚本，不自动执行**。在 `<安装目录>\sql\` 下运行自带的一键脚本：
+
+```powershell
+cd <安装目录>\sql
+powershell -ExecutionPolicy Bypass -File .\init_all.ps1 -Port 5432 -Password <你的postgres密码>
+```
+
+脚本依次执行 `01-init-database.sql`（建 `mapserver-manager` 库 + 启用 PostGIS 扩展）、`system.sql`（系统表）、`map.sql`（地图与数据表）。库名固定为 `mapserver-manager`（带短横线），端口 **5432**，顺序不可颠倒。中文/英文初始数据二选一：`system.sql`+`map.sql` 或 `system.en_US.sql`+`map.en_US.sql`，不要混跑。
+
+验证：`psql -U postgres -p 5432 -d "mapserver-manager" -c "SELECT count(*) FROM sys_user;"` 返回非零即成功。
+
+### 3) 以 Windows 服务运行（NSSM）
 
 ```powershell
 nssm install map-api "<安装目录>\bin\mapserve.exe"
@@ -235,7 +292,7 @@ nssm start manager
 
 **必须设 `AppDirectory`**：`data_root` 默认是相对路径 `data`，NSSM 不设时工作目录会落在 `bin\`，导致管理面报 `data_root 不可访问`。任何自定义启动方式（systemd / 计划任务）同理。
 
-### 3) 命令行直接启动
+### 4) 命令行直接启动
 
 ```powershell
 cd <安装目录>
