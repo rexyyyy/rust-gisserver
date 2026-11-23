@@ -25,7 +25,7 @@ RequestExecutionLevel admin
 
 !define APP_NAME       "rust-gisserver"
 !define APP_PUBLISHER  "rust-gisserver"
-!define APP_VERSION    "0.8.1.0"
+!define APP_VERSION    "0.8.2.0"
 
 ; 服务名（NSSM 注册用，实际进程 mapserve.exe / manager.exe）
 !define SVC_MAP_NAME   "mapserve"

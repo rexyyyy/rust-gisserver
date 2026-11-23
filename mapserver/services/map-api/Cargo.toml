@@ -4,6 +4,7 @@ version.workspace = true
 edition.workspace = true
 license.workspace = true
 description = "HTTP map server: WMS / WMTS / TMS / MVT / PMTiles / ArcGIS tile cache / COG tile services (axum + tokio)."
+repository = "https://github.com/rexyyyy/rust-gisserver"
 
 [lib]
 # The binary refers to this crate as `map_api::...`. Cargo derives the lib

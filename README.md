@@ -6,7 +6,7 @@
 
 > **先说重点：rust-gisserver 支持的服务类型非常多。** 一套引擎同时提供 WMS 1.1.1/1.3.0、WMTS 1.0.0、TMS/XYZ、MVT 矢量瓦片（含 PostGIS 动态矢量）、WFS、OGC API - Features、OGC API - Tiles、3D Tiles/terrain 直通，以及 COG / PMTiles / MBTiles / ArcGIS 紧凑缓存（`.tpk`/`.tpkx`）直读；并面向 CGCS2000、高斯-克吕格 3°/6° 分带、UTM 等中国常用坐标系提供恒等直出与可选 PROJ 跨坐标转换。
 
-**rust-gisserver** 基于 Rust 开发，**运行资源占用低、运行性能很高、并发量很大**，是面向国产化坐标系与大规模并发场景的新一代开放 GIS 服务器标杆产品。核心字节码路径（TIFF/COG 解析、瓦片解码、MVT 编码、PMTiles 归档读写、投影）均依据公开格式规范，不依赖 GDAL 等重型 C 绑定；PROJ 仅作为可选运行时后端，缺失时自动降级到内置投影路径。
+**rust-gisserver** 基于 Rust 开发，**运行资源占用低、运行性能很高、并发量很大**，是面向国产化坐标系与大规模并发场景的开放 GIS 服务器。核心字节码路径（TIFF/COG 解析、瓦片解码、MVT 编码、PMTiles 归档读写、投影）均依据公开格式规范，不依赖 GDAL 等重型 C 绑定；PROJ 仅作为可选运行时后端，缺失时自动降级到内置投影路径。
 
 > **四个先进性支点（迁移友好）：**
 > ① **传统瓦片格式平滑迁移** —— XYZ/TMS 目录、MBTiles、PMTiles 直接挂接，**不重切图、不转格式**；
@@ -36,7 +36,7 @@ rust-gisserver/
 
 ## 为什么快
 
-- **零重型依赖**：纯 Rust 实现，无 GDAL/tiff/mapbox C 绑定；PROJ 为可选动态后端，默认构建零 FFI、零 unsafe。
+- **零重型依赖**：纯 Rust 实现，无 GDAL/tiff/mapbox C 绑定；PROJ 为可选动态后端，默认 features 下零 unsafe；可选后端含必要 FFI。
 - **调用方式优先**：MVT 缓存命中 16–19ms，XYZ 栅格瓦片 10–21ms/片，归档/COG/3D Tiles 走 HTTP Range 零解码直通；WMS GetMap 是兜底，不当底图缩放主链路。
 - **五段缓存**：输出瓦片、图层索引、元数据文档、目录元数据、要素键值缓存，统一由 `CacheHub` 收口，支持 TTL、手动 purge、可选磁盘 L2。
 - **并发模型**：渲染/编码/阻塞 IO 全部走 `spawn_blocking`，tokio worker 只做调度；本地文件与 HTTP Range 源全部定位读（`read_at`/`seek_read`），共享 fd 并发无竞态；远程源隔离到专用 rayon 池。
@@ -117,7 +117,7 @@ MBTiles 同时支持 PNG/JPEG/WebP 栅格与 gzip pbf 矢量包，TMS 行号自�
 ### 3) 新型 COG：直接服务，无需切片入库
 
 - Cloud Optimized GeoTIFF 直接读取：本地路径或 HTTP(S) / S3 预签名 URL，走 **HTTP Range 206** 按字节取数据，QGIS / rasterio 可远程打开，GB 级影像不整读进内存。
-- 自研 TIFF / BigTIFF 解析（经典 TIFF 与 BigTIFF 的 IFD 链、overview 金字塔选层、rayon 并行解码），**无 GDAL 等重型 C 绑定**。
+- 基于公开格式规范实现的 TIFF / BigTIFF 解析（经典 TIFF 与 BigTIFF 的 IFD 链、overview 金字塔选层、rayon 并行解码），**无 GDAL 等重型 C 绑定**。
 - 一份 COG 同时服务 WMS / WMTS / TMS / XYZ，避免"先切片、再入库、再发布"的冗长链路；`/cog/{layer}` 提供零解码直通端点。
 - 兼容 CGCS2000、高斯-克吕格 3°/6° 分带、UTM 等常用坐标系；同坐标系恒等直出，跨坐标系交给可选 PROJ 后端。
 
@@ -131,7 +131,7 @@ MBTiles 同时支持 PNG/JPEG/WebP 栅格与 gzip pbf 矢量包，TMS 行号自�
 
 发布与调优见 [MVT 指南](docs/services/mvt.zh-CN.md) 与 [架构说明](docs/architecture.md)。
 
-> **为什么这更先进**：传统 GIS 服务器把"格式转换 + 金字塔切片 + 入库"当作发布前置条件，数据一变就要重跑整条链路。rust-gisserver 把字节层做到自研，直接面向已有资产（传统瓦片、ArcGIS 紧凑缓存）与新型标准（COG、PostGIS 动态 MVT）：**迁移零重切、新数据零预处理、发布即服务**；叠加纯 Rust 的零重型依赖、五段缓存、定位读与 `spawn_blocking` 并发模型，在国产化坐标系与大规模并发场景下兼具兼容性与性能优势。
+> **为什么这更先进**：传统 GIS 服务器把"格式转换 + 金字塔切片 + 入库"当作发布前置条件，数据一变就要重跑整条链路。rust-gisserver 在字节层按公开格式规范自行实现，直接面向已有资产（传统瓦片、ArcGIS 紧凑缓存）与新型标准（COG、PostGIS 动态 MVT）：**迁移零重切、新数据零预处理、发布即服务**；叠加纯 Rust 的零重型依赖、五段缓存、定位读与 `spawn_blocking` 并发模型，在国产化坐标系与大规模并发场景下兼具兼容性与性能优势。
 
 ---
 
