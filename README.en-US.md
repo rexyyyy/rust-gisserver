@@ -4,9 +4,9 @@
 | -------------------------- | --------------- |
 | [English](README.en-US.md) | [中文](README.md) |
 
-> **First things first: rust-gisserver serves a very wide range of service types.** One engine provides WMS 1.1.1/1.3.0, WMTS 1.0.0, TMS/XYZ, MVT vector tiles (including dynamic PostGIS vectors), WFS, OGC API - Features, OGC API - Tiles, 3D Tiles/terrain pass-through, plus direct reads of COG / PMTiles / MBTiles / ArcGIS compact caches (`.tpk`/`.tpkx`). It also handles CGCS2000, Gauss-Kruger 3°/6° zones and UTM with identity-path output and optional PROJ reprojection.
+> **First things first: rust-gisserver serves a very wide range of service types.** One engine provides WMS 1.1.1/1.3.0, WMTS 1.0.0, TMS/XYZ, MVT vector tiles (including dynamic PostGIS vectors), WFS, OGC API - Features, OGC API - Tiles, 3D Tiles/terrain pass-through, plus direct reads of COG / PMTiles / MBTiles / ArcGIS compact caches (`.tpk`/`.tpkx`). It supports WGS84 (EPSG:4326), Web Mercator (EPSG:3857) and other common CRSs, plus CGCS2000, Gauss-Kruger / UTM projections and custom tile grids — identity output in the source CRS, optional PROJ reprojection.
 
-**rust-gisserver** is built in Rust: **low runtime footprint, high performance and high concurrency**. It is an open GIS server for domestic coordinate systems (CGCS2000 / Gauss-Kruger) and large-scale concurrency. One engine covers everything from traditional tiles to COG, dynamic MVT and 3D Tiles — mount existing assets as-is or publish modern formats, with a small installer and simple configuration.
+**rust-gisserver** is built in Rust: **low runtime footprint, high performance and high concurrency**. It is an open GIS server for broad CRS compatibility (WGS84 / EPSG:3857, CGCS2000 and other projections) and large-scale concurrency. One engine covers everything from traditional tiles to COG, dynamic MVT and 3D Tiles — mount existing assets as-is or publish modern formats, with a small installer and simple configuration.
 
 > **Four pillars of advancement (migration-friendly):**
 > ① **Smooth migration of traditional tile formats** — XYZ/TMS directories, MBTiles and PMTiles mount directly, **no re-tiling, no format conversion**;
@@ -118,7 +118,7 @@ Format details: [docs/arcgis-cache-formats.md](docs/arcgis-cache-formats.md). Pu
 - Cloud Optimized GeoTIFF read directly from local paths or HTTP(S) / S3 pre-signed URLs via **HTTP Range 206** byte requests; QGIS / rasterio can open it remotely and GB-scale imagery is never loaded whole into memory.
 - TIFF / BigTIFF parser implemented from public specifications with overview-pyramid support, **no heavy GDAL components required**.
 - One COG serves WMS / WMTS / TMS / XYZ simultaneously, avoiding the long "tile → import → publish" pipeline; `/cog/{layer}` offers a zero-decode pass-through endpoint.
-- Compatible with CGCS2000, Gauss-Kruger 3°/6° zones and UTM; identity output in the source CRS, optional PROJ backend for cross-CRS transforms.
+- Broad CRS coverage: built-in WGS84 (EPSG:4326) ↔ Web Mercator (EPSG:3857), plus CGCS2000, Gauss-Kruger / UTM and other projections with custom tile grids; identity output in the source CRS, optional PROJ backend for cross-CRS transforms.
 
 ### 4) High-performance dynamic MVT tiles from PostGIS
 
@@ -130,7 +130,7 @@ Format details: [docs/arcgis-cache-formats.md](docs/arcgis-cache-formats.md). Pu
 
 Publishing and tuning: [MVT guide](docs/services/mvt.en-US.md) and [architecture notes](docs/architecture.md).
 
-> **Why this is more advanced**: traditional GIS servers treat format conversion + pyramid tiling + import as prerequisites to publishing, and any data change reruns the whole chain. rust-gisserver faces existing assets (traditional tiles, ArcGIS compact caches) and modern standards (COG, dynamic PostGIS MVT) directly: **zero re-tiling to migrate, zero preprocessing for new data, publish-and-serve**. Together with multi-level caching and lightweight deployment, it balances compatibility and performance for domestic CRS and high-concurrency scenarios.
+> **Why this is more advanced**: traditional GIS servers treat format conversion + pyramid tiling + import as prerequisites to publishing, and any data change reruns the whole chain. rust-gisserver faces existing assets (traditional tiles, ArcGIS compact caches) and modern standards (COG, dynamic PostGIS MVT) directly: **zero re-tiling to migrate, zero preprocessing for new data, publish-and-serve**. Together with multi-level caching and lightweight deployment, it balances compatibility and performance for mixed-CRS and high-concurrency scenarios.
 
 ---
 
@@ -242,6 +242,16 @@ PostgreSQL guides: [中文](docs/postgresql16-postgis-linux-install.zh-CN.md) / 
 
 ## Install on Windows
 
+### 0) Prerequisite: install PostgreSQL + PostGIS first
+
+**The installer neither installs nor initializes the database.** Whether you build from source below or use `rust-gisserver_Setup.exe`, prepare the database first:
+
+1. Install **PostgreSQL 16 x64**, keep the default port **5432**, and remember the `postgres` superuser password.
+2. Install **PostGIS 3.5** into the **exact same directory** as PostgreSQL; otherwise `CREATE EXTENSION postgis` fails.
+3. Make sure the Windows service `postgresql-x64-16` is running.
+
+Full walkthrough: see the bundled `01-PostgreSQL-PostGIS-zh-CN.pdf` / `02-PostgreSQL-PostGIS-en.pdf`.
+
 ### 1) Build and install
 
 Requirements: Windows 10/11 x64, Rust MSVC toolchain, VS 2019/2022 Build Tools, optional Node.js + pnpm.
@@ -256,7 +266,20 @@ cd <repo>\build\script
 
 The install directory contains `bin\` (`mapserve.exe`, `manager.exe`, PROJ DLLs), `config\`, `web\`, `data\`, `cache\`, `logs\`, `share\proj\`, `start-mapserver.bat` and `start-manager.bat`. Copy `.env.example` to `.env` and set at least `MANAGER_DB_PASSWORD`, `MANAGER_JWT_SECRET` and `MAPSERVER_DB_PASSWORD`. Full paths and known issues: [build/script/README.md](build/script/README.md).
 
-### 2) Run as a Windows service (NSSM)
+### 2) Initialize the database (required after install)
+
+The installer **only copies the SQL scripts; it does not run them**. Run the bundled one-shot script from `<install dir>\sql\`:
+
+```powershell
+cd <install dir>\sql
+powershell -ExecutionPolicy Bypass -File .\init_all.ps1 -Port 5432 -Password <your-postgres-password>
+```
+
+It runs `01-init-database.sql` (creates the `mapserver-manager` database and enables PostGIS), then `system.sql` (system tables) and `map.sql` (map/data tables), in that order. The database name is `mapserver-manager` and the port is **5432**. Pick one language baseline: `system.sql`+`map.sql` or `system.en_US.sql`+`map.en_US.sql` — never mix them.
+
+Verify: `psql -U postgres -p 5432 -d "mapserver-manager" -c "SELECT count(*) FROM sys_user;"` returns a non-zero count.
+
+### 3) Run as a Windows service (NSSM)
 
 ```powershell
 nssm install map-api "<install dir>\bin\mapserve.exe"
@@ -269,7 +292,7 @@ nssm start manager
 
 **Always set `AppDirectory`**: `data_root` defaults to the relative path `data`. Without it NSSM uses `bin\` as the working directory and the admin plane reports `data_root` inaccessible. The same rule applies to any custom launcher (systemd / Task Scheduler).
 
-### 3) Start from the command line
+### 4) Start from the command line
 
 ```powershell
 cd <install dir>

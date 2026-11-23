@@ -4,9 +4,9 @@
 | -------------------------- | --------------- |
 | [English](README.en-US.md) | [中文](README.md) |
 
-> **先说重点：rust-gisserver 支持的服务类型非常多。** 一套引擎同时提供 WMS 1.1.1/1.3.0、WMTS 1.0.0、TMS/XYZ、MVT 矢量瓦片（含 PostGIS 动态矢量）、WFS、OGC API - Features、OGC API - Tiles、3D Tiles/terrain 直通，以及 COG / PMTiles / MBTiles / ArcGIS 紧凑缓存（`.tpk`/`.tpkx`）直读；并面向 CGCS2000、高斯-克吕格 3°/6° 分带、UTM 等中国常用坐标系提供恒等直出与可选 PROJ 跨坐标转换。
+> **先说重点：rust-gisserver 支持的服务类型非常多。** 一套引擎同时提供 WMS 1.1.1/1.3.0、WMTS 1.0.0、TMS/XYZ、MVT 矢量瓦片（含 PostGIS 动态矢量）、WFS、OGC API - Features、OGC API - Tiles、3D Tiles/terrain 直通，以及 COG / PMTiles / MBTiles / ArcGIS 紧凑缓存（`.tpk`/`.tpkx`）直读；原生支持 WGS84（EPSG:4326）、Web Mercator（EPSG:3857）等常用坐标系，并兼容 CGCS2000、高斯-克吕格/UTM 投影与自定义瓦片网格；同坐标系恒等直出，跨坐标系可选 PROJ 转换。
 
-**rust-gisserver** 基于 Rust 开发，**运行资源占用低、性能高、并发量大**，是面向国产化坐标系与大规模并发场景的开放 GIS 服务器。一套引擎覆盖从传统瓦片到 COG、动态 MVT、3D Tiles 等各类服务，既能直接挂接已有数据资产，也能发布新型标准数据，安装即用、配置简单。
+**rust-gisserver** 基于 Rust 开发，**运行资源占用低、性能高、并发量大**，是面向多坐标系兼容与大规模并发场景的开放 GIS 服务器。一套引擎覆盖从传统瓦片到 COG、动态 MVT、3D Tiles 等各类服务，既能直接挂接已有数据资产，也能发布新型标准数据，安装即用、配置简单。
 
 > **四个先进性支点（迁移友好）：**
 > ① **传统瓦片格式平滑迁移** —— XYZ/TMS 目录、MBTiles、PMTiles 直接挂接，**不重切图、不转格式**；
@@ -118,7 +118,7 @@ MBTiles 同时支持 PNG/JPEG/WebP 栅格与 gzip pbf 矢量包，TMS 行号自�
 - Cloud Optimized GeoTIFF 直接读取：本地路径或 HTTP(S) / S3 预签名 URL，走 **HTTP Range 206** 按字节取数据，QGIS / rasterio 可远程打开，GB 级影像不整读进内存。
 - 基于公开格式规范实现的 TIFF / BigTIFF 解析，支持 overview 金字塔分层读取，**无需 GDAL 等重型组件**。
 - 一份 COG 同时服务 WMS / WMTS / TMS / XYZ，避免"先切片、再入库、再发布"的冗长链路；`/cog/{layer}` 提供零解码直通端点。
-- 兼容 CGCS2000、高斯-克吕格 3°/6° 分带、UTM 等常用坐标系；同坐标系恒等直出，跨坐标系交给可选 PROJ 后端。
+- 主流与国产坐标系全覆盖：内置 WGS84（EPSG:4326）↔ Web Mercator（EPSG:3857），兼容 CGCS2000、高斯-克吕格/UTM 等各类投影及自定义瓦片网格；同坐标系恒等直出，跨坐标系交给可选 PROJ 后端。
 
 ### 4) 基于 PostGIS 的高性能动态 MVT 瓦片
 
@@ -130,7 +130,7 @@ MBTiles 同时支持 PNG/JPEG/WebP 栅格与 gzip pbf 矢量包，TMS 行号自�
 
 发布与调优见 [MVT 指南](docs/services/mvt.zh-CN.md) 与 [架构说明](docs/architecture.md)。
 
-> **为什么这更先进**：传统 GIS 服务器把"格式转换 + 金字塔切片 + 入库"当作发布前置条件，数据一变就要重跑整条链路。rust-gisserver 直接面向已有资产（传统瓦片、ArcGIS 紧凑缓存）与新型标准（COG、PostGIS 动态 MVT）：**迁移零重切、新数据零预处理、发布即服务**；叠加多级缓存与轻量部署，在国产化坐标系与大规模并发场景下兼顾兼容与性能。
+> **为什么这更先进**：传统 GIS 服务器把"格式转换 + 金字塔切片 + 入库"当作发布前置条件，数据一变就要重跑整条链路。rust-gisserver 直接面向已有资产（传统瓦片、ArcGIS 紧凑缓存）与新型标准（COG、PostGIS 动态 MVT）：**迁移零重切、新数据零预处理、发布即服务**；叠加多级缓存与轻量部署，在多坐标系混合与大规模并发场景下兼顾兼容与性能。
 
 ---
 
@@ -242,6 +242,16 @@ export PROJ_DATA=/usr/share/proj
 
 ## Windows 安装
 
+### 0) 前置条件：先装 PostgreSQL + PostGIS
+
+**安装包不安装数据库，也不会自动建库建表。** 无论用下面的源码构建方式还是 `rust-gisserver_Setup.exe`，都要先把数据库准备好：
+
+1. 安装 **PostgreSQL 16 x64**，端口保持默认 **5432**，记住 `postgres` 超级用户密码。
+2. 安装 **PostGIS 3.5**，必须装到与 PostgreSQL **完全相同的目录**，否则 `CREATE EXTENSION postgis` 会失败。
+3. 确认 Windows 服务 `postgresql-x64-16` 正在运行。
+
+完整步骤见随安装包附带的中英文说明 `01-PostgreSQL-PostGIS-zh-CN.pdf` / `02-PostgreSQL-PostGIS-en.pdf`。
+
 ### 1) 构建与安装
 
 环境：Windows 10/11 x64、Rust MSVC toolchain、VS 2019/2022 Build Tools、可选 Node.js + pnpm。
@@ -256,7 +266,20 @@ cd <repo>\build\script
 
 安装目录生成 `bin\`（`mapserve.exe` / `manager.exe` / PROJ DLL）、`config\`、`web\`、`data\`、`cache\`、`logs\`、`share\proj\`、`start-mapserver.bat`、`start-manager.bat`。复制 `.env.example` 为 `.env`，至少设置 `MANAGER_DB_PASSWORD`、`MANAGER_JWT_SECRET`、`MAPSERVER_DB_PASSWORD`。完整路径与踩坑见 [build/script/README.md](build/script/README.md)。
 
-### 2) 以 Windows 服务运行（NSSM）
+### 2) 初始化数据库（安装后必做）
+
+安装包**只复制 SQL 脚本，不自动执行**。在 `<安装目录>\sql\` 下运行自带的一键脚本：
+
+```powershell
+cd <安装目录>\sql
+powershell -ExecutionPolicy Bypass -File .\init_all.ps1 -Port 5432 -Password <你的postgres密码>
+```
+
+脚本依次执行 `01-init-database.sql`（建 `mapserver-manager` 库 + 启用 PostGIS 扩展）、`system.sql`（系统表）、`map.sql`（地图与数据表）。库名固定为 `mapserver-manager`（带短横线），端口 **5432**，顺序不可颠倒。中文/英文初始数据二选一：`system.sql`+`map.sql` 或 `system.en_US.sql`+`map.en_US.sql`，不要混跑。
+
+验证：`psql -U postgres -p 5432 -d "mapserver-manager" -c "SELECT count(*) FROM sys_user;"` 返回非零即成功。
+
+### 3) 以 Windows 服务运行（NSSM）
 
 ```powershell
 nssm install map-api "<安装目录>\bin\mapserve.exe"
@@ -269,7 +292,7 @@ nssm start manager
 
 **必须设 `AppDirectory`**：`data_root` 默认是相对路径 `data`，NSSM 不设时工作目录会落在 `bin\`，导致管理面报 `data_root 不可访问`。任何自定义启动方式（systemd / 计划任务）同理。
 
-### 3) 命令行直接启动
+### 4) 命令行直接启动
 
 ```powershell
 cd <安装目录>
