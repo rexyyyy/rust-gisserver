@@ -9,7 +9,7 @@
 --          Engine management - ops surface for published services.
 --       "Data Services" before "Map Services": sources first, published services second.
 -- Depends: system.sql must run first (creates sys_menu, sys_role_menu, etc.)
--- Usage: psql -h localhost -p 5434 -U postgres -d mapserver-manager -f map.sql
+-- Usage: psql -h localhost -p 5432 -U postgres -d mapserver-manager -f map.sql
 -- ---------------------------------------------------------------------
 -- Contents:
 --   §0  Normalize top-level menu IDs (legacy migration; same block as system.sql §0, re-runnable)

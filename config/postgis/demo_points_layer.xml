@@ -6,5 +6,5 @@
     <item>116.3975</item>
     <item>40.0029</item>
   </extent>
-  <source dsn="postgresql://postgres:123456@127.0.0.1:5434/gis" geometry_column="geom" schema="public" srid="4326" table="demo_points" type="postgis"/>
+  <source dsn="postgresql://postgres:123456@127.0.0.1:5432/gis" geometry_column="geom" schema="public" srid="4326" table="demo_points" type="postgis"/>
 </layer>

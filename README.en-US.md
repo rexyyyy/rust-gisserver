@@ -170,7 +170,7 @@ Deployment entries are split by language × platform. On Linux use:
 | `manager/deploy_zh-cn/linux/` | `gis-data-base-zh-linux` | `system.sql` → `map.sql` |
 | `manager/deploy_en/linux/`    | `gis-data-base-en-linux` | `.en_US` seeds           |
 
-Both projects use the same ports (6180 / 8080 / `MAPSERVER_DB_PORT`, default 5434), so **they cannot run at the same time**. Volumes are isolated per project, so switching language does not need `down -v`.
+Both projects use the same ports (6180 / 8080 / `MAPSERVER_DB_PORT`, default 5432), so **they cannot run at the same time**. Volumes are isolated per project, so switching language does not need `down -v`.
 
 ```bash
 cd manager/deploy_zh-cn/linux          # English: manager/deploy_en/linux
@@ -215,9 +215,9 @@ cd ../../..
 Initialize PostgreSQL 16 + PostGIS (the database name contains a hyphen and needs double quotes):
 
 ```bash
-psql -h localhost -p 5434 -U postgres -c 'CREATE DATABASE "mapserver-manager"'
-psql -h localhost -p 5434 -U postgres -d mapserver-manager -f manager/backend/sql/system.sql
-psql -h localhost -p 5434 -U postgres -d mapserver-manager -f manager/backend/sql/map.sql
+psql -h localhost -p 5432 -U postgres -c 'CREATE DATABASE "mapserver-manager"'
+psql -h localhost -p 5432 -U postgres -d mapserver-manager -f manager/backend/sql/system.sql
+psql -h localhost -p 5432 -U postgres -d mapserver-manager -f manager/backend/sql/map.sql
 # English baseline: use system.en_US.sql / map.en_US.sql instead; never run both sets
 ```
 
@@ -250,7 +250,7 @@ PostgreSQL guides: [中文](docs/postgresql16-postgis-linux-install.zh-CN.md) / 
 2. Install **PostGIS 3.5** into the **exact same directory** as PostgreSQL; otherwise `CREATE EXTENSION postgis` fails.
 3. Make sure the Windows service `postgresql-x64-16` is running.
 
-Full walkthrough: see the bundled `01-PostgreSQL-PostGIS-zh-CN.pdf` / `02-PostgreSQL-PostGIS-en.pdf`.
+Quick install: see the bundled [`installscript/安装速查.md`](installscript/安装速查.md) (one-page, authoritative). All four bilingual manuals `installscript/0*.pdf` are aligned with it (sources `0*.md`; run `python installscript/gen_manuals.py` after edits). Only the `postgis` extension is required; topology / sfcgal / tiger_geocoder / fuzzystrmatch are not used.
 
 ### 1) Build and install
 
@@ -275,7 +275,7 @@ cd <install dir>\sql
 powershell -ExecutionPolicy Bypass -File .\init_all.ps1 -Port 5432 -Password <your-postgres-password>
 ```
 
-It runs `01-init-database.sql` (creates the `mapserver-manager` database and enables PostGIS), then `system.sql` (system tables) and `map.sql` (map/data tables), in that order. The database name is `mapserver-manager` and the port is **5432**. Pick one language baseline: `system.sql`+`map.sql` or `system.en_US.sql`+`map.en_US.sql` — never mix them.
+It runs `01-init-database.sql` (creates the `mapserver-manager` database and enables **only** the `postgis` extension), then `system.sql` (system tables) and `map.sql` (map/data tables), in that order. The database name is `mapserver-manager` and the port is **5432**. Pick one language baseline: `system.sql`+`map.sql` or `system.en_US.sql`+`map.en_US.sql` — never mix them.
 
 Verify: `psql -U postgres -p 5432 -d "mapserver-manager" -c "SELECT count(*) FROM sys_user;"` returns a non-zero count.
 

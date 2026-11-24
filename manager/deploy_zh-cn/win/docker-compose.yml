@@ -26,7 +26,7 @@ services:
       POSTGRES_USER: ${POSTGRES_USER:-postgres}
       POSTGRES_PASSWORD: ${MAPSERVER_DB_PASSWORD:-123456}
     ports:
-      - "${MAPSERVER_DB_PORT:-5434}:5432"
+      - "${MAPSERVER_DB_PORT:-5432}:5432"
     volumes:
       - pgdata:/var/lib/postgresql/data
       # 受控建表：dbinit/00-init.sql 依序执行 /sql 下 system.sql → map.sql。

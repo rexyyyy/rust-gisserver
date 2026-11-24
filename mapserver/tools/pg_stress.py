@@ -27,7 +27,7 @@ import psycopg2
 
 OPENER = urllib.request.build_opener(urllib.request.ProxyHandler({}))
 
-PG_DSN = "dbname=gis user=postgres password=123456 host=localhost port=5434"
+PG_DSN = "dbname=gis user=postgres password=123456 host=localhost port=5432"
 BASE = "http://127.0.0.1:8081"
 ROOT = os.path.join(os.path.dirname(__file__), "..", ".tmp-stress")
 CFG_DIR = os.path.join(ROOT, "config")
@@ -124,7 +124,7 @@ name: stress_100k
 title: 100k stress table
 source:
   type: postgis
-  dsn: postgres://postgres:123456@localhost:5434/gis
+  dsn: postgres://postgres:123456@localhost:5432/gis
   table: {TABLE}
   srid: 4543
   geometry_column: geom

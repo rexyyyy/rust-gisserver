@@ -9,7 +9,7 @@
 --          服务引擎管理 —— 已发布出去的服务的运维面。
 --       「数据服务」排在「地图服务」之前：先管数据源，再管已发布服务。
 -- 依赖：需先执行 system.sql（建好 sys_menu / sys_role_menu 等系统表）
--- 用法：psql -h localhost -p 5434 -U postgres -d mapserver-manager -f map.sql
+-- 用法：psql -h localhost -p 5432 -U postgres -d mapserver-manager -f map.sql
 -- ---------------------------------------------------------------------
 -- 内容：
 --   §0  顶级菜单 ID 归一（老库迁移；与 system.sql §0 同一块，可重复执行）

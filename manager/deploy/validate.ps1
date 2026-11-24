@@ -5,7 +5,7 @@
 # Any FAIL -> exit code 1 (consumed by start.ps1 / CI).
 #
 # Usage:
-#   pwsh -File validate.ps1                              # default: local 8080/6180/5434
+#   pwsh -File validate.ps1                              # default: local 8080/6180/5432
 #   pwsh -File validate.ps1 -Dir ..\deploy_zh-cn\win -CheckDataRoot   # verify that platform dir's gisdata
 #   pwsh -File validate.ps1 -AdminToken 'xxx'             # when map-api has admin.token configured
 # Linux hosts use validate.sh (same checks, bash + curl).
@@ -14,7 +14,7 @@ param(
     [string]$MapApiBase = 'http://localhost:8080',
     [string]$ManagerBase = 'http://localhost:6180',
     [string]$DbHost = 'localhost',
-    [int]$DbPort = 5434,
+    [int]$DbPort = 5432,
     [string]$AdminToken = '',
     [string]$Dir = '',
     [switch]$CheckDataRoot

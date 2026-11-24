@@ -88,7 +88,7 @@ fi
 # 自检
 if [[ "$SKIP_VALIDATE" -eq 0 ]]; then
     bash "$SCRIPT_DIR/validate.sh" \
-        --db-port "${MAPSERVER_DB_PORT:-5434}" \
+        --db-port "${MAPSERVER_DB_PORT:-5432}" \
         --dir "$COMPOSE_DIR" \
         --check-data-root
 fi

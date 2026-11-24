@@ -12,7 +12,7 @@
 -- exceed varchar(n) are widened first (upper bound only, no data rewrite).
 --
 -- Execute as ONE transaction (the -1 flag wraps the file in a transaction):
---   psql -h localhost -p 5434 -U postgres -d mapserver-manager -v ON_ERROR_STOP=1 -1 -f switch_to_zh_CN.sql
+--   psql -h localhost -p 5432 -U postgres -d mapserver-manager -v ON_ERROR_STOP=1 -1 -f switch_to_zh_CN.sql
 --
 -- Rollback: run switch_to_en_US.sql the same way.
 -- Source rows: 284 | UPDATE: 177 | COMMENT ON: 230 | widened: 0

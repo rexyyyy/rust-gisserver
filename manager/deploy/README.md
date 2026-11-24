@@ -34,7 +34,7 @@ pwsh -File ..\deploy\start.ps1 -Dir ..\deploy_en
 
 - 两个语言目录是**独立 compose 项目**（pgdata / 缓存卷互不共享）：切换语言 = 另一
   目录直接 `up`，不需要 `down -v`，数据互不覆盖。
-- 端口（6180 / 8080 / MAPSERVER_DB_PORT 默认 15434）两套相同，**不能同时运行**。
+- 端口（6180 / 8080 / MAPSERVER_DB_PORT 默认 15432）两套相同，**不能同时运行**。
 - DB 种子语言只在**首次建库**时写入；运行期接口 msg 由 manager 后端按请求头
   `X-Language` 动态 zh→en，与库种子无关。英文库上中文请求的 DB 文本（菜单/字典）
   会显示英文（中间件无 en→zh 路径），故英文目录面向纯英语环境。
@@ -44,7 +44,7 @@ pwsh -File ..\deploy\start.ps1 -Dir ..\deploy_en
 
 | 服务      | 镜像 / 构建                          | 宿主端口 | 说明                        |
 |-----------|--------------------------------------|----------|-----------------------------|
-| postgis   | `postgis/postgis:16-3.4`             | MAPSERVER_DB_PORT→5432 | 单库 `mapserver-manager`（默认 5434，宿主被占时在语言目录 .env 改） |
+| postgis   | `postgis/postgis:16-3.4`             | MAPSERVER_DB_PORT→5432 | 单库 `mapserver-manager`（默认 5432，宿主被占时在语言目录 .env 改） |
 | map-api   | 仓库根上下文 + `mapserver/Dockerfile` | 8080     | WMS/WMTS/WFS/MVT/COG/PMTiles… |
 | manager   | `..`（manager/，backend + ui）        | 6180     | 管理平面 + 前端静态资源     |
 
@@ -57,7 +57,7 @@ pwsh -File ..\deploy\start.ps1 -Dir ..\deploy_en
 | `MANAGER_JWT_SECRET`    | （必填）    | JWT 签名密钥，compose `:?` 强校验，未设置拒绝启动                    |
 | `POSTGRES_USER`         | `postgres`  | PG 超级用户名；注入 DB 初始化与两服务 DSN（envsubst 渲染 config 模板）|
 | `MAPSERVER_DB_PASSWORD` | `123456`    | PG 口令（默认 = 本机开发口径；共享环境务必改强口令）                 |
-| `MAPSERVER_DB_PORT`     | `5434`      | PostGIS 暴露到宿主机的端口                                           |
+| `MAPSERVER_DB_PORT`     | `5432`      | PostGIS 暴露到宿主机的端口                                           |
 | `GISDATA_DIR`           | `./gisdata` | gisdata 挂载点（宿主目录）：**只挂到 map-api** 的 `/app/data`（只读）；manager 不挂数据卷，所有数据操作经 map-api 接口执行。默认工作区 ws1 的 `data_root` 即此目录；Windows 外置盘路径请用正斜杠（如 `X:/gisdata`）|
 
 ## 密钥去哪了（P0-3）

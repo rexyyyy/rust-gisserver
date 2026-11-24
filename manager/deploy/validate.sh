@@ -7,7 +7,7 @@
 #
 # Usage:
 #   bash deploy/validate.sh --dir deploy_zh-cn/linux --check-data-root
-#   bash deploy/validate.sh --map-api-base http://host:8080 --db-port 5434
+#   bash deploy/validate.sh --map-api-base http://host:8080 --db-port 5432
 #   bash deploy/validate.sh --admin-token 'xxx'
 # ============================================================================
 set -uo pipefail
@@ -17,7 +17,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 MAP_API_BASE='http://localhost:8080'
 MANAGER_BASE='http://localhost:6180'
 DB_HOST='localhost'
-DB_PORT=5434
+DB_PORT=5432
 ADMIN_TOKEN=''
 DIR_ARG=''
 CHECK_DATA_ROOT=0

@@ -85,7 +85,7 @@
   <!-- admin 的 token 属性是管理面主令牌（X-Admin-Token）；配置后，主令牌或
        共享库 sys_api_key 中启用且未过期的 admin key 均被认可。rust-gisserver 的
        「API Key 管理 → 应用到引擎」会把生成的 admin key 写入默认引擎。 -->
-  <admin dsn="postgresql://postgres:${MAPSERVER_DB_PASSWORD}@${MAPSERVER_DB_HOST:-localhost}:${MAPSERVER_DB_PORT:-5434}/mapserver-manager"/>
+  <admin dsn="postgresql://postgres:${MAPSERVER_DB_PASSWORD}@${MAPSERVER_DB_HOST:-localhost}:${MAPSERVER_DB_PORT:-5432}/mapserver-manager"/>
   <!-- PMTiles 独立归档：name -> 绝对路径，暴露为 /pmtiles/{name}（Range 读取）。
        与同名 pmtiles 图层二选一；此处用归档映射，无需 config/pmtiles/*.xml。 -->
   <archives>

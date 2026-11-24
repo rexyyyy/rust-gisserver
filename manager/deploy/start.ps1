@@ -55,7 +55,7 @@ if (-not $healthy) { Write-Warning 'PostGIS 未在 3 分钟内转 healthy，继�
 
 # Self-check
 if (-not $SkipValidate) {
-    $dbPort = if ($env:MAPSERVER_DB_PORT) { [int]$env:MAPSERVER_DB_PORT } else { 5434 }
+    $dbPort = if ($env:MAPSERVER_DB_PORT) { [int]$env:MAPSERVER_DB_PORT } else { 5432 }
     & (Join-Path $PSScriptRoot 'validate.ps1') -DbPort $dbPort -Dir $Dir -CheckDataRoot
 }
 

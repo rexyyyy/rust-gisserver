@@ -23,7 +23,7 @@ use serde::{Deserialize, Serialize};
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
 pub struct PgSourceDef {
     /// Connection string, e.g.
-    /// `postgres://postgres:123456@localhost:5434/gis`.
+    /// `postgres://postgres:123456@localhost:5432/gis`.
     pub dsn: String,
     /// Table schema (default `public`).
     #[serde(default = "default_public")]

@@ -29,7 +29,7 @@ services:
       POSTGRES_USER: ${POSTGRES_USER:-postgres}
       POSTGRES_PASSWORD: ${MAPSERVER_DB_PASSWORD:-123456}
     ports:
-      - "${MAPSERVER_DB_PORT:-5434}:5432"
+      - "${MAPSERVER_DB_PORT:-5432}:5432"
     volumes:
       - pgdata:/var/lib/postgresql/data
       - ../../backend/sql:/sql:ro

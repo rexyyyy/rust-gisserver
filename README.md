@@ -170,7 +170,7 @@ MBTiles 同时支持 PNG/JPEG/WebP 栅格与 gzip pbf 矢量包，TMS 行号自�
 | `manager/deploy_zh-cn/linux/` | `gis-data-base-zh-linux` | `system.sql` → `map.sql` |
 | `manager/deploy_en/linux/`    | `gis-data-base-en-linux` | `.en_US` 版种子             |
 
-两个项目端口相同（6180 / 8080 / `MAPSERVER_DB_PORT` 默认 5434），**不能同时运行**；卷按项目名隔离，切换语言不需要 `down -v`。
+两个项目端口相同（6180 / 8080 / `MAPSERVER_DB_PORT` 默认 5432），**不能同时运行**；卷按项目名隔离，切换语言不需要 `down -v`。
 
 ```bash
 cd manager/deploy_zh-cn/linux          # 英文环境：cd ../../deploy_en/linux 或 manager/deploy_en/linux
@@ -215,9 +215,9 @@ cd ../../..
 初始化 PostgreSQL 16 + PostGIS（库名带连字符，需双引号）：
 
 ```bash
-psql -h localhost -p 5434 -U postgres -c 'CREATE DATABASE "mapserver-manager"'
-psql -h localhost -p 5434 -U postgres -d mapserver-manager -f manager/backend/sql/system.sql
-psql -h localhost -p 5434 -U postgres -d mapserver-manager -f manager/backend/sql/map.sql
+psql -h localhost -p 5432 -U postgres -c 'CREATE DATABASE "mapserver-manager"'
+psql -h localhost -p 5432 -U postgres -d mapserver-manager -f manager/backend/sql/system.sql
+psql -h localhost -p 5432 -U postgres -d mapserver-manager -f manager/backend/sql/map.sql
 # 英文基线：改用 system.en_US.sql / map.en_US.sql，二选一，不要两套都跑
 ```
 
@@ -250,7 +250,7 @@ export PROJ_DATA=/usr/share/proj
 2. 安装 **PostGIS 3.5**，必须装到与 PostgreSQL **完全相同的目录**，否则 `CREATE EXTENSION postgis` 会失败。
 3. 确认 Windows 服务 `postgresql-x64-16` 正在运行。
 
-完整步骤见随安装包附带的中英文说明 `01-PostgreSQL-PostGIS-zh-CN.pdf` / `02-PostgreSQL-PostGIS-en.pdf`。
+快速安装见随安装包附带的 [`installscript/安装速查.md`](installscript/安装速查.md)（一页纸，口径权威）；四份中英文安装手册 `installscript/0*.pdf` 已与速查对齐（源文件 `0*.md`，改后运行 `python installscript/gen_manuals.py` 重出）。只需装 `postgis` 一个扩展，不需要 topology / sfcgal / tiger_geocoder / fuzzystrmatch。
 
 ### 1) 构建与安装
 

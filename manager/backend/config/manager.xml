@@ -6,7 +6,7 @@
   =============================================================================
   Secret keys / passwords (MANAGER_DB_PASSWORD, MANAGER_JWT_SECRET) are injected
   through environment variables, never stored in plaintext in this file.
-  host/port fall back to non-sensitive defaults (localhost:5434 / 127.0.0.1:8080).
+  host/port fall back to non-sensitive defaults (localhost:5432 / 127.0.0.1:8080).
   Set these two env vars before a local run; in containers they are auto-injected
   by the deploy compose file.
 -->
@@ -18,7 +18,7 @@
       <item>http://127.0.0.1:5100</item>
     </cors_origins>
   </server>
-  <database url="postgresql://postgres:${MANAGER_DB_PASSWORD}@${MANAGER_DB_HOST:-localhost}:${MANAGER_DB_PORT:-5434}/mapserver-manager" pool_max="16"/>
+  <database url="postgresql://postgres:${MANAGER_DB_PASSWORD}@${MANAGER_DB_HOST:-localhost}:${MANAGER_DB_PORT:-5432}/mapserver-manager" pool_max="16"/>
   <!-- Avatar local storage root. Relative paths resolve against the backend
        process working directory. For production prefer an absolute path
        (e.g. /var/lib/rust-gisserver/avatar) to ease mounting a data disk. -->

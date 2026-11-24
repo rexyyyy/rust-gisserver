@@ -3,7 +3,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[2]
 out = []
 try:
-    conn = psycopg2.connect("postgres://postgres:123456@localhost:5434/gis")
+    conn = psycopg2.connect("postgres://postgres:123456@localhost:5432/gis")
     conn.autocommit = True
     cur = conn.cursor()
     cur.execute("SELECT to_regclass('public.v_wuhua_tall')")

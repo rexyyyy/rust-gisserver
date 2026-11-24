@@ -113,8 +113,8 @@ notepad .env
 | **必需** | `MANAGER_DB_PASSWORD` | `config/manager/manager.xml` 的 `<database url>` | DSN 口令为空，manager 连不上库 |
 | **必需** | `MANAGER_JWT_SECRET` | 同上 `<security jwt_secret>` | 签名密钥为空串，登录态不可用 |
 | **必需** | `MAPSERVER_DB_PASSWORD` | `config/mapserver.xml` 的 `<admin dsn>` | `/admin/*` 管理面连库失败 |
-| 可选 | `MANAGER_DB_HOST` / `MANAGER_DB_PORT` | manager DSN | 默认 `localhost` / `5434` |
-| 可选 | `MAPSERVER_DB_HOST` / `MAPSERVER_DB_PORT` | map-api admin DSN | 默认 `localhost` / `5434` |
+| 可选 | `MANAGER_DB_HOST` / `MANAGER_DB_PORT` | manager DSN | 默认 `localhost` / `5432` |
+| 可选 | `MAPSERVER_DB_HOST` / `MAPSERVER_DB_PORT` | map-api admin DSN | 默认 `localhost` / `5432` |
 | 可选 | `MAPSRV_HOST` / `MAPSRV_PORT` | manager 反代 map-api | 默认 `127.0.0.1` / `8080` |
 | 可选 | `MAPSERVER_MANAGER_URL` | map-api 回连 manager（跨机部署） | 默认 `http://127.0.0.1:6180` |
 | 可选 | `GIS_ENCODING_REGION` / `GIS_ENCODING_LOCALE` | `gisserver::encoding` | 默认 `zh-CN` |

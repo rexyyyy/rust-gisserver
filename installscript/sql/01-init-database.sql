@@ -1,33 +1,29 @@
 ﻿-- ====================================================================
---  rust-gisserver 数据库初始化脚本（第 1 步）
---  目标：创建 mapserver-manager 数据库 + 启用 PostGIS 扩展
---  用法：psql -U postgres -p <端口> -f init_db.sql
+--  rust-gisserver database bootstrap - step 1 (Windows-safe)
+--  Usage: psql -U postgres -p 5432 -f 01-init-database.sql
+--  Password can be supplied via PGPASSWORD to avoid interactive prompts.
 -- ====================================================================
 
--- 1. 创建数据库（如果不存在）
--- 注意：CREATE DATABASE 不能在事务块内执行，psql 默认 autocommit 所以没事
-SELECT 'CREATE DATABASE "mapserver-manager" ENCODING ''UTF8'' LC_COLLATE ''en_US.UTF-8'' LC_CTYPE ''en_US.UTF-8'' TEMPLATE template0'
+-- 1. Create database.
+--    Windows PostgreSQL does not recognize POSIX locales such as 'en_US.UTF-8';
+--    specifying LC_COLLATE/LC_CTYPE that way fails with "locale does not exist".
+--    TEMPLATE template0 + ENCODING 'UTF8' inherits the server's install-time
+--    locale while guaranteeing UTF-8 storage, and works on every platform.
+SELECT 'CREATE DATABASE "mapserver-manager" ENCODING ''UTF8'' TEMPLATE template0'
 WHERE NOT EXISTS (SELECT FROM pg_database WHERE datname = 'mapserver-manager')
 \gexec
 
--- 2. 切到新库
+-- 2. Connect to the new database.
 \connect "mapserver-manager"
 
--- 3. 启用 PostGIS 扩展（在新库里执行）
+-- 3. Enable PostGIS.
+--    Only core PostGIS is used by the code base: ST_Transform, ST_AsMVTGeom,
+--    ST_TileEnvelope, ST_Intersects, geometry_columns, and friends.
+--    postgis_topology / postgis_sfcgal / postgis_tiger_geocoder /
+--    fuzzystrmatch are NOT used and are a frequent cause of install failures
+--    (tiger_geocoder in particular requires a superuser).
 CREATE EXTENSION IF NOT EXISTS postgis;
-CREATE EXTENSION IF NOT EXISTS postgis_topology;
-CREATE EXTENSION IF NOT EXISTS fuzzystrmatch;
-CREATE EXTENSION IF NOT EXISTS postgis_tiger_geocoder;
 
--- 4. 验证
-SELECT
-  current_database() AS "当前数据库",
-  extname || ' ' || extversion AS "已启用扩展"
-FROM pg_extension
-ORDER BY extname;
-
--- ====================================================================
---  接下来：依次执行 system.sql 和 map.sql
--- ====================================================================
--- psql -U postgres -p <端口> -d "mapserver-manager" -f system.sql
--- psql -U postgres -p <端口> -d "mapserver-manager" -f map.sql
+-- 4. Verify: expect one row with a version such as 3.5.2.
+SELECT extname, extversion FROM pg_extension WHERE extname = 'postgis';
+SELECT postgis_full_version();

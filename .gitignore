@@ -50,10 +50,10 @@ installscript/数据库/
 # Local PostGIS layer configs may contain plaintext DSN credentials
 /mapserver/config/postgis/
 
-# installscript: keep only numbered PDFs and install.nsi; drop duplicated sources/docs
+# installscript: keep numbered PDFs + their markdown sources + install.nsi.
+# Markdown sources are authoritative (run gen_manuals.py to rebuild PDFs).
 /installscript/package.json
 /installscript/package-lock.json
-/installscript/*.md
 /installscript/*.html
 /installscript/*.mjs
 /installscript/installation-docs.pdf

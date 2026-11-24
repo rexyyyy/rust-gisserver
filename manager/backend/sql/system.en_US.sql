@@ -4,7 +4,7 @@
 -- Purpose: rust-gisserver manager (Axum + PostgreSQL) baseline - create all tables and seed
 --       System Administration / System Monitor menus, roles, users, dicts, configs.
 -- Depends: none (runs standalone)
--- Usage: psql -h localhost -p 5434 -U postgres -d mapserver-manager -f system.sql
+-- Usage: psql -h localhost -p 5432 -U postgres -d mapserver-manager -f system.sql
 -- ---------------------------------------------------------------------
 -- Contents:
 --   §1 DDL: sys_dept / sys_user / sys_post / sys_role / sys_menu /

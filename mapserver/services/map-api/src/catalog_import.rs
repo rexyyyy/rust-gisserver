@@ -10,7 +10,7 @@
 //!
 //! ```text
 //! map-api catalog-import --config config/mapserver.xml \
-//!     --dsn "postgres://postgres:123456@localhost:5434/mapserver-manager" \
+//!     --dsn "postgres://postgres:123456@localhost:5432/mapserver-manager" \
 //!     --workspace mapserver [--dry-run]
 //! ```
 //!

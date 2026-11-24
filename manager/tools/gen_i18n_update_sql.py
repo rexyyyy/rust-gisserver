@@ -270,7 +270,7 @@ HEADER = """-- =================================================================
 -- exceed varchar(n) are widened first (upper bound only, no data rewrite).
 --
 -- Execute as ONE transaction (the -1 flag wraps the file in a transaction):
---   psql -h localhost -p 5434 -U postgres -d mapserver-manager -v ON_ERROR_STOP=1 -1 -f {filename}
+--   psql -h localhost -p 5432 -U postgres -d mapserver-manager -v ON_ERROR_STOP=1 -1 -f {filename}
 --
 -- Rollback: run {rollback} the same way.
 -- Source rows: {n_rows} | UPDATE: {n_updates} | COMMENT ON: {n_comments} | widened: {n_alters}

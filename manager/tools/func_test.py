@@ -2,7 +2,7 @@
 
 与 rust-gisserver/tools/capability_probe.py（自建最小 catalog、验路由语义）不同，
 本脚本直接打 rust-gisserver 仓库 config/ 下的真实图层目录（数据源 E:\\data\\1 +
-PostGIS :5434 的 gis 库），并按 rust-gisserver 的实际管理链路做接口级走查：
+PostGIS :5432 的 gis 库），并按 rust-gisserver 的实际管理链路做接口级走查：
 
   map-api :8080   数据面：WMS / WMTS / XYZ / OGC API Features / OGC API Tiles /
                   MVT（vector + PostGIS 双坐标接口）/ PMTiles / MBTiles /

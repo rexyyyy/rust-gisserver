@@ -36,11 +36,11 @@ manager/
 
 ```bash
 # 建库（库名含连字符，SQL 标识符必须加双引号；外层改用单引号包裹）
-psql -h localhost -p 5434 -U postgres -c 'CREATE DATABASE "mapserver-manager"'
+psql -h localhost -p 5432 -U postgres -c 'CREATE DATABASE "mapserver-manager"'
 
 # 建表 + 初始化数据（两个文件都要跑；顺序不敏感，均可重复执行）
-psql -h localhost -p 5434 -U postgres -d mapserver-manager -f manager/backend/sql/system.sql
-psql -h localhost -p 5434 -U postgres -d mapserver-manager -f manager/backend/sql/map.sql
+psql -h localhost -p 5432 -U postgres -d mapserver-manager -f manager/backend/sql/system.sql
+psql -h localhost -p 5432 -U postgres -d mapserver-manager -f manager/backend/sql/map.sql
 ```
 
 两个脚本都是**全量幂等**的：建表 `create ... if not exists`、索引 `create index if not exists`、
@@ -60,8 +60,8 @@ psql -h localhost -p 5434 -U postgres -d mapserver-manager -f manager/backend/sq
 
 ```bash
 # 英文版（替代上面两条中文命令，不要两套都跑）
-psql -h localhost -p 5434 -U postgres -d mapserver-manager -f manager/backend/sql/system.en_US.sql
-psql -h localhost -p 5434 -U postgres -d mapserver-manager -f manager/backend/sql/map.en_US.sql
+psql -h localhost -p 5432 -U postgres -d mapserver-manager -f manager/backend/sql/system.en_US.sql
+psql -h localhost -p 5432 -U postgres -d mapserver-manager -f manager/backend/sql/map.en_US.sql
 ```
 
 新增中文种子词条后需同步补 `i18n_terms.json` 并重新生成，禁止手工编辑生成物：
@@ -82,10 +82,10 @@ python manager/tools/gen_i18n_update_sql.py
 python manager/tools/gen_i18n_update_sql.py --check
 
 # 单事务执行（-1 保证出错整体回滚）
-psql -h localhost -p 5434 -U postgres -d mapserver-manager -v ON_ERROR_STOP=1 -1 -f manager/backend/sql/switch_to_en_US.sql
+psql -h localhost -p 5432 -U postgres -d mapserver-manager -v ON_ERROR_STOP=1 -1 -f manager/backend/sql/switch_to_en_US.sql
 
 # 回滚到中文
-psql -h localhost -p 5434 -U postgres -d mapserver-manager -v ON_ERROR_STOP=1 -1 -f manager/backend/sql/switch_to_zh_CN.sql
+psql -h localhost -p 5432 -U postgres -d mapserver-manager -v ON_ERROR_STOP=1 -1 -f manager/backend/sql/switch_to_zh_CN.sql
 ```
 
 补丁按主键配对中英文基线中相同的种子行，只更新有差异的文本列（菜单名、字典项、公告、
